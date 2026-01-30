@@ -159,31 +159,8 @@ struct ArgusSanctumView: View {
             }
             .zIndex(90)
 
-            // 7. ARGUS ANALYST FAB (Quick Access)
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    if selectedModule == nil && selectedBistModule == nil {
-                        Button(action: { showAnalystReportSheet = true }) {
-                            ZStack {
-                                Circle()
-                                    .fill(Theme.tint)
-                                    .frame(width: 56, height: 56)
-                                    .shadow(color: Theme.tint.opacity(0.4), radius: 10, x: 0, y: 5)
-                                
-                                Image(systemName: "doc.text.magnifyingglass")
-                                    .font(.system(size: 24))
-                                    .foregroundColor(.white)
-                            }
-                        }
-                        .padding(.trailing, 24)
-                        .padding(.bottom, 100) // Align with Trade Panel or slightly above
-                        .transition(.scale.combined(with: .opacity))
-                    }
-                }
-            }
-            .zIndex(95) // Above Trade Panel (90), Below HoloPanel (100)
+            // FAB REMOVED
+
         }
         .navigationBarHidden(true)
         .sheet(isPresented: $showTradeSheet) {
@@ -243,9 +220,25 @@ struct ArgusSanctumView: View {
                     Image(systemName: "binoculars.fill")
                         .font(.system(size: 18))
                         .foregroundColor(SanctumTheme.titanGold)
-                        .padding(10)
-                        .background(Color.black.opacity(0.3))
                         .cornerRadius(8)
+                }
+                
+                // NEW: Argus Analysis Button (Top Right)
+                Button(action: { showAnalystReportSheet = true }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles.rectangle.stack")
+                            .font(.system(size: 16))
+                        Text("ANALİZ")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    }
+                    .foregroundColor(Theme.accent) // Cyan/Blue
+                    .padding(8)
+                    .background(Color.black.opacity(0.3))
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Theme.accent.opacity(0.3), lineWidth: 1)
+                    )
                 }
             }
             .padding(.top, 40)
