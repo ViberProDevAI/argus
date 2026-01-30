@@ -28,6 +28,7 @@ struct ArgusSanctumView: View {
     @State private var showArgusLabSheet = false
     @State private var showObservatorySheet = false
     @State private var showAlkindusSheet = false
+    @State private var showAnalystReportSheet = false // NEW: Quick Access to AI Report
     
     // Legacy type alias for internal references
     typealias ModuleType = SanctumModuleType
@@ -157,6 +158,32 @@ struct ArgusSanctumView: View {
                 }
             }
             .zIndex(90)
+
+            // 7. ARGUS ANALYST FAB (Quick Access)
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    if selectedModule == nil && selectedBistModule == nil {
+                        Button(action: { showAnalystReportSheet = true }) {
+                            ZStack {
+                                Circle()
+                                    .fill(Theme.tint)
+                                    .frame(width: 56, height: 56)
+                                    .shadow(color: Theme.tint.opacity(0.4), radius: 10, x: 0, y: 5)
+                                
+                                Image(systemName: "doc.text.magnifyingglass")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .padding(.trailing, 24)
+                        .padding(.bottom, 100) // Align with Trade Panel or slightly above
+                        .transition(.scale.combined(with: .opacity))
+                    }
+                }
+            }
+            .zIndex(95) // Above Trade Panel (90), Below HoloPanel (100)
         }
         .navigationBarHidden(true)
         .sheet(isPresented: $showTradeSheet) {
@@ -172,6 +199,9 @@ struct ArgusSanctumView: View {
         .sheet(isPresented: $showArgusLabSheet) { argusLabSheetContent }
         .sheet(isPresented: $showObservatorySheet) { observatorySheetContent }
         .sheet(isPresented: $showAlkindusSheet) { alkindusSheetContent }
+        .sheet(isPresented: $showAnalystReportSheet) {
+            ArgusAnalystReportView(symbol: symbol, viewModel: viewModel)
+        }
         .task {
             // Ensure data is loaded when view appears
             if vm.quote == nil {
