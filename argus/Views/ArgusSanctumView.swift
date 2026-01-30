@@ -541,6 +541,7 @@ struct HoloPanelView: View {
                     // NEW: Technical Consensus Dashboard
                     if let consensus = orion.signalBreakdown {
                         TechnicalConsensusView(breakdown: consensus)
+                            .padding(.bottom, 20) // Added padding to separate from graph
                     }
                     
                     OrionDetailView(
@@ -562,17 +563,6 @@ struct HoloPanelView: View {
                     } else {
                         OrionMotherboardErrorView(symbol: symbol)
                     }
-                }
-                
-                // NEW: Prometheus - 5 Day Forecast (Shared across versions)
-                if !vm.candles.isEmpty, vm.candles.count >= 30, vm.orionAnalysis == nil {
-                    // Only show simpler components if not in Motherboard mode (Motherboard is immersive)
-                    // Or keep it as "Forward Look" below the board?
-                    // Let's keep it below for now.
-                    ForecastCard(
-                        symbol: symbol,
-                        historicalPrices: vm.candles.map { $0.close }
-                    )
                 }
                 
                 // NEW: Multi-Timeframe Strategy Button
@@ -597,7 +587,17 @@ struct HoloPanelView: View {
                     )
                 }
                 .padding(.horizontal)
+
+                // NEW: Prometheus - 5 Day Forecast (Moved to Bottom)
+                if !vm.candles.isEmpty, vm.candles.count >= 30, vm.orionAnalysis == nil {
+                    ForecastCard(
+                        symbol: symbol,
+                        historicalPrices: vm.candles.map { $0.close }
+                    )
+                    .padding(.top, 16) // Spacing from strategy button
+                }
             }
+
             .sheet(isPresented: $showStrategySheet) {
                 NavigationView {
                     StrategyDashboardView(viewModel: viewModel)
