@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SplashScreenView: View {
-    @Binding var isAppReady: Bool // Controls app launch state
+    var onFinished: () -> Void // Controls app launch state
     
     // Animation States
     @State private var eyeOpacity: Double = 0.0
@@ -86,7 +86,7 @@ struct SplashScreenView: View {
             
             // Handover
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                isAppReady = true
+                onFinished()
             }
         }
     }

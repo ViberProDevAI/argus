@@ -74,7 +74,7 @@ struct argusApp: App {
         WindowGroup {
             Group {
                 if showIntro {
-                    ArgusIntroView {
+                    SplashScreenView {
                         withAnimation {
                             showIntro = false
                         }
