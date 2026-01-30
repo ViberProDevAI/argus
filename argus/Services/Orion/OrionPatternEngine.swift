@@ -45,15 +45,17 @@ struct OrionChartPattern: Identifiable, Codable {
     let targetPrice: Double?
     let detectedAt: Date
     let description: String
+    let points: [OrionPatternEngine.SwingPoint]
     
     // Explicit init to support default UUID
-    init(id: UUID = UUID(), type: OrionChartPatternType, confidence: Double, targetPrice: Double?, detectedAt: Date, description: String) {
+    init(id: UUID = UUID(), type: OrionChartPatternType, confidence: Double, targetPrice: Double?, detectedAt: Date, description: String, points: [OrionPatternEngine.SwingPoint] = []) {
         self.id = id
         self.type = type
         self.confidence = confidence
         self.targetPrice = targetPrice
         self.detectedAt = detectedAt
         self.description = description
+        self.points = points
     }
 }
 
@@ -65,7 +67,7 @@ final class OrionPatternEngine {
     private init() {}
     
     // ZigZag Point Structure
-    private struct SwingPoint {
+    public struct SwingPoint: Codable {
         let index: Int
         let price: Double
         let isHigh: Bool
@@ -192,7 +194,8 @@ final class OrionPatternEngine {
                     confidence: 75,
                     targetPrice: target,
                     detectedAt: Date(),
-                    description: "İkili Tepe Formasyonu: \(String(format: "%.2f", valley.price)) kırılırsa hedef \(String(format: "%.2f", target))"
+                    description: "İkili Tepe Formasyonu: \(String(format: "%.2f", valley.price)) kırılırsa hedef \(String(format: "%.2f", target))",
+                    points: [peek1, valley, peek2]
                 )
             }
         }
@@ -220,7 +223,8 @@ final class OrionPatternEngine {
                     confidence: 75,
                     targetPrice: target,
                     detectedAt: Date(),
-                    description: "İkili Dip (W) Formasyonu: \(String(format: "%.2f", peak.price)) aşılırsa hedef \(String(format: "%.2f", target))"
+                    description: "İkili Dip (W) Formasyonu: \(String(format: "%.2f", peak.price)) aşılırsa hedef \(String(format: "%.2f", target))",
+                    points: [dip1, peak, dip2]
                 )
             }
         }
@@ -258,7 +262,8 @@ final class OrionPatternEngine {
                         confidence: 85,
                         targetPrice: target,
                         detectedAt: Date(),
-                        description: "OBO (Omuz Baş Omuz): \(String(format: "%.2f", neckline)) altı kapanışta hedef \(String(format: "%.2f", target))"
+                        description: "OBO (Omuz Baş Omuz): \(String(format: "%.2f", neckline)) altı kapanışta hedef \(String(format: "%.2f", target))",
+                        points: [left, valley1, head, valley2, right]
                     )
                 }
             }

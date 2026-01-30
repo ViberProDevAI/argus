@@ -229,9 +229,14 @@ struct OrionDetailView: View {
                                         .lineLimit(1)
                                     
                                     if let candles = candles, !candles.isEmpty {
-                                        // Simple Sparkline
-                                        Sparkline(data: candles.suffix(10).map { $0.close }, color: .pink)
-                                            .frame(height: 20)
+                                        if let patterns = patterns, let firstPattern = patterns.first {
+                                            OrionPatternGraphView(pattern: firstPattern, candles: candles)
+                                                .frame(height: 60)
+                                        } else {
+                                            // Fallback Sparkline
+                                            Sparkline(data: candles.suffix(20).map { $0.close }, color: .pink)
+                                                .frame(height: 30)
+                                        }
                                     }
                                 }
                             }

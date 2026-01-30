@@ -254,7 +254,7 @@ struct ArgusSanctumView: View {
     private var centerCoreArea: some View {
         ZStack {
             // The Dial
-            CenterCoreView(symbol: symbol, viewModel: viewModel, showDecision: $showDecision)
+            CenterCoreView(symbol: symbol, viewModel: viewModel, showDecision: $showDebateSheet)
             
             // Orbiting Satellites (Modules)
             // BIST vs Global Separation
@@ -534,7 +534,7 @@ struct HoloPanelView: View {
                         symbol: symbol,
                         orion: orion,
                         candles: vm.candles,
-                        patterns: [] // vm.patterns to be added
+                        patterns: viewModel.patterns[symbol] ?? []
                     )
                 } else {
                     if vm.isLoading {

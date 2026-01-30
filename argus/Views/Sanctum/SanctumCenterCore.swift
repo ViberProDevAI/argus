@@ -103,14 +103,15 @@ struct CenterCoreView: View {
                     Circle().stroke(Color.white.opacity(0.1), lineWidth: 1)
                 )
                 .onTapGesture {
-                    withAnimation(.spring()) {
-                        focusedModuleName = nil
+                    if focusedModuleName != nil {
+                        withAnimation(.spring()) {
+                            focusedModuleName = nil
+                        }
+                        impactFeedback.impactOccurred(intensity: 0.5)
+                    } else {
+                        showDecision = true
+                        impactFeedback.impactOccurred(intensity: 0.7)
                     }
-                    impactFeedback.impactOccurred(intensity: 0.7)
-                }
-                .onLongPressGesture(minimumDuration: 0.5) {
-                    showDecision = true
-                    impactFeedback.impactOccurred(intensity: 1.0)
                 }
             
             // LAYER 2: Text Overlays
