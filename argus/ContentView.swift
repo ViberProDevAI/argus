@@ -104,6 +104,18 @@ import SwiftUI
                 }
 
         }
+        .sheet(item: $viewModel.generatedSmartPlan) { plan in
+            if let trade = viewModel.portfolio.first(where: { $0.id == plan.tradeId }) {
+                PlanEditorSheet(
+                    trade: trade,
+                    currentPrice: viewModel.quotes[trade.symbol]?.currentPrice ?? trade.entryPrice,
+                    plan: plan
+                )
+            } else {
+                Text("Hata: Pozisyon bulunamadı")
+                    .presentationDetents([.medium])
+            }
+        }
         .sheet(isPresented: $showVoiceSheet) {
             VoiceAssistantView()
         }
