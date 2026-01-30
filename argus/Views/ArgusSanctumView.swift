@@ -76,10 +76,10 @@ struct ArgusSanctumView: View {
                         .scaleEffect(1.5)
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                 } else {
-                    VStack {
+                    VStack(spacing: 0) {
                         headerView
                         footerHelper // Pantheon modülleri - Header altında (küçük toplar)
-                        Spacer()
+                        Spacer().frame(height: 20)
                         centerCoreArea
                         Spacer()
                     }
@@ -152,7 +152,7 @@ struct ArgusSanctumView: View {
                         }
                     )
                     .padding(.horizontal, 24)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 100)
                     .transition(.move(edge: .bottom))
                 }
             }
@@ -291,7 +291,7 @@ struct ArgusSanctumView: View {
                 }
             }
         }
-        .frame(height: 300) // Constrain height to keep layout tight
+        .frame(height: 260) // Daha kompakt - yukarıda konumlanır
     }
     
     // ALKINDUS SHEET CONTENT
