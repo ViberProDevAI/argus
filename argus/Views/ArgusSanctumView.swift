@@ -79,7 +79,7 @@ struct ArgusSanctumView: View {
                     VStack(spacing: 0) {
                         headerView
                         footerHelper // Pantheon modülleri - Header altında (küçük toplar)
-                        Spacer().frame(height: 20)
+                        Spacer().frame(height: 40)
                         centerCoreArea
                         Spacer()
                     }
