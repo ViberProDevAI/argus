@@ -206,22 +206,9 @@ struct ArgusSanctumView: View {
                 }
                 Spacer()
                 
-                // Alkindus Button (Brain)
-                Button(action: { showAlkindusSheet = true }) {
-                    AlkindusAvatarView(size: 24, isThinking: false, hasIdea: false)
-                        .foregroundColor(Color(red: 0.6, green: 0.4, blue: 1.0))
-                        .padding(8)
-                        .background(Color.black.opacity(0.3))
-                        .cornerRadius(8)
-                }
+                Spacer()
                 
-                // Observatory Button
-                Button(action: { showObservatorySheet = true }) {
-                    Image(systemName: "binoculars.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(SanctumTheme.titanGold)
-                        .cornerRadius(8)
-                }
+                // ICONS REMOVED FOR CLEANER UI (User Request)
                 
                 // NEW: Argus Analysis Button (Top Right)
                 Button(action: { showAnalystReportSheet = true }) {
@@ -272,7 +259,8 @@ struct ArgusSanctumView: View {
                 }
             }
         }
-        .padding(.top, 50)
+
+        .padding(.top, 110) // Increased to clear top bar buttons
     }
     
     // 3. CENTER CORE
