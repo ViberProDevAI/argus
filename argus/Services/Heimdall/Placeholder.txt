@@ -1,0 +1,6 @@
+// This file is intended to REPLACE parts of HeimdallOrchestrator to fix the registration.
+// However, since we are building a new "Data Gateway", maybe we should put logic there?
+// The user prompt said: "3.4 ProviderCapabilityRegistry / Adapter Registry Fix ... Update planRequest".
+// So I must fix HeimdallOrchestrator directly.
+
+// Strategy: I will read HeimdallOrchestrator first to apply patches safely.

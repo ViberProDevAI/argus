@@ -65,15 +65,25 @@ struct ArgusSanctumView: View {
     var body: some View {
         ZStack {
             // 1. Background
+            Color.black.ignoresSafeArea() // Fallback to prevent white screen
             SanctumTheme.bg.ignoresSafeArea()
             
             // 2. Main Content
-            VStack {
-                headerView
-                Spacer()
-                centerCoreArea
-                Spacer()
-                footerHelper
+            // 2. Main Content
+            Group {
+                if vm.isLoading && vm.quote == nil {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                } else {
+                    VStack {
+                        headerView
+                        Spacer()
+                        centerCoreArea
+                        Spacer()
+                        footerHelper
+                    }
+                }
             }
             .blur(radius: (selectedModule != nil || selectedBistModule != nil) ? 10 : 0)
             .scaleEffect((selectedModule != nil || selectedBistModule != nil) ? 0.95 : 1.0)
@@ -162,6 +172,12 @@ struct ArgusSanctumView: View {
         .sheet(isPresented: $showArgusLabSheet) { argusLabSheetContent }
         .sheet(isPresented: $showObservatorySheet) { observatorySheetContent }
         .sheet(isPresented: $showAlkindusSheet) { alkindusSheetContent }
+        .task {
+            // Ensure data is loaded when view appears
+            if vm.quote == nil {
+                await vm.loadData()
+            }
+        }
     }
 
     // MARK: - Subviews (Computed Properties)
