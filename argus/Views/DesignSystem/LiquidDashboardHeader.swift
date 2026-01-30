@@ -29,7 +29,7 @@ struct LiquidDashboardHeader: View {
     }
     
     private var realized: Double {
-        isBist ? 0.0 : viewModel.getRealizedPnL()
+        viewModel.getRealizedPnL(market: selectedMarket)
     }
     
     private var unrealized: Double {

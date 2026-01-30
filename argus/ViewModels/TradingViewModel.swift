@@ -939,8 +939,14 @@ class TradingViewModel: ObservableObject {
         return PortfolioStore.shared.getBistUnrealizedPnL(quotes: self.quotes)
     }
     
-    func getRealizedPnL() -> Double {
-        return PortfolioStore.shared.getRealizedPnL(currency: nil) // Total
+    func getRealizedPnL(market: TradeMarket? = nil) -> Double {
+        let currency: Currency?
+        if let m = market {
+            currency = (m == .bist) ? .TRY : .USD
+        } else {
+            currency = nil
+        }
+        return PortfolioStore.shared.getRealizedPnL(currency: currency)
     }
     
     // MARK: - Discover & Helpers (Legacy)
