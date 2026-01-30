@@ -1,8 +1,8 @@
 import SwiftUI
 
 // MARK: - Pantheon Deck View
-/// Argus Sanctum'un alt kismi - Chiron, Athena ve Demeter modulleri.
-/// "Overwatch Deck" olarak da bilinir.
+/// Argus Sanctum'da Chiron, Athena ve Demeter mini modülleri.
+/// Daha küçük toplar halinde yerleştirilmiş - Tab Bar ile çakışmayı önler.
 struct PantheonDeckView: View {
     let symbol: String
     @ObservedObject var viewModel: TradingViewModel
@@ -11,44 +11,26 @@ struct PantheonDeckView: View {
     @Binding var selectedBistModule: SanctumBistModuleType?
     
     var body: some View {
-        ZStack {
-            // 0. VISUAL CONNECTORS (Lines)
-            Path { path in
-                let apex = CGPoint(x: UIScreen.main.bounds.width / 2, y: 35)
-                let leftFlank = CGPoint(x: (UIScreen.main.bounds.width / 2) - 100, y: 80)
-                let rightFlank = CGPoint(x: (UIScreen.main.bounds.width / 2) + 100, y: 80)
-                
-                path.move(to: apex); path.addLine(to: leftFlank)
-                path.move(to: apex); path.addLine(to: rightFlank)
-            }
-            .stroke(SanctumTheme.chironColor.opacity(DesignTokens.Opacity.glassCard), lineWidth: 1)
-            
-            // 1. APEX: CHIRON (Time & Risk)
-            let chironColor = SanctumTheme.chironColor
-            
-            VStack(spacing: 4) {
-                ZStack {
-                    Circle()
-                        .fill(Color(hex: "1E293B"))
-                        .frame(width: 56, height: 56)
-                        .shadow(color: chironColor.opacity(0.3), radius: 10, x: 0, y: 0)
-                    
-                    Circle()
-                        .stroke(chironColor, lineWidth: 2)
-                        .frame(width: 56, height: 56)
-                        
-                    Image(systemName: "hourglass")
-                        .font(.system(size: 20))
-                        .foregroundColor(chironColor)
+        HStack(spacing: 20) {
+            // ATHENA (Sol)
+            if !isBist {
+                MiniPantheonOrb(
+                    name: "ATHENA",
+                    icon: "brain.head.profile",
+                    color: SanctumTheme.athenaColor
+                )
+                .onTapGesture {
+                    selectedModule = .athena
                 }
-                
-                Text("CHIRON")
-                    .font(.system(size: 9, weight: .black, design: .monospaced))
-                    .foregroundColor(chironColor)
-                    .tracking(2)
             }
-            .offset(y: -20)
-            .zIndex(100)
+            
+            // CHIRON (Orta)
+            MiniPantheonOrb(
+                name: "CHIRON",
+                icon: "hourglass",
+                color: SanctumTheme.chironColor,
+                isPrimary: true
+            )
             .onTapGesture {
                 if isBist {
                     selectedBistModule = .oracle
@@ -57,74 +39,62 @@ struct PantheonDeckView: View {
                 }
             }
             
+            // DEMETER (Sağ)
             if !isBist {
-                // 2. FLANKS: ATHENA (Left)
-                PantheonFlankView(
-                    name: "ATHENA",
-                    icon: "brain.head.profile",
-                    color: SanctumTheme.athenaColor,
-                    score: getAthenaScore(),
-                    label: getAthenaLabel()
-                )
-                .offset(x: -100, y: 55)
-                .onTapGesture {
-                    selectedModule = .athena
-                }
-                
-                // 3. FLANKS: DEMETER (Right)
-                PantheonFlankView(
+                MiniPantheonOrb(
                     name: "DEMETER",
                     icon: "leaf.fill",
-                    color: SanctumTheme.demeterColor,
-                    score: getDemeterScore(),
-                    label: getDemeterLabel()
+                    color: SanctumTheme.demeterColor
                 )
-                .offset(x: 100, y: 55)
                 .onTapGesture {
                     selectedModule = .demeter
                 }
             }
-            
         }
-        .frame(height: 120)
-        .padding(.top, 10)
-    }
-    
-    // MARK: - Data Helpers
-    
-    func getAthenaScore() -> String {
-        if isBist {
-            if let score = viewModel.grandDecisions[symbol]?.bistDetails?.faktor.score {
-                return String(format: "%.0f", score)
-            }
-            return "--"
-        } else {
-            return String(format: "%.0f", viewModel.athenaResults[symbol]?.totalScore ?? 0.0)
-        }
-    }
-    
-    func getAthenaLabel() -> String {
-        return isBist ? "AKIL" : "STRATEJI"
-    }
-    
-    func getDemeterScore() -> String {
-        if isBist {
-            if let score = viewModel.grandDecisions[symbol]?.bistDetails?.sektor.score {
-                return String(format: "%.0f", score)
-            }
-            return "--"
-        } else {
-            return String(format: "%.0f", viewModel.getDemeterScore(for: symbol)?.totalScore ?? 0.0)
-        }
-    }
-    
-    func getDemeterLabel() -> String {
-        return isBist ? "ZEMIN" : "SEKTOR"
+        .padding(.horizontal, 40)
+        .padding(.vertical, 8)
     }
 }
 
-// MARK: - Pantheon Flank View
-/// Athena ve Demeter modul ikonlari icin yardimci gorunum.
+// MARK: - Mini Pantheon Orb
+/// Küçük, kompakt modül gösterimi
+struct MiniPantheonOrb: View {
+    let name: String
+    let icon: String
+    let color: Color
+    var isPrimary: Bool = false
+    
+    // Boyutlar
+    private var size: CGFloat { isPrimary ? 32 : 26 }
+    private var iconSize: CGFloat { isPrimary ? 14 : 11 }
+    private var fontSize: CGFloat { isPrimary ? 7 : 6 }
+    
+    var body: some View {
+        VStack(spacing: 3) {
+            ZStack {
+                Circle()
+                    .fill(Color(hex: "1E293B"))
+                    .frame(width: size, height: size)
+                    .shadow(color: color.opacity(0.4), radius: 6, x: 0, y: 0)
+                
+                Circle()
+                    .stroke(color, lineWidth: isPrimary ? 1.5 : 1)
+                    .frame(width: size, height: size)
+                
+                Image(systemName: icon)
+                    .font(.system(size: iconSize, weight: .semibold))
+                    .foregroundColor(color)
+            }
+            
+            Text(name)
+                .font(.system(size: fontSize, weight: .bold, design: .monospaced))
+                .foregroundColor(color.opacity(0.8))
+                .tracking(0.5)
+        }
+    }
+}
+
+// MARK: - Legacy Flank View (Eski tasarım için korunuyor)
 struct PantheonFlankView: View {
     let name: String
     let icon: String
@@ -134,7 +104,6 @@ struct PantheonFlankView: View {
     
     var body: some View {
         VStack(spacing: 4) {
-            // Icon Badge
             ZStack {
                 Circle()
                     .fill(Color(hex: "1E293B"))
@@ -149,7 +118,6 @@ struct PantheonFlankView: View {
                     .foregroundColor(color)
             }
             
-            // Info
             VStack(spacing: 1) {
                 Text(name)
                     .font(.system(size: 8, weight: .bold, design: .monospaced))

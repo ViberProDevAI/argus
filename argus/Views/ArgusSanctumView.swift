@@ -78,10 +78,10 @@ struct ArgusSanctumView: View {
                 } else {
                     VStack {
                         headerView
+                        footerHelper // Pantheon modülleri - Header altında (küçük toplar)
                         Spacer()
                         centerCoreArea
                         Spacer()
-                        footerHelper
                     }
                 }
             }
