@@ -2,75 +2,90 @@ import SwiftUI
 
 struct SplashScreenView: View {
     @Binding var isAppReady: Bool // Controls app launch state
-    @State private var opacity: Double = 0.0
-    @State private var taglineOpacity: Double = 0.0
-    @State private var progress: CGFloat = 0.0
+    
+    // Animation States
+    @State private var eyeOpacity: Double = 0.0
+    @State private var eyeScale: CGFloat = 0.95
+    @State private var glowOpacity: Double = 0.0
+    @State private var textOpacity: Double = 0.0
     
     var body: some View {
         ZStack {
-            // Premium Dark Background
+            // 1. Absolute Black Background
             Color.black.edgesIgnoringSafeArea(.all)
             
-            VStack(spacing: 40) {
-                // 1. Brand Name - Minimal & Bold
-                VStack(spacing: 8) {
-                    Text("ARGUS")
-                        .font(.custom("HelveticaNeue-Bold", size: 48))
-                        .foregroundColor(.white)
-                        .tracking(10) // Elegant wide spacing
-                        .opacity(opacity)
-                        .scaleEffect(opacity) // Subtle scale with fade
+            // 2. Main Content
+            VStack(spacing: 50) {
+                
+                // The Eye (Logo)
+                ZStack {
+                    // Outer Glow (Breathing Shadow)
+                    Circle()
+                        .fill(Color.teal.opacity(0.15))
+                        .frame(width: 180, height: 180)
+                        .blur(radius: 30)
+                        .scaleEffect(eyeScale)
+                        .opacity(glowOpacity)
                     
-                    Text("YATIRIM KONSEYİ")
-                        .font(.system(size: 14, weight: .medium, design: .monospaced))
-                        .foregroundColor(.gray)
-                        .tracking(4)
-                        .opacity(taglineOpacity)
+                    // The Icon
+                    Image("SplashLogo") // Utilizes the new asset
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 160, height: 160)
+                        .cornerRadius(20) // Subtle rounding if needed, though icon is borderless
+                        .opacity(eyeOpacity)
+                        .scaleEffect(eyeScale)
                 }
                 
-                // 2. Loading Indicator (Minimal Line)
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.1))
-                        .frame(width: 200, height: 4)
+                // 3. Brand Name
+                VStack(spacing: 12) {
+                    Text("ARGUS")
+                        .font(.custom("HelveticaNeue-CondensedBold", size: 42))
+                        .foregroundColor(.white.opacity(0.9))
+                        .tracking(12) // Very wide stance
+                        .opacity(textOpacity)
                     
-                    Capsule()
-                        .fill(LinearGradient(colors: [Color.blue, Color.purple], startPoint: .leading, endPoint: .trailing))
-                        .frame(width: 200 * progress, height: 4)
+                    Text("YATIRIM KONSEYİ")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(.gray.opacity(0.5))
+                        .tracking(6)
+                        .opacity(textOpacity)
                 }
-                .opacity(taglineOpacity)
             }
         }
         .onAppear {
-            startAnimation()
+            startSeriousAnimation()
         }
     }
     
-    private func startAnimation() {
-        // 1. Argus Fade In
-        withAnimation(.easeOut(duration: 1.0)) {
-            opacity = 1.0
+    private func startSeriousAnimation() {
+        // Phase 1: Eye Emerges from Darkness (Slow & Heavy)
+        withAnimation(.easeInOut(duration: 1.8)) {
+            eyeOpacity = 1.0
+            glowOpacity = 1.0
         }
         
-        // 2. Tagline Fade In
-        withAnimation(.easeIn(duration: 0.8).delay(0.6)) {
-            taglineOpacity = 1.0
+        // Phase 2: Subtle Breathing (The eye is alive)
+        withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
+            eyeScale = 1.05
         }
         
-        // 3. Progress Bar Fill
-        withAnimation(.easeInOut(duration: 1.5).delay(0.6)) {
-            progress = 1.0
+        // Phase 3: Identity Reveal (Delayed)
+        withAnimation(.easeOut(duration: 1.2).delay(0.8)) {
+            textOpacity = 1.0
         }
         
-        // 4. Clean Exit
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.4) {
-             withAnimation(.easeOut(duration: 0.5)) {
-                 opacity = 0.0
-                 taglineOpacity = 0.0
-             }
+        // Phase 4: Transition to App (Wait for user to feel the weight)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) {
+            withAnimation(.easeInOut(duration: 0.8)) {
+                // Fade out everything to black
+                eyeOpacity = 0.0
+                textOpacity = 0.0
+                glowOpacity = 0.0
+            }
             
-            // Hand over control
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Handover
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
                 isAppReady = true
             }
         }
