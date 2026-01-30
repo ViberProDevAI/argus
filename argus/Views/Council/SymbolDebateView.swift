@@ -3,6 +3,7 @@ import SwiftUI
 // MARK: - Symbol Debate View (Council Room)
 struct SymbolDebateView: View {
     let decision: ArgusGrandDecision
+    @ObservedObject var viewModel: TradingViewModel // Added ViewModel Dependency
     @Binding var isPresented: Bool
     
     var body: some View {
@@ -137,6 +138,24 @@ struct SymbolDebateView: View {
                                 }
                             }
                         }
+
+                        // 5. DETAILED AI REPORT
+                        NavigationLink(destination: ArgusAnalystReportView(symbol: decision.symbol, viewModel: viewModel)) {
+                           HStack {
+                               Image(systemName: "doc.text.magnifyingglass")
+                                   .font(.headline)
+                               Text("Yapay Zeka Raporunu Oku")
+                                   .font(.headline)
+                                   .bold()
+                           }
+                           .foregroundColor(.black)
+                           .padding()
+                           .frame(maxWidth: .infinity)
+                           .background(Theme.tint)
+                           .cornerRadius(12)
+                           .padding(.horizontal)
+                        }
+                        .padding(.top, 10)
                         
                         Spacer(minLength: 50)
                     }

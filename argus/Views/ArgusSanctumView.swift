@@ -240,10 +240,12 @@ struct ArgusSanctumView: View {
                         .foregroundColor((quote.percentChange ?? 0) >= 0 ? SanctumTheme.auroraGreen : SanctumTheme.crimsonRed)
                     
                     // NEW: SIGNAL CAPSULE (Restored Feature)
-                    SanctumSignalCapsule(
-                        signal: vm.grandDecision,
-                        dataHealth: .healthy
-                    )
+                    Button(action: { showDebateSheet = true }) {
+                        SanctumSignalCapsule(
+                            signal: vm.grandDecision,
+                            dataHealth: .healthy
+                        )
+                    }
                 }
             }
         }
@@ -317,7 +319,7 @@ struct ArgusSanctumView: View {
     private var debateSheetContent: some View {
         NavigationView {
              if let decision = viewModel.grandDecisions[symbol] {
-                 SymbolDebateView(decision: decision, isPresented: $showDebateSheet)
+                 SymbolDebateView(decision: decision, viewModel: viewModel, isPresented: $showDebateSheet)
                      .navigationTitle("Konsey Tartışması")
                      .navigationBarHidden(true) // Custom header in view
              } else {
