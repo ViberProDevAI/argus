@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PriceAlertSettingsView: View {
     @ObservedObject var alertManager = AlertManager.shared
+    @State private var infoMessage: String?
     
     var body: some View {
         List {
@@ -18,7 +19,13 @@ struct PriceAlertSettingsView: View {
                         Task {
                             // Fetch real watchlist
                             let storedWatchlist = ArgusStorage.shared.loadWatchlist()
-                            await alertManager.scanWatchlist(symbols: storedWatchlist.isEmpty ? ["AAPL", "BTC-USD"] : storedWatchlist)
+                            if storedWatchlist.isEmpty {
+                                await MainActor.run {
+                                    infoMessage = "Izleme listesi bos. Once hisse ekleyin."
+                                }
+                                return
+                            }
+                            await alertManager.scanWatchlist(symbols: storedWatchlist)
                         }
                     }) {
                         HStack {
@@ -62,5 +69,10 @@ struct PriceAlertSettingsView: View {
         }
         .navigationTitle("Fiyat Alarmları")
         .listStyle(InsetGroupedListStyle())
+        .alert("Bilgi", isPresented: Binding(get: { infoMessage != nil }, set: { _ in infoMessage = nil })) {
+            Button("Tamam") { }
+        } message: {
+            Text(infoMessage ?? "")
+        }
     }
 }

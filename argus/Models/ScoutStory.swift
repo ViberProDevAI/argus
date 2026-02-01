@@ -225,9 +225,9 @@ final class ScoutStoryStore: ObservableObject {
         do {
             let data = try Data(contentsOf: fileURL)
             stories = try JSONDecoder().decode([ScoutStory].self, from: data)
-            print("🔭 ScoutStoryStore: \(stories.count) story yüklendi")
+            print(" ScoutStoryStore: \(stories.count) story yüklendi")
         } catch {
-            print("🔭 ScoutStoryStore: Load error - \(error.localizedDescription)")
+            print(" ScoutStoryStore: Load error - \(error.localizedDescription)")
         }
     }
     
@@ -236,7 +236,7 @@ final class ScoutStoryStore: ObservableObject {
             let data = try JSONEncoder().encode(stories)
             try data.write(to: fileURL)
         } catch {
-            print("🔭 ScoutStoryStore: Save error - \(error.localizedDescription)")
+            print(" ScoutStoryStore: Save error - \(error.localizedDescription)")
         }
     }
 }

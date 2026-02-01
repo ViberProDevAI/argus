@@ -7,7 +7,7 @@ struct ArgusFloatingTabBar: View {
     // Tab Yapılandırması
     private let tabs = [
         "chart.bar.xaxis",   // 0: Piyasa (Market)
-        "brain.head.profile",// 1: Alkindus (Meta-Zeka)
+        "AlkindusIcon", // 1: Alkindus (Meta-Zeka)
 
         "terminal.fill",     // 2: Kokpit (Terminal)
         "mic.fill",          // 3: Sesli Asistan (Action)
@@ -30,9 +30,8 @@ struct ArgusFloatingTabBar: View {
                     }
                 }) {
                     VStack(spacing: 4) {
-                        // İkon
-                        Image(systemName: tabs[index])
-                            .font(.system(size: index == 3 ? 24 : 20, weight: selectedTab == index ? .semibold : .regular))
+                        // İkon - Custom asset veya SF Symbol
+                        tabIcon(for: index)
                             .foregroundColor(
                                 index == 3 ? Theme.primary : (selectedTab == index ? Theme.accent : .gray.opacity(0.6))
                             )
@@ -65,5 +64,24 @@ struct ArgusFloatingTabBar: View {
         )
         .padding(.horizontal, 24)
         .padding(.bottom, 8)
+    }
+
+    // MARK: - Tab Icon Helper
+    @ViewBuilder
+    private func tabIcon(for index: Int) -> some View {
+        let iconName = tabs[index]
+        let size: CGFloat = index == 3 ? 24 : 20
+
+        if iconName.hasSuffix("Icon") {
+            // Custom asset icon (AlkindusIcon, etc.)
+            Image(iconName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+        } else {
+            // SF Symbol
+            Image(systemName: iconName)
+                .font(.system(size: size, weight: selectedTab == index ? .semibold : .regular))
+        }
     }
 }

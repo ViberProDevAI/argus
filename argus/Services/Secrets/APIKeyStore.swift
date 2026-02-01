@@ -18,7 +18,7 @@ final class APIKeyStore: ObservableObject, @unchecked Sendable {
         // 2. Fallback to Secrets/Info.plist (Build-time Config)
         
         // Define all supported providers
-        let providers: [APIProvider] = [.fred, .gemini, .groq, .fmp, .twelveData, .tiingo, .marketstack, .alphaVantage, .eodhd, .deepSeek]
+        let providers: [APIProvider] = [.fred, .gemini, .groq, .fmp, .twelveData, .tiingo, .marketstack, .alphaVantage, .eodhd, .deepSeek] // Note: .finnhub removed because APIProvider has no such case
         
         for provider in providers {
             if let savedKey = defaults.string(forKey: "API_KEY_\(provider.rawValue)"), !savedKey.isEmpty {
@@ -53,7 +53,7 @@ final class APIKeyStore: ObservableObject, @unchecked Sendable {
     var fredApiKey: String { keys[.fred] ?? Secrets.fredKey }
     
     var massiveToken: String {
-        return keys[.massive] ?? "demo-massive-token"
+        return keys[.massive] ?? ""
     }
     
     // MARK: - ObservableObject Methods (Heimdall & Settings)

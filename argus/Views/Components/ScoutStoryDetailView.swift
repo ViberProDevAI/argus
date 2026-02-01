@@ -120,7 +120,7 @@ struct ScoutStoryDetailView: View {
             }
         }
         .onAppear {
-            print("🚀 Scout Story Opened (Safe Mode): \(currentStory.symbol)")
+            print(" Scout Story Opened (Safe Mode): \(currentStory.symbol)")
             markAsViewed()
         }
         .statusBarHidden(true)

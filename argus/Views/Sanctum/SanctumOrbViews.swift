@@ -22,11 +22,10 @@ struct OrbView: View {
                     .frame(width: 52, height: 52)
                 
                 // Icon
-                Image(systemName: module.icon)
-                    .font(.system(size: 20, weight: .regular))
+                SanctumModuleIconView(module: module, size: 32)
                     .foregroundColor(module.color)
             }
-            
+
             // LOCALIZED LABELS
             let label: String = {
                 if symbol.uppercased().hasSuffix(".IS") {
@@ -71,11 +70,10 @@ struct BistOrbView: View {
                     .frame(width: 52, height: 52)
                     
                 // Icon
-                Image(systemName: module.icon)
-                    .font(.system(size: 20, weight: .regular))
+                SanctumModuleIconView(bistModule: module, size: 32)
                     .foregroundColor(module.color)
             }
-            
+
             // Modul Ismi
             Text(module.rawValue)
                 .font(.system(size: 9, weight: .bold, design: .monospaced))

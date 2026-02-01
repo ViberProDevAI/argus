@@ -81,7 +81,7 @@ struct TradeHistoryCard: View {
                     Text("Giriş: \(formattedDate(trade.entryDate)) @ $\(String(format: "%.2f", trade.entryPrice))")
                         .font(.subheadline)
                 } icon: {
-                    Text("📅")
+                    Text("")
                 }
                 
                 Spacer()
@@ -93,7 +93,7 @@ struct TradeHistoryCard: View {
                         Text("Çıkış: \(formattedDate(exitDate)) @ $\(String(format: "%.2f", exitPrice))")
                             .font(.subheadline)
                     } icon: {
-                        Text("📅")
+                        Text("")
                     }
                     
                     Spacer()
@@ -107,7 +107,7 @@ struct TradeHistoryCard: View {
                         .bold()
                         .foregroundColor(isProfit ? .green : .red)
                 } icon: {
-                    Text("💰")
+                    Text("")
                 }
                 
                 Spacer()
@@ -121,7 +121,7 @@ struct TradeHistoryCard: View {
     private var entryReasonSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("📊")
+                Text("")
                 Text("Giriş Sebebi:")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -155,7 +155,7 @@ struct TradeHistoryCard: View {
     private func lessonSection(lesson: LessonRecord) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("📚")
+                Text("")
                 Text("NE ÖĞRENDİK?")
                     .font(.caption)
                     .bold()
@@ -187,7 +187,7 @@ struct TradeHistoryCard: View {
     private func weightAdjustmentSection(changes: [String: Double]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("🔧")
+                Text("")
                 Text("SİSTEM AYARI")
                     .font(.caption)
                     .bold()
@@ -220,7 +220,7 @@ struct TradeHistoryCard: View {
     private var noLessonSection: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("📚")
+                Text("")
                 Text("NE ÖĞRENDİK?")
                     .font(.caption)
                     .bold()

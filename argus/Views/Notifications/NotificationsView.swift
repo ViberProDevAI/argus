@@ -5,6 +5,8 @@ struct NotificationsView: View {
     @State private var selectedNotification: ArgusNotification?
     @ObservedObject var viewModel: TradingViewModel // Needed for execution
     var deepLinkID: String? = nil // Deep Link Parameter
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
+    @State private var showDrawer = false
     
     var body: some View {
         NavigationView {
@@ -49,8 +51,14 @@ struct NotificationsView: View {
                     }
                 }
             }
-            .navigationTitle("Argus Gelen Kutusu 📬")
+            .navigationTitle("Argus Gelen Kutusu")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showDrawer = true }) {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundColor(.white)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     if !store.notifications.isEmpty {
                         Button("Tümünü Oku") {
@@ -63,6 +71,80 @@ struct NotificationsView: View {
                 ArgusReportDetailView(notification: note, viewModel: viewModel)
             }
         }
+        .overlay {
+            if showDrawer {
+                ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                    drawerSections(openSheet: openSheet)
+                }
+                .zIndex(200)
+            }
+        }
+    }
+
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "AlkindusIcon") {
+                        deepLinkManager.navigate(to: .alkindus)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Ayarlar", subtitle: "Tercihler", icon: "gearshape") {
+                        deepLinkManager.navigate(to: .settings)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "BILDIRIMLER",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Tumunu Oku", subtitle: "Tum bildirimleri temizle", icon: "checkmark.circle") {
+                        store.markAllRead()
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "ARACLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                        openSheet(.calendar)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                        openSheet(.dictionary)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
+                        openSheet(.systemHealth)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                        openSheet(.feedback)
+                    }
+                ]
+            )
+        )
+        
+        return sections
     }
 }
 

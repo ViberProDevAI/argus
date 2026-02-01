@@ -67,19 +67,19 @@ struct AetherDashboardCard: View {
                     // Category Breakdown
                     VStack(alignment: .leading, spacing: 8) {
                         CategoryRow(
-                            icon: "🟢",
+                            icon: "",
                             label: "Öncü",
                             score: rating.leadingScore ?? 50,
                             weight: "x1.5"
                         )
                         CategoryRow(
-                            icon: "🟡",
+                            icon: "",
                             label: "Eşzamanlı",
                             score: rating.coincidentScore ?? 50,
                             weight: "x1.0"
                         )
                         CategoryRow(
-                            icon: "🔴",
+                            icon: "",
                             label: "Gecikmeli",
                             score: rating.laggingScore ?? 50,
                             weight: "x0.8"
@@ -108,9 +108,9 @@ struct AetherDashboardCard: View {
                     
                     // Mini Category Pills
                     HStack(spacing: 6) {
-                        MiniCategoryPill(emoji: "🟢", score: rating.leadingScore ?? 50)
-                        MiniCategoryPill(emoji: "🟡", score: rating.coincidentScore ?? 50)
-                        MiniCategoryPill(emoji: "🔴", score: rating.laggingScore ?? 50)
+                        MiniCategoryPill(emoji: "", score: rating.leadingScore ?? 50)
+                        MiniCategoryPill(emoji: "", score: rating.coincidentScore ?? 50)
+                        MiniCategoryPill(emoji: "", score: rating.laggingScore ?? 50)
                     }
                     
                     Image(systemName: "chevron.right")

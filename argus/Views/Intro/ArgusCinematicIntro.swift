@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// 💎 THE PRISM INTRO 💎
+///  THE PRISM INTRO 
 /// A high-end, holographic reveal of the Argus identity.
 struct ArgusCinematicIntro: View {
     var onFinished: () -> Void

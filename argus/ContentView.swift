@@ -9,9 +9,6 @@ import SwiftUI
     // Voice Sheet State
     @State private var showVoiceSheet = false
     
-    // Drawer State
-    @State private var showDrawer = false
-    
     var body: some View {
         ZStack {
             // Global Living Background (Design System Base)
@@ -43,30 +40,7 @@ import SwiftUI
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     
-                    // Hamburger Button (Top Left) - Safe Area Aware
-                    VStack {
-                        Button {
-                            withAnimation {
-                                showDrawer = true
-                            }
-                        } label: {
-                            Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 18, weight: .medium))
-                                .foregroundColor(Theme.textSecondary)
-                                .padding(10)
-                                .background(
-                                    Circle()
-                                        .fill(Theme.secondaryBackground)
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Theme.border, lineWidth: 1)
-                                        )
-                                )
-                        }
-                        .padding(.leading, 16)
-                        Spacer()
-                    }
-                    .padding(.top, 4)
+                    // Hamburger Button REMOVED (Moved to individual views)
                     
                     Spacer()
                     
@@ -74,33 +48,9 @@ import SwiftUI
                     VStack {
                         Spacer()
                         
-                        if !showDrawer {
-                            AppTabBar()
-                                .zIndex(1)
-                        }
+                        AppTabBar()
+                            .zIndex(1)
                     }
-                }
-                
-                // Drawer Overlay
-                if showDrawer {
-                    ArgusDrawerView(isPresented: $showDrawer, onNavigateToTab: { drawerTab in
-                        withAnimation {
-                            showDrawer = false
-                            switch drawerTab {
-                            case .home:
-                                deepLinkManager.navigate(to: .home)
-                            case .markets:
-                                deepLinkManager.navigate(to: .markets)
-                            case .alkindus:
-                                deepLinkManager.navigate(to: .alkindus)
-                            case .portfolio:
-                                deepLinkManager.navigate(to: .portfolio)
-                            case .settings:
-                                deepLinkManager.navigate(to: .settings)
-                            }
-                        }
-                    })
-                    .zIndex(100)
                 }
 
         }

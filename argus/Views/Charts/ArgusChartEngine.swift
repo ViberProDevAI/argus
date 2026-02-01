@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - Argus Chart Engine Pro 🚀
+// MARK: - Argus Chart Engine Pro 
 // TradingView-quality charting experience for Argus Terminal.
 
 struct ArgusChartEngine: View {

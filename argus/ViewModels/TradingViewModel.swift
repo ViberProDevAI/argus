@@ -238,18 +238,50 @@ class TradingViewModel: ObservableObject {
     
     func triggerSmartPlan(for trade: Trade) {
         Task {
-            // SmartPlanService delegate
-            let plan = await SmartPlanService.shared.createPlan(
-                for: trade,
-                quotes: self.quotes,
-                grandDecisions: self.grandDecisions
-            )
+            // 1. PositionPlanStore üzerinden plan oluştur (persist edilir)
+            let decision = self.grandDecisions[trade.symbol] ?? createDefaultDecision(for: trade.symbol)
+            let plan = PositionPlanStore.shared.createPlan(for: trade, decision: decision)
             
-            // UI Delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            // 2. UI'a da ata
+            await MainActor.run {
                 self.generatedSmartPlan = plan
             }
+            
+            print("✅ Smart Plan oluşturuldu ve kaydedildi: \(trade.symbol)")
         }
+    }
+    
+    private func createDefaultDecision(for symbol: String) -> ArgusGrandDecision {
+        let orionDummy = CouncilDecision(
+            symbol: symbol, action: .hold, netSupport: 0.5, approveWeight: 0,
+            vetoWeight: 0, isStrongSignal: false, isWeakSignal: false,
+            winningProposal: nil, allProposals: [], votes: [], vetoReasons: [], timestamp: Date()
+        )
+        
+        let aetherDummy = AetherDecision(
+            stance: .cautious, marketMode: .neutral, netSupport: 0.5,
+            isStrongSignal: false, winningProposal: nil, votes: [], warnings: [], timestamp: Date()
+        )
+        
+        return ArgusGrandDecision(
+            id: UUID(),
+            symbol: symbol,
+            action: .accumulate,
+            strength: .normal,
+            confidence: 0.5,
+            reasoning: "Yeni pozisyon için varsayılan plan",
+            contributors: [],
+            vetoes: [],
+            orionDecision: orionDummy,
+            atlasDecision: nil,
+            aetherDecision: aetherDummy,
+            hermesDecision: nil,
+            orionDetails: nil,
+            financialDetails: nil,
+            bistDetails: nil,
+            patterns: nil,
+            timestamp: Date()
+        )
     }
     // AutoPilot & Scout delegated to AutoPilotStore
     var scoutingCandidates: [TradeSignal] { AutoPilotStore.shared.scoutingCandidates }

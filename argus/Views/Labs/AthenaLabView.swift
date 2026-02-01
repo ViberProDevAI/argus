@@ -73,7 +73,7 @@ struct AthenaLabView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Athena Lab 🏛️")
+        .navigationTitle("Athena Lab ")
         .background(Theme.background)
     }
     

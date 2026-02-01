@@ -589,7 +589,7 @@ extension AtlasV2DetailView {
         let symbolToAnalyze = symbol
         
         // 60 saniye timeout ile analiz yap (increased from 30 to 60)
-        print("🔍 AtlasV2DetailView: Starting analysis for \(symbol)...")
+        print(" AtlasV2DetailView: Starting analysis for \(symbol)...")
         let loadTask = Task { () -> Result<AtlasV2Result, Error> in
             do {
                 // Timeout protection - increased timeout for better reliability

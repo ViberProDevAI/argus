@@ -31,7 +31,7 @@ struct ArgusLabView: View {
             }
             .tabViewStyle(.page(indexDisplayMode: .never))
         }
-        .navigationTitle("🧪 Argus Lab")
+        .navigationTitle(" Argus Lab")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {

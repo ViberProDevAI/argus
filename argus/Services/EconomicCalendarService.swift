@@ -9,6 +9,26 @@ class EconomicCalendarService {
     
     private init() {}
     
+    // MARK: - Market Calendar (Real Data)
+    
+    enum CalendarFetchError: Error {
+        case missingApiKey
+        case invalidResponse
+    }
+    
+    struct CalendarEvent: Identifiable {
+        let id = UUID()
+        let date: Date
+        let title: String
+        let country: String?
+        let impact: String?
+        let actual: String?
+        let forecast: String?
+        let previous: String?
+        let unit: String?
+        let source: String
+    }
+    
     // MARK: - Economic Event Model
     
     struct EconomicEvent: Identifiable {
@@ -139,29 +159,33 @@ class EconomicCalendarService {
     /// Eksik beklentileri kontrol et ve bildirim gönder
     @MainActor
     func checkAndNotifyMissingExpectations() {
-        let immediateEvents = getImmediateEvents()
-        
-        for event in immediateEvents {
-            // Beklenti girilmiş mi kontrol et
-            if ExpectationsStore.shared.getExpectation(for: event.indicator) == nil {
-                // Bildirim oluştur
-                sendMissingExpectationNotification(for: event)
+        Task {
+            do {
+                let calendarEvents = try await fetchUpcomingCalendarEvents(days: 2)
+                let indicators = calendarEvents.compactMap { mapIndicator(from: $0.title) }
+                for indicator in indicators {
+                    if ExpectationsStore.shared.getExpectation(for: indicator) == nil {
+                        sendMissingExpectationNotification(for: indicator)
+                    }
+                }
+            } catch {
+                // Gercek veri cekilemediyse bildirim gonderme
             }
         }
     }
     
     @MainActor
-    private func sendMissingExpectationNotification(for event: EconomicEvent) {
-        let timeStr = event.isToday ? "Bugün" : "Yarın"
+    private func sendMissingExpectationNotification(for indicator: ExpectationsStore.EconomicIndicator) {
+        let timeStr = "Yakinda"
         
         let notification = ArgusNotification(
             symbol: "AETHER",
-            headline: "\(timeStr) \(event.displayName) Açıklanıyor",
+            headline: "\(timeStr) \(indicator.displayName) Açıklanıyor",
             summary: "Henüz beklenti girmediniz. Sürpriz etkisini yakalamak için şimdi girin.",
             detailedReport: """
             ## Ekonomik Veri Hatırlatması
             
-            **\(event.displayName)** \(timeStr.lowercased()) açıklanacak.
+            **\(indicator.displayName)** \(timeStr.lowercased()) açıklanacak.
             
             ### Neden Önemli?
             Beklenti girdiğinizde, gerçekleşen veri ile karşılaştırılır ve sürpriz etkisi Aether skoruna yansır.
@@ -172,7 +196,7 @@ class EconomicCalendarService {
             ### Nasıl Girilir?
             1. Aether detay sayfasına gidin
             2. "Beklentiler" bölümünü açın
-            3. **\(event.indicator.displayName)** için tahmininizi girin
+            3. **\(indicator.displayName)** için tahmininizi girin
             
             **İpucu**: Bloomberg, Investing.com veya Trading Economics'ten konsensüs beklentisini bulabilirsiniz.
             """,
@@ -188,7 +212,126 @@ class EconomicCalendarService {
         
         if !isDuplicate {
             NotificationStore.shared.addNotification(notification)
-            print("[AETHER] Beklenti hatırlatması gönderildi - \(event.displayName)")
+            print("[AETHER] Beklenti hatırlatması gönderildi - \(indicator.displayName)")
+        }
+    }
+
+    private func mapIndicator(from title: String) -> ExpectationsStore.EconomicIndicator? {
+        let normalized = title.lowercased()
+        if normalized.contains("cpi") || normalized.contains("enflasyon") {
+            return .cpi
+        }
+        if normalized.contains("unemployment") || normalized.contains("işsizlik") || normalized.contains("issizlik") {
+            return .unemployment
+        }
+        if normalized.contains("nonfarm") || normalized.contains("payroll") || normalized.contains("istihdam") {
+            return .payrolls
+        }
+        if normalized.contains("jobless") || normalized.contains("claims") || normalized.contains("basvuru") {
+            return .claims
+        }
+        if normalized.contains("pce") {
+            return .pce
+        }
+        if normalized.contains("gdp") || normalized.contains("gsyih") {
+            return .gdp
+        }
+        return nil
+    }
+    
+    // MARK: - External Calendar Fetch (FMP)
+    
+    func fetchUpcomingCalendarEvents(days: Int = 14) async throws -> [CalendarEvent] {
+        let apiKey = APIKeyStore.shared.getKey(for: .fmp) ?? ""
+        guard !apiKey.isEmpty else {
+            throw CalendarFetchError.missingApiKey
+        }
+        
+        let now = Date()
+        guard let endDate = Calendar.current.date(byAdding: .day, value: days, to: now) else {
+            return []
+        }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+        dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+        
+        let fromStr = dateFormatter.string(from: now)
+        let toStr = dateFormatter.string(from: endDate)
+        
+        var components = URLComponents(string: "https://financialmodelingprep.com/stable/economic-calendar")
+        components?.queryItems = [
+            URLQueryItem(name: "from", value: fromStr),
+            URLQueryItem(name: "to", value: toStr),
+            URLQueryItem(name: "apikey", value: apiKey)
+        ]
+        
+        guard let url = components?.url else { throw CalendarFetchError.invalidResponse }
+        
+        let (data, response) = try await URLSession.shared.data(from: url)
+        
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw CalendarFetchError.invalidResponse
+        }
+        
+        guard let rawArray = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+            throw CalendarFetchError.invalidResponse
+        }
+        
+        let events: [CalendarEvent] = rawArray.compactMap { item in
+            guard let title = stringValue(item["event"]) ?? stringValue(item["title"]) ?? stringValue(item["indicator"]) else {
+                return nil
+            }
+            let dateString = stringValue(item["date"]) ?? stringValue(item["datetime"]) ?? stringValue(item["releaseDate"])
+            guard let date = parseCalendarDate(dateString) else { return nil }
+            
+            return CalendarEvent(
+                date: date,
+                title: title,
+                country: stringValue(item["country"]) ?? stringValue(item["countryCode"]),
+                impact: stringValue(item["impact"]) ?? stringValue(item["importance"]),
+                actual: stringValue(item["actual"]),
+                forecast: stringValue(item["forecast"]),
+                previous: stringValue(item["previous"]),
+                unit: stringValue(item["unit"]),
+                source: "FMP"
+            )
+        }
+        
+        return events.sorted { $0.date < $1.date }
+    }
+    
+    private func parseCalendarDate(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        
+        let isoFormatter = ISO8601DateFormatter()
+        if let date = isoFormatter.date(from: value) {
+            return date
+        }
+        
+        let formats = ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd"]
+        for format in formats {
+            let formatter = DateFormatter()
+            formatter.dateFormat = format
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            if let date = formatter.date(from: value) {
+                return date
+            }
+        }
+        
+        return nil
+    }
+    
+    private func stringValue(_ value: Any?) -> String? {
+        switch value {
+        case let str as String:
+            return str.trimmingCharacters(in: .whitespacesAndNewlines)
+        case let num as NSNumber:
+            return num.stringValue
+        default:
+            return nil
         }
     }
     

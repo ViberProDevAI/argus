@@ -7,6 +7,8 @@ import SwiftUI
 struct AlkindusDashboardView: View {
     @State private var stats: AlkindusStats?
     @State private var isLoading = true
+    @State private var showDrawer = false
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
     
     // Processing State
     @State private var isProcessing = false
@@ -37,13 +39,13 @@ struct AlkindusDashboardView: View {
                             // Header Card
                             headerCard(stats: stats)
                             
-                            // 🧠 Today's Insights (Phase 2)
+                            //  Today's Insights (Phase 2)
                             insightsSection
                             
                             // Data Tools (Processing & Cleanup)
                             dataToolsSection
                             
-                            // 🔗 Correlations (Phase 2)
+                            //  Correlations (Phase 2)
                             correlationsSection
                             
                             // Module Calibration Table
@@ -55,7 +57,7 @@ struct AlkindusDashboardView: View {
                             // ⏰ Temporal Insights (Phase 3)
                             AlkindusTimeCard()
                             
-                            // 📊 Market Comparison (Phase 3)  
+                            //  Market Comparison (Phase 3)  
                             marketComparisonSection
                             
                             // Pending Observations
@@ -68,10 +70,23 @@ struct AlkindusDashboardView: View {
                 } else {
                     emptyState
                 }
+                
+                if showDrawer {
+                    ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                        drawerSections(openSheet: openSheet)
+                    }
+                    .zIndex(200)
+                }
             }
             .navigationTitle("Alkindus")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { showDrawer = true }) {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundColor(cyan)
+                    }
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: refresh) {
                         Image(systemName: "arrow.clockwise")
@@ -83,6 +98,76 @@ struct AlkindusDashboardView: View {
         .task {
             await loadStats()
         }
+    }
+    
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Ayarlar", subtitle: "Tercihler", icon: "gearshape") {
+                        deepLinkManager.navigate(to: .settings)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "ALKINDUS",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Yenile", subtitle: "Istatistikleri guncelle", icon: "arrow.clockwise") {
+                        refresh()
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sistem Rehberi", subtitle: "Argus isleyisi", icon: "doc.text") {
+                        openSheet(.systemGuide)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus Rehberi", subtitle: "Motor aciklamasi", icon: "book") {
+                        openSheet(.alkindusGuide)
+                    }
+                ]
+            )
+        )
+        
+        sections.append(commonToolsSection(openSheet: openSheet))
+        
+        return sections
+    }
+    
+    private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
+        ArgusDrawerView.DrawerSection(
+            title: "ARACLAR",
+            items: [
+                ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                    openSheet(.calendar)
+                },
+                ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                    openSheet(.dictionary)
+                },
+                ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
+                    openSheet(.systemHealth)
+                },
+                ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                    openSheet(.feedback)
+                }
+            ]
+        )
     }
     
     // MARK: - Header Card
@@ -283,7 +368,7 @@ struct AlkindusDashboardView: View {
     private var insightsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("🧠 BUGÜN ÖĞRENDİKLERİM")
+                Text(" BUGÜN ÖĞRENDİKLERİM")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(.gray)
                     .tracking(1)
@@ -358,7 +443,7 @@ struct AlkindusDashboardView: View {
     
     private var correlationsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("🔗 EN BAŞARILI KOMBİNASYONLAR")
+            Text(" EN BAŞARILI KOMBİNASYONLAR")
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundColor(.gray)
                 .tracking(1)
@@ -406,7 +491,7 @@ struct AlkindusDashboardView: View {
     
     private var marketComparisonSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("📊 MARKET KARŞILAŞTIRMASI")
+            Text(" MARKET KARŞILAŞTIRMASI")
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundColor(.gray)
                 .tracking(1)
@@ -639,4 +724,3 @@ struct AlkindusDashboardView: View {
 #Preview {
     AlkindusDashboardView()
 }
-

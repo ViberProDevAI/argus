@@ -6,7 +6,7 @@ import Foundation
 struct BISTSentimentAdapter {
     
     /// BIST Sonucunu Hermes Protokolüne dönüştürür
-    static func adapt(result: BISTSentimentResult) -> HermesNewsSnapshot {
+    static func adapt(result: BISTSentimentResult, articles: [NewsArticle]) -> HermesNewsSnapshot {
         // 1. Convert Score to Sentiment Enum
         let sentiment: NewsSentiment
         if result.overallScore >= 65 { sentiment = .strongPositive }
@@ -26,21 +26,6 @@ struct BISTSentimentAdapter {
             confidence: Double(result.relevantNewsCount) / Double(max(1, result.newsVolume)),
             impactScore: result.mentionTrend == .increasing ? 80.0 : 50.0
         )
-        
-        // 3. Create Dummy Articles (Hermes expects articles, but we have aggregated result)
-        // We wrap headlines as minimal articles
-        let articles = result.keyHeadlines.map { headline in
-            NewsArticle(
-                id: UUID().uuidString,
-                symbol: result.symbol,
-                source: "BIST Feed",
-                headline: headline,
-                summary: "BIST Sentiment Engine tarafından derlendi.",
-                url: "",
-                publishedAt: result.lastUpdated,
-                fetchedAt: result.lastUpdated
-            )
-        }
         
         return HermesNewsSnapshot(
             symbol: result.symbol,

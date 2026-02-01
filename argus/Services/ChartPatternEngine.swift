@@ -7,11 +7,13 @@ final class ChartPatternEngine {
     static let shared = ChartPatternEngine()
     
     private var geminiKey: String {
-        Secrets.shared.gemini
+        APIKeyStore.shared.geminiApiKey
     }
     
-    // Changed to stable model - gemini-2.0-flash may require billing
-    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+    private let modelCandidates = [
+        "gemini-1.5-pro",
+        "gemini-1.0-pro"
+    ]
     
     // Rate limiting (15 RPM for free tier = 4 sec interval)
     private var lastRequestTime: Date?
@@ -173,8 +175,9 @@ final class ChartPatternEngine {
     // MARK: - Gemini API Call
     
     private func callGemini(prompt: String) async throws -> String {
-        let url = URL(string: "\(baseURL)?key=\(geminiKey)")!
-        
+        guard !geminiKey.isEmpty else {
+            throw URLError(.userAuthenticationRequired)
+        }
         let requestBody: [String: Any] = [
             "contents": [
                 ["parts": [["text": prompt]]]
@@ -184,34 +187,47 @@ final class ChartPatternEngine {
                 "maxOutputTokens": 1024
             ]
         ]
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        if let httpResponse = response as? HTTPURLResponse, !(200...299).contains(httpResponse.statusCode) {
-            throw NSError(domain: "ChartPatternEngine", code: httpResponse.statusCode, 
-                         userInfo: [NSLocalizedDescriptionKey: "Gemini API error: \(httpResponse.statusCode)"])
-        }
-        
-        struct GeminiResponse: Codable {
-            struct Candidate: Codable {
-                struct Content: Codable {
-                    struct Part: Codable {
-                        let text: String?
+        var lastError: Error?
+        for version in ["v1beta", "v1"] {
+            for model in modelCandidates {
+                guard let url = URL(string: "https://generativelanguage.googleapis.com/\(version)/models/\(model):generateContent?key=\(geminiKey)") else { continue }
+                
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+                
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                    struct GeminiResponse: Codable {
+                        struct Candidate: Codable {
+                            struct Content: Codable {
+                                struct Part: Codable {
+                                    let text: String?
+                                }
+                                let parts: [Part]
+                            }
+                            let content: Content
+                        }
+                        let candidates: [Candidate]?
                     }
-                    let parts: [Part]
+                    
+                    let geminiResponse = try JSONDecoder().decode(GeminiResponse.self, from: data)
+                    return geminiResponse.candidates?.first?.content.parts.first?.text ?? ""
                 }
-                let content: Content
+                
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+                let errorText = String(data: data, encoding: .utf8) ?? "Unknown Error"
+                print("❌ ChartPatternEngine Gemini Error (\(statusCode)) [\(version)/\(model)]: \(errorText)")
+                lastError = NSError(domain: "ChartPatternEngine", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "Gemini API error: \(statusCode)"])
             }
-            let candidates: [Candidate]?
         }
         
-        let geminiResponse = try JSONDecoder().decode(GeminiResponse.self, from: data)
-        return geminiResponse.candidates?.first?.content.parts.first?.text ?? ""
+        if let lastError {
+            throw lastError
+        }
+        throw URLError(.badServerResponse)
     }
     
     // MARK: - Response Parsing

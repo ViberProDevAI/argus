@@ -291,7 +291,7 @@ struct StrategyDashboardView: View {
     
     private var topOpportunitiesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("🎯 EN İYİ FIRSATLAR")
+            Text(" EN İYİ FIRSATLAR")
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
                 .foregroundColor(.gray)
                 .tracking(1)
@@ -387,12 +387,15 @@ struct StrategyDashboardView: View {
     // MARK: - Loading View
     
     private var loadingView: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             ProgressView()
                 .scaleEffect(1.5)
             Text("Multi-timeframe analiz yapılıyor...")
                 .font(.caption)
                 .foregroundColor(.gray)
+            
+            LoadingQuoteView()
+                .padding(.top, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

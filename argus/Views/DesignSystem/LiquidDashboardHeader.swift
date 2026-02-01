@@ -10,6 +10,7 @@ struct LiquidDashboardHeader: View {
     // Actions
     var onBrainTap: () -> Void
     var onHistoryTap: () -> Void
+    var onDrawerTap: () -> Void // New Action
     
     private var isBist: Bool { selectedMarket == .bist }
     
@@ -62,8 +63,9 @@ struct LiquidDashboardHeader: View {
                     
                     Spacer()
                     
-                    // Action Buttons - Biraz daha küçük
+                    // Action Buttons
                     HStack(spacing: 8) {
+                        glassIconButton(icon: "line.3.horizontal", action: onDrawerTap) // Drawer Button
                         glassIconButton(icon: "brain.head.profile", action: onBrainTap)
                         glassIconButton(icon: "clock.arrow.circlepath", action: onHistoryTap)
                     }

@@ -16,7 +16,7 @@ struct PantheonDeckView: View {
             if !isBist {
                 MiniPantheonOrb(
                     name: "ATHENA",
-                    icon: "brain.head.profile",
+                    icon: "AlkindusIcon",
                     color: SanctumTheme.athenaColor
                 )
                 .onTapGesture {

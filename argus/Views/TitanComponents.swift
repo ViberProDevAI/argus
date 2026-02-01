@@ -93,7 +93,7 @@ struct FundProfileCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Fon Profili 🏛️")
+            Text("Fon Profili ")
                 .font(.headline)
                 .foregroundColor(.white)
             

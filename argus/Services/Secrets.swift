@@ -14,33 +14,26 @@ enum Secrets {
 
     static var twelveDataKey: String { getKey("TWELVE_DATA_KEY") }
     static var fmpKey: String { getKey("FMP_KEY") }
+    static var finnhubKey: String { getKey("FINNHUB_KEY") }
     static var tiingoKey: String { getKey("TIINGO_KEY") }
     static var marketStackKey: String { getKey("MARKETSTACK_KEY") }
     static var groqKey: String { getKey("GROQ_KEY") }
     static var alphaVantageKey: String { getKey("ALPHA_VANTAGE_KEY") }
     static var eodhdKey: String { getKey("EODHD_KEY") }
-    static var geminiKey: String {
-        let key = getKey("GEMINI_KEY")
-        return key.isEmpty || key.hasPrefix("$") ? "REDACTED_GEMINI_KEY" : key
-    }
+    static var geminiKey: String { getKey("GEMINI_KEY") }
     static var deepSeekKey: String { getKey("DEEPSEEK_KEY") }
-    static var fredKey: String { 
-        let k = getKey("FRED_KEY")
-        return k.isEmpty ? "REDACTED_FRED_KEY" : k 
-    }
+    static var fredKey: String { getKey("FRED_KEY") }
     static var pineconeKey: String { getKey("PINECONE_KEY") }
+    static var dovizComKey: String { getKey("DOVIZCOM_KEY") }
+    static var borsaPyKey: String { getKey("BORSAPY_KEY") }
     
-    // MARK: - Local / Hardcoded Keys (Simülasyon İçin - Geçici)
-    // Gerçek prod ortamında bunlar Info.plist/Keychain'e taşınmalı
-    static let dovizComKey = "REDACTED_DOVIZCOM_KEY"
-    static let borsaPyKey = "REDACTED_BORSAPY_KEY"
-
     // MARK: - Legacy Support (Singleton Adapter)
     static let shared = SecretsLegacyAdapter()
 
     struct SecretsLegacyAdapter {
         var twelveData: String { Secrets.twelveDataKey }
         var fmp: String { Secrets.fmpKey }
+        var finnhub: String { Secrets.finnhubKey }
         var tiingo: String { Secrets.tiingoKey }
         var marketStack: String { Secrets.marketStackKey }
         var alphaVantage: String { Secrets.alphaVantageKey }

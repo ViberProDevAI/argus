@@ -2,6 +2,9 @@ import SwiftUI
 
 struct EconomicCalendarSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var events: [EconomicCalendarService.CalendarEvent] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationView {
@@ -25,6 +28,9 @@ struct EconomicCalendarSheet: View {
                 }
             }
         }
+        .task {
+            await loadEvents()
+        }
     }
 
     // MARK: - Intro
@@ -42,42 +48,59 @@ struct EconomicCalendarSheet: View {
         }
     }
 
-    // MARK: - Upcoming Events (Placeholder - ideally from API)
+    // MARK: - Upcoming Events
 
     private var upcomingEvents: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeader("YAKLASAN OLAYLAR")
 
-            VStack(spacing: 8) {
-                eventRow(date: "Her ay", event: "TCMB PPK Toplantisi", impact: .high)
-                eventRow(date: "Her ay", event: "TUFE Aciklamasi", impact: .high)
-                eventRow(date: "6 haftada bir", event: "FED FOMC Karari", impact: .high)
-                eventRow(date: "Ceyreklik", event: "GSYH Verisi", impact: .medium)
-                eventRow(date: "Aylik", event: "Issizlik Orani", impact: .medium)
+            if isLoading {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("Takvim yukleniyor...")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
+            } else if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(Theme.negative)
+            } else if events.isEmpty {
+                Text("Secilen aralikta kayitli olay yok.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            } else {
+                VStack(spacing: 8) {
+                    ForEach(events) { event in
+                        eventRow(event)
+                    }
+                }
             }
-
-            Text("Gercek zamanli takvim verileri yaklasik olarak ekleniyor.")
-                .font(.caption2)
-                .foregroundColor(Theme.textSecondary)
-                .italic()
-                .padding(.top, 4)
         }
     }
 
-    private func eventRow(date: String, event: String, impact: EventImpact) -> some View {
+    private func eventRow(_ event: EconomicCalendarService.CalendarEvent) -> some View {
         HStack(spacing: 12) {
-            Text(date)
+            Text(event.date.formatted(date: .abbreviated, time: .omitted))
                 .font(.caption2)
                 .foregroundColor(Theme.textSecondary)
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 90, alignment: .leading)
 
-            Text(event)
-                .font(.caption)
-                .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.title)
+                    .font(.caption)
+                    .foregroundColor(.white)
+
+                if let country = event.country, !country.isEmpty {
+                    Text(country)
+                        .font(.caption2)
+                        .foregroundColor(Theme.textSecondary)
+                }
+            }
 
             Spacer()
 
-            impactBadge(impact)
+            impactBadge(impactFromString(event.impact))
         }
         .padding(10)
         .background(Color.white.opacity(0.02))
@@ -112,6 +135,17 @@ struct EconomicCalendarSheet: View {
             .padding(.vertical, 3)
             .background(impact.color.opacity(DesignTokens.Opacity.glassCard))
             .cornerRadius(4)
+    }
+
+    private func impactFromString(_ value: String?) -> EventImpact {
+        guard let value = value?.lowercased() else { return .low }
+        if value.contains("high") || value.contains("yuksek") {
+            return .high
+        }
+        if value.contains("medium") || value.contains("orta") {
+            return .medium
+        }
+        return .low
     }
 
     // MARK: - Impact Guide
@@ -227,6 +261,24 @@ struct EconomicCalendarSheet: View {
             .fontWeight(.semibold)
             .foregroundColor(Theme.textSecondary)
             .tracking(0.5)
+    }
+
+    // MARK: - Data Load
+
+    @MainActor
+    private func loadEvents() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            events = try await EconomicCalendarService.shared.fetchUpcomingCalendarEvents(days: 14)
+        } catch EconomicCalendarService.CalendarFetchError.missingApiKey {
+            errorMessage = "Ekonomi takvimi icin FMP anahtari bulunamadi."
+        } catch {
+            errorMessage = "Ekonomi takvimi yuklenemedi: \(error.localizedDescription)"
+        }
+
+        isLoading = false
     }
 }
 

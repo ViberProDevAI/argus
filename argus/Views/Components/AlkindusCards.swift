@@ -23,6 +23,7 @@ struct AlkindusSymbolCard: View {
             // Header
             HStack {
                 Image(systemName: "brain.head.profile")
+                    .font(.system(size: 14))
                     .foregroundColor(gold)
                 Text("ALKINDUS ÖĞRENMELERİ")
                     .font(.system(size: 10, weight: .bold, design: .monospaced))

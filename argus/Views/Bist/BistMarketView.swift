@@ -7,6 +7,8 @@ struct BistMarketView: View {
     @EnvironmentObject var viewModel: TradingViewModel
     @State private var searchText = ""
     @Environment(\.dismiss) var dismiss
+    @State private var showDrawer = false
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
     
     // Sabit BIST Listesi
     let universe: [String: String] = [
@@ -61,11 +63,25 @@ struct BistMarketView: View {
             .background(Theme.background.ignoresSafeArea())
             .navigationTitle("BIST Piyasa")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showDrawer = true }) {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundColor(.white)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Kapat") {
                         dismiss()
                     }
                 }
+            }
+        }
+        .overlay {
+            if showDrawer {
+                ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                    drawerSections(openSheet: openSheet)
+                }
+                .zIndex(200)
             }
         }
     }
@@ -194,7 +210,7 @@ struct BistMarketView: View {
         }
         
         guard let quote = viewModel.quotes[symbol] else {
-            print("⚠️ Quote not available for \(symbol)")
+            print("Quote not available for \(symbol)")
             return
         }
         
@@ -206,7 +222,7 @@ struct BistMarketView: View {
         )
         
         if success != nil {
-            print("✅ BIST Alım Başarılı: \(symbol)")
+            print("BIST alim basarili: \(symbol)")
         }
     }
     
@@ -220,6 +236,80 @@ struct BistMarketView: View {
         if score >= 70 { return .green }
         if score <= 30 { return .red }
         return .orange
+    }
+
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "brain.head.profile") {
+                        deepLinkManager.navigate(to: .alkindus)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Ayarlar", subtitle: "Tercihler", icon: "gearshape") {
+                        deepLinkManager.navigate(to: .settings)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "BIST",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Arama Temizle", subtitle: "Filtreyi sifirla", icon: "xmark.circle") {
+                        searchText = ""
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Takip Listem", subtitle: "Izleme listesi", icon: "eye") {
+                        searchText = ""
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Kapat", subtitle: "Pencereyi kapat", icon: "xmark") {
+                        dismiss()
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "ARACLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                        openSheet(.calendar)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                        openSheet(.dictionary)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
+                        openSheet(.systemHealth)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                        openSheet(.feedback)
+                    }
+                ]
+            )
+        )
+        
+        return sections
     }
 }
 

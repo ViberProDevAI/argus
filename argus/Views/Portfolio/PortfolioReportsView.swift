@@ -93,7 +93,7 @@ struct PortfolioReportsView: View {
         }
 
         .onChange(of: viewModel.transactionHistory.count) { _ in
-            print("📊 UI: Transaction count changed, refreshing reports...")
+            print(" UI: Transaction count changed, refreshing reports...")
             Task { await viewModel.refreshReports() }
         }
         .onChange(of: viewModel.bistBalance) { _ in

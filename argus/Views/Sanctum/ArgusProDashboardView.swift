@@ -85,7 +85,7 @@ struct ArgusProDashboardView: View {
                             .onTapGesture { activeModule = .hermes }
                              
                             // BLOCK F: ALKINDUS (1x1)
-                            BentoCard(title: "ALKINDUS", icon: "brain.head.profile", accentColor: Sanctum2Theme.crimsonRed, height: 160) {
+                            BentoCard(title: "ALKINDUS", icon: "AlkindusIcon", accentColor: Sanctum2Theme.crimsonRed, height: 160) {
                                 alkindusContent
                             }
                             .onTapGesture { activeModule = .chiron }

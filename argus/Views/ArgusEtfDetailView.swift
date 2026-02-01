@@ -114,11 +114,11 @@ struct ArgusEtfDetailView: View {
     
     private func loadData() async {
         isLoading = true
-        print("🔱 Titan: loadData started for \(symbol)")
+        print(" Titan: loadData started for \(symbol)")
         
         // 1. Ensure Quote is available
         if viewModel.quotes[symbol] == nil {
-            print("🔱 Titan: Fetching quote for \(symbol)...")
+            print(" Titan: Fetching quote for \(symbol)...")
             await viewModel.fetchQuote(for: symbol)
         }
         
@@ -126,17 +126,17 @@ struct ArgusEtfDetailView: View {
         var candles = viewModel.candles[symbol] ?? []
         
         if candles.isEmpty {
-            print("🔱 Titan: Candles empty. Fetching candles for \(symbol)...")
+            print(" Titan: Candles empty. Fetching candles for \(symbol)...")
             await viewModel.loadCandles(for: symbol, timeframe: "1G")
             candles = viewModel.candles[symbol] ?? []
-            print("🔱 Titan: Fetched \(candles.count) candles")
+            print(" Titan: Fetched \(candles.count) candles")
         } else {
-            print("🔱 Titan: Using cached \(candles.count) candles")
+            print(" Titan: Using cached \(candles.count) candles")
         }
         
         // 3. Ensure Macro data if possible
         if viewModel.macroRating == nil {
-            print("🔱 Titan: Macro rating missing, using nil")
+            print(" Titan: Macro rating missing, using nil")
         }
         
         // 4. Profile - Currently disabled (FMP removed)
@@ -157,7 +157,7 @@ struct ArgusEtfDetailView: View {
             profile: self.profile
         )
         
-        print("🔱 Titan: Analysis complete. Score: \(String(format: "%.1f", res.score))")
+        print(" Titan: Analysis complete. Score: \(String(format: "%.1f", res.score))")
         
         self.titanResult = res
         isLoading = false

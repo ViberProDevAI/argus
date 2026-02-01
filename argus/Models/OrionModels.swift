@@ -109,9 +109,9 @@ struct MacroEnvironmentRating: Codable {
     let claimsScore: Double?        // NEW: ICSA Initial Claims (Leading)
     
     // Aether v5: Category Scores (Raw Averages)
-    let leadingScore: Double?       // 🟢 Öncü (VIX, Rates, Claims, BTC)
-    let coincidentScore: Double?    // 🟡 Eşzamanlı (SPY, Payrolls, DXY)
-    let laggingScore: Double?       // 🔴 Gecikmeli (CPI, Unemployment, Gold)
+    let leadingScore: Double?       //  Öncü (VIX, Rates, Claims, BTC)
+    let coincidentScore: Double?    //  Eşzamanlı (SPY, Payrolls, DXY)
+    let laggingScore: Double?       //  Gecikmeli (CPI, Unemployment, Gold)
     
     // Aether v5: Weighted Contributions (for UI display)
     // Leading × 1.5 / 3.3, Coincident × 1.0 / 3.3, Lagging × 0.8 / 3.3

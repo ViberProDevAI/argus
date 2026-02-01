@@ -113,6 +113,11 @@ struct ArgusGrandCouncilCard: View {
                 )
             }
             .background(Theme.secondaryBackground)
+            
+            // 4. Wisdom Quote Strip
+            WisdomQuoteStrip(action: decision.action)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 12)
         }
         .cornerRadius(20)
         .overlay(

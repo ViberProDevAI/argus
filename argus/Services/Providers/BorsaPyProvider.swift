@@ -152,11 +152,15 @@ enum BorsaPyError: Error, LocalizedError {
     case requestFailed
     case invalidResponse
     case decodingError
+    case missingApiKey
+    case dataUnavailable
     
     var errorDescription: String? {
         switch self {
         case .requestFailed: return "İstek başarısız"
         case .invalidResponse: return "Geçersiz yanıt"
+        case .missingApiKey: return "API anahtarı eksik"
+        case .dataUnavailable: return "Veri bulunamadı"
         default: return "Bir hata oluştu"
         }
     }
@@ -320,9 +324,17 @@ actor BorsaPyProvider {
     func getSectorIndex(code: String) async throws -> BistQuote { try await getBistQuote(symbol: code) }
     
     func getFXRate(asset: String) async throws -> FXRate {
-        // Doviz.com endpointi (Eski koddan)
-        // Placeholder
-        return FXRate(symbol: asset, last: 0, open: 0, high: 0, low: 0, timestamp: Date())
+        let ySymbol = mapYahooSymbol(for: asset)
+        let candles = try await YahooFinanceProvider.shared.fetchCandles(symbol: ySymbol, timeframe: "1d", limit: 1)
+        guard let latest = candles.first else { throw BorsaPyError.dataUnavailable }
+        return FXRate(
+            symbol: asset,
+            last: latest.close,
+            open: latest.open,
+            high: latest.high,
+            low: latest.low,
+            timestamp: latest.date
+        )
     }
     
     func getBrentPrice() async throws -> FXRate {
@@ -330,24 +342,61 @@ actor BorsaPyProvider {
     }
     
     func getBistHistory(symbol: String, days: Int = 30) async throws -> [BorsaPyCandle] {
-        // HisseTekil endpointini dene
-        // Implementasyon detaylı
-        return []
+        let s = normalizeBistYahooSymbol(symbol)
+        let candles = try await YahooFinanceProvider.shared.fetchCandles(symbol: s, timeframe: "1d", limit: days)
+        guard !candles.isEmpty else { throw BorsaPyError.dataUnavailable }
+        return candles.map { candle in
+            BorsaPyCandle(
+                date: candle.date,
+                open: candle.open,
+                high: candle.high,
+                low: candle.low,
+                close: candle.close,
+                volume: candle.volume
+            )
+        }
     }
     
     func getAnalystRecommendations(symbol: String) async throws -> BistAnalystConsensus {
-         return BistAnalystConsensus(
-            symbol: symbol,
-            averageTargetPrice: 0,
-            highTargetPrice: 0,
-            lowTargetPrice: 0,
-            potentialReturn: 0,
-            recommendation: "N/A",
-            buyCount: 0,
-            holdCount: 0,
-            sellCount: 0,
+        let key = APIKeyStore.shared.getKey(for: .fmp) ?? Secrets.fmpKey
+        guard !key.isEmpty else { throw BorsaPyError.missingApiKey }
+        
+        let clean = cleanSymbol(symbol)
+        let fmpSymbol = clean.contains(".") ? clean : "\(clean).IS"
+        
+        let grades = try await fetchFMPGradesConsensus(symbol: fmpSymbol, apiKey: key)
+        let targets = try await fetchFMPPriceTargetConsensus(symbol: fmpSymbol, apiKey: key)
+        
+        let strongBuy = grades.strongBuy
+        let buy = grades.buy
+        let hold = grades.hold
+        let sell = grades.sell
+        let strongSell = grades.strongSell
+        
+        let buyCount = strongBuy + buy
+        let sellCount = strongSell + sell
+        let holdCount = hold
+        let total = buyCount + holdCount + sellCount
+        
+        if total == 0 && targets.average == nil && targets.high == nil && targets.low == nil {
+            throw BorsaPyError.dataUnavailable
+        }
+        
+        let currentPrice = (try? await getBistQuote(symbol: clean)).map { $0.last }
+        let potentialReturn = computePotentialReturn(currentPrice: currentPrice, target: targets.average)
+        
+        return BistAnalystConsensus(
+            symbol: clean,
+            averageTargetPrice: targets.average,
+            highTargetPrice: targets.high,
+            lowTargetPrice: targets.low,
+            potentialReturn: potentialReturn,
+            recommendation: grades.recommendation ?? "N/A",
+            buyCount: buyCount,
+            holdCount: holdCount,
+            sellCount: sellCount,
             timestamp: Date()
-         )
+        )
     }
 
     // MARK: - Internal Helpers
@@ -360,6 +409,173 @@ actor BorsaPyProvider {
     
     private func stockPageURL(symbol: String) -> String {
         return "\(baseURL)/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse=\(symbol)"
+    }
+
+    private func mapYahooSymbol(for asset: String) -> String {
+        let clean = asset.uppercased().replacingOccurrences(of: "/", with: "")
+        if clean.contains("USDTRY") || clean == "USD" {
+            return "USDTRY=X"
+        }
+        if clean.contains("EURTRY") || clean == "EUR" {
+            return "EURTRY=X"
+        }
+        if clean.contains("GBPTRY") || clean == "GBP" {
+            return "GBPTRY=X"
+        }
+        if clean.contains("BRENT") || clean.contains("BRN") {
+            return "BZ=F"
+        }
+        return asset
+    }
+
+    private func normalizeBistYahooSymbol(_ symbol: String) -> String {
+        let s = symbol.uppercased()
+        if s.hasSuffix(".IS") { return s }
+        return "\(s).IS"
+    }
+
+    private func computePotentialReturn(currentPrice: Double?, target: Double?) -> Double {
+        guard let price = currentPrice, let target = target, price > 0 else { return 0 }
+        return ((target - price) / price) * 100
+    }
+
+    private struct FMPGradesConsensus {
+        let strongBuy: Int
+        let buy: Int
+        let hold: Int
+        let sell: Int
+        let strongSell: Int
+        let recommendation: String?
+    }
+    
+    private struct FMPPriceTargets {
+        let average: Double?
+        let high: Double?
+        let low: Double?
+    }
+    
+    private func fetchFMPGradesConsensus(symbol: String, apiKey: String) async throws -> FMPGradesConsensus {
+        let stableURL = try fmpURL(path: "stable/grades-consensus", symbol: symbol, apiKey: apiKey)
+        if let first = try? await fetchFMPFirstObject(url: stableURL) {
+            let strongBuy = intValue(first, keys: ["strongBuy", "strong_buy", "analystRatingsStrongBuy"])
+            let buy = intValue(first, keys: ["buy", "analystRatingsBuy"])
+            let hold = intValue(first, keys: ["hold", "analystRatingsHold", "neutral"])
+            let sell = intValue(first, keys: ["sell", "analystRatingsSell"])
+            let strongSell = intValue(first, keys: ["strongSell", "strong_sell", "analystRatingsStrongSell"])
+            let recommendation = stringValue(first, keys: ["consensus", "recommendation"])
+            return FMPGradesConsensus(
+                strongBuy: strongBuy,
+                buy: buy,
+                hold: hold,
+                sell: sell,
+                strongSell: strongSell,
+                recommendation: recommendation
+            )
+        }
+        
+        let legacyURL = try fmpURL(path: "api/v3/analyst-stock-recommendations/\(symbol)", apiKey: apiKey)
+        if let first = try? await fetchFMPFirstObject(url: legacyURL) {
+            let strongBuy = intValue(first, keys: ["strongBuy", "analystRatingsStrongBuy"])
+            let buy = intValue(first, keys: ["buy", "analystRatingsBuy"])
+            let hold = intValue(first, keys: ["hold", "analystRatingsHold", "neutral"])
+            let sell = intValue(first, keys: ["sell", "analystRatingsSell"])
+            let strongSell = intValue(first, keys: ["strongSell", "analystRatingsStrongSell"])
+            let recommendation = stringValue(first, keys: ["consensus", "recommendation"])
+            return FMPGradesConsensus(
+                strongBuy: strongBuy,
+                buy: buy,
+                hold: hold,
+                sell: sell,
+                strongSell: strongSell,
+                recommendation: recommendation
+            )
+        }
+        
+        return FMPGradesConsensus(strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0, recommendation: nil)
+    }
+    
+    private func fetchFMPPriceTargetConsensus(symbol: String, apiKey: String) async throws -> FMPPriceTargets {
+        let stableURL = try fmpURL(path: "stable/price-target-consensus", symbol: symbol, apiKey: apiKey)
+        if let first = try? await fetchFMPFirstObject(url: stableURL) {
+            let average = doubleValue(first, keys: ["priceTarget", "targetPrice", "targetConsensus", "averageTargetPrice", "targetMeanPrice"])
+            let high = doubleValue(first, keys: ["targetHigh", "targetHighPrice", "highPriceTarget"])
+            let low = doubleValue(first, keys: ["targetLow", "targetLowPrice", "lowPriceTarget"])
+            return FMPPriceTargets(average: average, high: high, low: low)
+        }
+        
+        let legacyURL = try fmpURL(path: "api/v3/price-target-consensus/\(symbol)", apiKey: apiKey)
+        if let first = try? await fetchFMPFirstObject(url: legacyURL) {
+            let average = doubleValue(first, keys: ["priceTarget", "targetMeanPrice", "targetPrice", "averageTargetPrice"])
+            let high = doubleValue(first, keys: ["targetHighPrice", "highPriceTarget"])
+            let low = doubleValue(first, keys: ["targetLowPrice", "lowPriceTarget"])
+            return FMPPriceTargets(average: average, high: high, low: low)
+        }
+        
+        return FMPPriceTargets(average: nil, high: nil, low: nil)
+    }
+    
+    private func fmpURL(path: String, symbol: String? = nil, apiKey: String) throws -> URL {
+        var components: URLComponents
+        if path.hasPrefix("http") {
+            components = URLComponents(string: path) ?? URLComponents()
+        } else if path.hasPrefix("api/v3") {
+            components = URLComponents(string: "https://financialmodelingprep.com/\(path)") ?? URLComponents()
+        } else {
+            components = URLComponents(string: "https://financialmodelingprep.com/\(path)") ?? URLComponents()
+        }
+        var items = components.queryItems ?? []
+        if let symbol { items.append(URLQueryItem(name: "symbol", value: symbol)) }
+        items.append(URLQueryItem(name: "apikey", value: apiKey))
+        components.queryItems = items
+        guard let url = components.url else { throw BorsaPyError.invalidURL }
+        return url
+    }
+    
+    private func fmpURL(path: String, apiKey: String) throws -> URL {
+        guard let url = URL(string: "https://financialmodelingprep.com/\(path)?apikey=\(apiKey)") else {
+            throw BorsaPyError.invalidURL
+        }
+        return url
+    }
+    
+    private func fetchFMPFirstObject(url: URL) async throws -> [String: Any]? {
+        let (data, response) = try await URLSession.shared.data(from: url)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw BorsaPyError.invalidResponse
+        }
+        let json = try JSONSerialization.jsonObject(with: data, options: [])
+        if let arr = json as? [[String: Any]] {
+            return arr.first
+        }
+        if let obj = json as? [String: Any] {
+            return obj
+        }
+        return nil
+    }
+    
+    private func intValue(_ dict: [String: Any], keys: [String]) -> Int {
+        for key in keys {
+            if let v = dict[key] as? Int { return v }
+            if let v = dict[key] as? Double { return Int(v) }
+            if let v = dict[key] as? String, let i = Int(v) { return i }
+        }
+        return 0
+    }
+    
+    private func doubleValue(_ dict: [String: Any], keys: [String]) -> Double? {
+        for key in keys {
+            if let v = dict[key] as? Double { return v }
+            if let v = dict[key] as? Int { return Double(v) }
+            if let v = dict[key] as? String, let d = Double(v) { return d }
+        }
+        return nil
+    }
+    
+    private func stringValue(_ dict: [String: Any], keys: [String]) -> String? {
+        for key in keys {
+            if let v = dict[key] as? String, !v.isEmpty { return v }
+        }
+        return nil
     }
     
     private func performRequest(url: URL, method: String, payload: [String: Any]? = nil, referer: String? = nil) async throws -> Data {

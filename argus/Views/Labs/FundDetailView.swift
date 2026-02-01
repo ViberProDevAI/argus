@@ -230,12 +230,12 @@ struct FundDetailView: View {
                 let endDate = Date()
                 let startDate = Calendar.current.date(byAdding: .day, value: -60, to: endDate)!
                 
-                print("📊 FundDetail: Loading \(fundCode) from \(startDate) to \(endDate)")
+                print(" FundDetail: Loading \(fundCode) from \(startDate) to \(endDate)")
                 
                 // Sadece history çalışıyor - allocation API engelli
                 let hist = try await TefasService.shared.fetchHistory(fundCode: fundCode, startDate: startDate, endDate: endDate)
                 
-                print("📊 FundDetail: Got \(hist.count) price points")
+                print(" FundDetail: Got \(hist.count) price points")
                 
                 let prices = hist.map { $0.price }
                 let metrics = await RiskMetricsEngine.shared.calculateMetricsAsync(prices: prices)

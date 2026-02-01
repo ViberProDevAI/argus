@@ -1,6 +1,6 @@
 import SwiftUI
 
-// MARK: - 📊 Grafik Eğitici Kartı (SAR TRY, TSI, RSI)
+// MARK: -  Grafik Eğitici Kartı (SAR TRY, TSI, RSI)
 // Teknik analiz verilerini "Veri → Hesaplama → Sonuç" formatında gösterir
 
 struct GrafikEducationalCard: View {
@@ -740,7 +740,7 @@ struct MetricMiniCard: View {
     }
 }
 
-// MARK: - 🎯 Universal BIST Modül Detay Kartı
+// MARK: -  Universal BIST Modül Detay Kartı
 // Backend'deki BistModuleResult verilerini direkt gösterir
 
 struct BistModuleDetailCard: View {
@@ -924,8 +924,8 @@ struct BistModuleDetailCard: View {
     
     private var actionText: String {
         switch moduleResult.action {
-        case .buy: return "📈 AL"
-        case .sell: return "📉 SAT"
+        case .buy: return " AL"
+        case .sell: return " SAT"
         case .hold: return "⏸️ BEKLE"
         }
     }
@@ -962,7 +962,7 @@ struct ExtraInfoItem: Identifiable {
     let color: Color
 }
 
-// MARK: - 🌍 Global Modül Detay Kartı
+// MARK: -  Global Modül Detay Kartı
 // CouncilDecision verilerini gösterir (Orion, Atlas, Aether, Hermes için)
 
 struct GlobalModuleDetailCard: View {
@@ -1121,8 +1121,8 @@ struct GlobalModuleDetailCard: View {
     
     private var actionText: String {
         switch decision.action {
-        case .buy: return "📈 AL"
-        case .sell: return "📉 SAT"
+        case .buy: return " AL"
+        case .sell: return " SAT"
         case .hold: return "⏸️ BEKLE"
         }
     }

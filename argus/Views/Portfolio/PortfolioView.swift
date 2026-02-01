@@ -12,6 +12,8 @@ struct PortfolioView: View {
     @State private var showModelInfo = false
     @State private var selectedEntityForInfo: ArgusSystemEntity = .corse // Default
     @State private var showTradeBrain = false // Trade Brain UI State
+    @State private var showDrawer = false // Contextual Drawer State
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
     
     // Sell Logic
     @State private var showSellConfirmation = false
@@ -36,6 +38,14 @@ struct PortfolioView: View {
             ZStack {
                 Theme.background.ignoresSafeArea()
                 
+                // Contextual Drawer
+                if showDrawer {
+                    ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                        drawerSections(openSheet: openSheet)
+                    }
+                        .zIndex(100)
+                }
+                
                 VStack(spacing: 0) {
                 // 2. CONTENT SCROLL
                     ScrollView {
@@ -45,7 +55,8 @@ struct PortfolioView: View {
                                 viewModel: viewModel,
                                 selectedMarket: $selectedMarket,
                                 onBrainTap: { showTradeBrain = true },
-                                onHistoryTap: { showHistory = true }
+                                onHistoryTap: { showHistory = true },
+                                onDrawerTap: { withAnimation { showDrawer = true } }
                             )
                             .padding(.horizontal)
                             .padding(.top, 8)
@@ -269,6 +280,103 @@ struct PortfolioView: View {
             // MacroRegimeService zaten Bootstrap'ta çağrılıyor (Phase 4)
             // .onAppear { } // Artık boş - ağır işlem yok
         }
+    }
+    
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "AlkindusIcon") {
+                        deepLinkManager.navigate(to: .alkindus)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Ayarlar", subtitle: "Tercihler", icon: "gearshape") {
+                        deepLinkManager.navigate(to: .settings)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        var portfolioItems: [ArgusDrawerView.DrawerItem] = [
+            ArgusDrawerView.DrawerItem(title: "Yeni Islem", subtitle: "Pozisyon ac", icon: "plus.circle") {
+                showNewTradeSheet = true
+                showDrawer = false
+            },
+            ArgusDrawerView.DrawerItem(title: "Islem Gecmisi", subtitle: "Kapanan islemler", icon: "clock.arrow.circlepath") {
+                showHistory = true
+                showDrawer = false
+            },
+            ArgusDrawerView.DrawerItem(title: "Trade Brain", subtitle: "Yonetim paneli", icon: "brain") {
+                showTradeBrain = true
+                showDrawer = false
+            },
+            ArgusDrawerView.DrawerItem(title: "Global Portfoy", subtitle: "Pazar degistir", icon: "globe") {
+                selectedMarket = .global
+                showDrawer = false
+            },
+            ArgusDrawerView.DrawerItem(title: "BIST Portfoy", subtitle: "Pazar degistir", icon: "chart.bar") {
+                selectedMarket = .bist
+                showDrawer = false
+            }
+        ]
+        
+        if selectedMarket == .global {
+            portfolioItems.append(contentsOf: [
+                ArgusDrawerView.DrawerItem(title: "Motor: Genel", subtitle: "Tum islemler", icon: "circle.grid.2x2") {
+                    selectedEngine = .all
+                    showDrawer = false
+                },
+                ArgusDrawerView.DrawerItem(title: "Motor: Corse", subtitle: "Swing", icon: "chart.line.uptrend.xyaxis") {
+                    selectedEngine = .corse
+                    showDrawer = false
+                },
+                ArgusDrawerView.DrawerItem(title: "Motor: Pulse", subtitle: "Scalp", icon: "bolt") {
+                    selectedEngine = .pulse
+                    showDrawer = false
+                },
+                ArgusDrawerView.DrawerItem(title: "Motor: Gozcu", subtitle: "Canli tarama", icon: "binoculars") {
+                    selectedEngine = .scouting
+                    showDrawer = false
+                }
+            ])
+        }
+        
+        sections.append(ArgusDrawerView.DrawerSection(title: "PORTFOY", items: portfolioItems))
+        sections.append(commonToolsSection(openSheet: openSheet))
+        
+        return sections
+    }
+    
+    private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
+        ArgusDrawerView.DrawerSection(
+            title: "ARACLAR",
+            items: [
+                ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                    openSheet(.calendar)
+                },
+                ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                    openSheet(.dictionary)
+                },
+                ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
+                    openSheet(.systemHealth)
+                },
+                ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                    openSheet(.feedback)
+                }
+            ]
+        )
     }
     private func mapAndShowInfo(_ engine: AutoPilotEngine) {
         switch engine {
@@ -878,15 +986,19 @@ struct PortfolioCard: View {
 
 struct EmptyPortfolioState: View {
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             Image(systemName: "shippingbox")
                 .font(.system(size: 48))
                 .foregroundColor(Theme.textSecondary.opacity(0.3))
             Text("Portföyün Boş")
                 .font(.headline)
                 .foregroundColor(Theme.textSecondary)
+            
+            // Motivasyon sözü
+            EmptyPortfolioQuote()
+                .padding(.top, 8)
         }
-        .padding(.top, 60)
+        .padding(.top, 40)
     }
 }
 
@@ -1107,4 +1219,3 @@ struct ScoutHistoryRow: View {
         .cornerRadius(8)
     }
 }
-

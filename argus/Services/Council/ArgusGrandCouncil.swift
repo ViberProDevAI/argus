@@ -184,10 +184,10 @@ actor ArgusGrandCouncil {
         if isBist {
             // [ADAPTER] BIST Sentiment -> Hermes Snapshot
             // BIST için native sentiment analizini çalıştırıp Hermes formatına çeviriyoruz
-            if let sentimentResult = try? await BISTSentimentEngine.shared.analyzeSentiment(for: symbol) {
-                let adaptedSnapshot = BISTSentimentAdapter.adapt(result: sentimentResult)
+            if let payload = try? await BISTSentimentEngine.shared.analyzeSentimentPayload(for: symbol) {
+                let adaptedSnapshot = BISTSentimentAdapter.adapt(result: payload.result, articles: payload.articles)
                 hermesDecision = await HermesCouncil.shared.convene(symbol: symbol, news: adaptedSnapshot)
-                print("🇹🇷 Hermes (Adapter): BIST Sentiment Entegre Edildi. Skor: \(Int(sentimentResult.overallScore))")
+                print("🇹🇷 Hermes (Adapter): BIST Sentiment Entegre Edildi. Skor: \(Int(payload.result.overallScore))")
             }
         } else if let newsData = news {
             hermesDecision = await HermesCouncil.shared.convene(symbol: symbol, news: newsData)

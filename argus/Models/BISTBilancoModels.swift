@@ -47,11 +47,11 @@ enum BISTMetrikDurum: String, Codable {
     
     var emoji: String {
         switch self {
-        case .mukemmel: return "🟢"
-        case .iyi: return "🟢"
-        case .notr: return "🟡"
-        case .dikkat: return "🟠"
-        case .kotu: return "🔴"
+        case .mukemmel: return ""
+        case .iyi: return ""
+        case .notr: return ""
+        case .dikkat: return ""
+        case .kotu: return ""
         case .kritik: return "⛔"
         case .veriYok: return "⚪"
         }

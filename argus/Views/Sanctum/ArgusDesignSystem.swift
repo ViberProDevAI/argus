@@ -156,10 +156,18 @@ struct BentoCard<Content: View, HeaderAccessory: View>: View {
             // Card Header
             HStack {
                 HStack(spacing: 6) {
-                    Image(systemName: icon)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(accentColor)
-                    
+                    // Custom asset veya SF Symbol
+                    if icon.hasSuffix("Icon") {
+                        Image(icon)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 14, height: 14)
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(accentColor)
+                    }
+
                     Text(title.uppercased())
                         .font(.system(size: 10, weight: .heavy))
                         .foregroundColor(accentColor.opacity(0.8))

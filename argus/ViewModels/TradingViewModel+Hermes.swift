@@ -32,9 +32,7 @@ extension TradingViewModel {
                     articles = try await YahooFinanceNewsProvider.shared.fetchNews(symbol: symbol, limit: 20)
                 }
                 
-                if !isGeneral {
-                    self.newsBySymbol[symbol] = articles
-                }
+                self.newsBySymbol[symbol] = articles
                 
                 // 2. Analyze Top Articles
                 // General: Analyze top 5
@@ -289,7 +287,7 @@ extension TradingViewModel {
                 symbol: "BIST",
                 timestamp: Date(),
                 insights: turkeyRelatedInsights,
-                articles: [] // Sirkiye için raw article gerekmez, insights yeterli
+                articles: self.newsBySymbol["GENERAL"] ?? []
             )
         }
         
@@ -345,6 +343,8 @@ extension TradingViewModel {
             } else {
                 articles = try await YahooFinanceNewsProvider.shared.fetchNews(symbol: symbol, limit: 15)
             }
+            
+            self.newsBySymbol[symbol] = articles
             
             let scope: HermesEventScope = isBist ? .bist : .global
             let events = try await HermesLLMService.shared.analyzeEvents(

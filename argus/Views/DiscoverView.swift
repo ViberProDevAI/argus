@@ -2,6 +2,8 @@ import SwiftUI
 
 struct DiscoverView: View {
     @ObservedObject var viewModel: TradingViewModel
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
+    @State private var showDrawer = false
     
     // Grid adaptation for horizontal scroll if needed, but HStacks work better for single row carousels.
     
@@ -16,13 +18,19 @@ struct DiscoverView: View {
                         
                         // MARK: - 1. Top Gainers (Momentum)
                         VStack(alignment: .leading, spacing: 16) {
-                            DiscoverSectionHeader(title: "Yükselenler 🚀", subtitle: "Günün Momentum Liderleri")
+                            DiscoverSectionHeader(title: "Yükselenler", subtitle: "Günün momentum liderleri")
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(viewModel.topGainers, id: \.symbol) { quote in
                                         NavigationLink(destination: StockDetailView(symbol: quote.symbol ?? "---", viewModel: viewModel)) {
-                                            DiscoverMarketCard(quote: quote, type: .gainer)
+                                            DiscoverMarketCard(
+                                                quote: quote,
+                                                type: .gainer,
+                                                onAddToWatchlist: { symbol in
+                                                    viewModel.addToWatchlist(symbol: symbol)
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -32,13 +40,19 @@ struct DiscoverView: View {
                         
                         // MARK: - 2. Top Losers (Dip Opportunities)
                         VStack(alignment: .leading, spacing: 16) {
-                            DiscoverSectionHeader(title: "Düşenler 🩸", subtitle: "Olası Phoenix Adayları")
+                            DiscoverSectionHeader(title: "Düşenler", subtitle: "Olası Phoenix adayları")
                             
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(viewModel.topLosers, id: \.symbol) { quote in
                                         NavigationLink(destination: StockDetailView(symbol: quote.symbol ?? "---", viewModel: viewModel)) {
-                                            DiscoverMarketCard(quote: quote, type: .loser)
+                                            DiscoverMarketCard(
+                                                quote: quote,
+                                                type: .loser,
+                                                onAddToWatchlist: { symbol in
+                                                    viewModel.addToWatchlist(symbol: symbol)
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -48,7 +62,7 @@ struct DiscoverView: View {
                         
                         // MARK: - 3. Most Active (Volume Leaders)
                         VStack(alignment: .leading, spacing: 16) {
-                            DiscoverSectionHeader(title: "En Hareketliler 🔥", subtitle: "Hacim Liderleri")
+                            DiscoverSectionHeader(title: "En Hareketliler", subtitle: "Hacim liderleri")
                                 .padding(.bottom, 4)
                             
                             LazyVStack(spacing: 0) {
@@ -74,6 +88,20 @@ struct DiscoverView: View {
             }
             .navigationTitle("Keşfet")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showDrawer = true }) {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundColor(.white)
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { viewModel.loadDiscoverData() }) {
+                        Image(systemName: "arrow.clockwise")
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+            }
             .onAppear {
                 viewModel.loadDiscoverData()
             }
@@ -82,6 +110,80 @@ struct DiscoverView: View {
             }
         }
         .preferredColorScheme(.dark) // Force Dark Mode for this view
+        .overlay {
+            if showDrawer {
+                ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                    drawerSections(openSheet: openSheet)
+                }
+                .zIndex(200)
+            }
+        }
+    }
+
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "AlkindusIcon") {
+                        deepLinkManager.navigate(to: .alkindus)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Ayarlar", subtitle: "Tercihler", icon: "gearshape") {
+                        deepLinkManager.navigate(to: .settings)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "KESFET",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Yenile", subtitle: "Listeyi guncelle", icon: "arrow.clockwise") {
+                        viewModel.loadDiscoverData()
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "ARACLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                        openSheet(.calendar)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                        openSheet(.dictionary)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
+                        openSheet(.systemHealth)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                        openSheet(.feedback)
+                    }
+                ]
+            )
+        )
+        
+        return sections
     }
 }
 
@@ -113,6 +215,7 @@ enum MarketCardType {
 struct DiscoverMarketCard: View {
     let quote: Quote
     let type: MarketCardType
+    let onAddToWatchlist: (String) -> Void
     
     var cardColor: Color {
         switch type {
@@ -173,7 +276,9 @@ struct DiscoverMarketCard: View {
         )
         .contextMenu {
             Button {
-                // Add to watchlist logic would go here
+                if let symbol = quote.symbol, !symbol.isEmpty {
+                    onAddToWatchlist(symbol)
+                }
             } label: {
                 Label("İzlemeye Ekle", systemImage: "eye.fill")
             }
@@ -211,10 +316,12 @@ struct DiscoverMarketRow: View {
                     .font(.headline)
                     .bold()
                     .foregroundColor(.white)
-                Text(quote.shortName ?? "Unknown")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                    .lineLimit(1)
+                if let name = quote.shortName, !name.isEmpty {
+                    Text(name)
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                        .lineLimit(1)
+                }
             }
             
             Spacer()

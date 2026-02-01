@@ -86,7 +86,7 @@ struct ChironDetailView: View {
                             
                             // MARK: - Engine Selector
                             HStack(spacing: 0) {
-                                EngineTab(title: "CORSE 🐢", isSelected: selectedEngine == .corse) {
+                                EngineTab(title: "CORSE ", isSelected: selectedEngine == .corse) {
                                     withAnimation { selectedEngine = .corse }
                                 }
                                 EngineTab(title: "PULSE ⚡", isSelected: selectedEngine == .pulse) {
@@ -235,7 +235,7 @@ struct WeightsCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Text(engine == .corse ? "CORSE Ağırlıkları 🐢" : "PULSE Ağırlıkları ⚡")
+                Text(engine == .corse ? "CORSE Ağırlıkları " : "PULSE Ağırlıkları ⚡")
                     .font(.headline)
                     .foregroundColor(.white)
                 Spacer()

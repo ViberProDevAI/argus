@@ -68,7 +68,7 @@ enum CircuitNode: Equatable {
             • **Altın Kesişim (Golden Cross):** SMA 50'nin SMA 200'ü yukarı kesmesi, boğa piyasasının en güçlü sinyallerinden biridir.
             • **ADX (Trend Gücü):** Yön ne olursa olsun, trendin gücünü ölçer. 25 üzeri ADX, güçlü bir trendi işaret eder.
             
-            💡 **PRO TIP:** Trend dostunuzdur, ancak "düzeltme" (pullback) ile "dönüş" (reversal) arasındaki farkı anlamak kritiktir. ADX düşüyorsa trend zayıflıyor olabilir.
+             **PRO TIP:** Trend dostunuzdur, ancak "düzeltme" (pullback) ile "dönüş" (reversal) arasındaki farkı anlamak kritiktir. ADX düşüyorsa trend zayıflıyor olabilir.
             """
             
         case .momentum:
@@ -81,7 +81,7 @@ enum CircuitNode: Equatable {
             • **RSI (Göreceli Güç):** 70 üzeri "Aşırı Alım" (Fiyat pahalı), 30 altı "Aşırı Satım" (Fiyat ucuz) bölgesidir. Ancak güçlü trendlerde RSI uzun süre 70 üzerinde kalabilir; bu bir güç göstergesidir, hemen sat sinyali değildir.
             • **Uyumsuzluk (Divergence):** Fiyat yeni zirve yaparken RSI yapamıyorsa (Negatif Uyumsuzluk), düşüş yakındır.
             
-            💡 **PRO TIP:** RSI 50 seviyesi "Boğa/Ayı Kontrol Bölgesi"dir. 50'nin üzerinde kalıcılık, alıcıların iştahlı olduğunu gösterir.
+             **PRO TIP:** RSI 50 seviyesi "Boğa/Ayı Kontrol Bölgesi"dir. 50'nin üzerinde kalıcılık, alıcıların iştahlı olduğunu gösterir.
             """
             
         case .structure:
@@ -95,7 +95,7 @@ enum CircuitNode: Equatable {
             • **Destek/Direnç Kanalları:** Fiyatın tarihsel olarak tepki verdiği bölgelerdir.
             • **Anomali:** Fiyat artarken hacim düşüyorsa, yükseliş "sahte" (Fakeout) olabilir.
             
-            💡 **PRO TIP:** Hacimsiz yükselişler genellikle satış fırsatıdır. Büyük mumlar + Yüksek hacim = Kurumsal Ayak İzi.
+             **PRO TIP:** Hacimsiz yükselişler genellikle satış fırsatıdır. Büyük mumlar + Yüksek hacim = Kurumsal Ayak İzi.
             """
             
         case .pattern:
@@ -108,7 +108,7 @@ enum CircuitNode: Equatable {
             • **Dönüş Formasyonları:** İkili Dip, OBO (Omuz Baş Omuz), Ters OBO. Trendin değişeceğini haber verir.
             • **Devam Formasyonları:** Bayrak (Flag), Flama (Pennant). Trendin kısa bir moladan sonra devam edeceğini gösterir.
             
-            💡 **PRO TIP:** Formasyonlar "gerçekleşmeden" değil, "kırılım" (breakout) teyidi alındıktan sonra işlem yapılmalıdır. Erken girmek risklidir.
+             **PRO TIP:** Formasyonlar "gerçekleşmeden" değil, "kırılım" (breakout) teyidi alındıktan sonra işlem yapılmalıdır. Erken girmek risklidir.
             """
             
         case .cpu:

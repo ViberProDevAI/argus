@@ -60,14 +60,14 @@ struct StockDetailView: View {
         }
         .onAppear {
             #if DEBUG
-            print("🔍 UI DEBUG: StockDetailView appeared for \(symbol)")
+            print(" UI DEBUG: StockDetailView appeared for \(symbol)")
             #endif
             checkType()
         }
         // React to data reloading (e.g. after manual override)
         .onChange(of: viewModel.argusDecisions[symbol]?.assetType) { oldValue, newValue in
             #if DEBUG
-            print("🔍 UI DEBUG: Asset Type Changed for \(symbol). Old: \(String(describing: oldValue)), New: \(String(describing: newValue))")
+            print(" UI DEBUG: Asset Type Changed for \(symbol). Old: \(String(describing: oldValue)), New: \(String(describing: newValue))")
             #endif
             checkType()
         }
@@ -75,13 +75,13 @@ struct StockDetailView: View {
 
     private func checkType() {
         #if DEBUG
-        print("🔍 UI DEBUG: checkType called for \(symbol)")
+        print(" UI DEBUG: checkType called for \(symbol)")
         #endif
         Task {
             // Force check again (checking overrides)
             let result = await viewModel.checkIsEtf(symbol)
             #if DEBUG
-            print("🔍 UI DEBUG: checkIsEtf result for \(symbol): \(String(describing: result))")
+            print(" UI DEBUG: checkIsEtf result for \(symbol): \(String(describing: result))")
             #endif
             await MainActor.run {
                 withAnimation {
@@ -106,7 +106,6 @@ struct StockDetailContent: View {
     @State private var showAthenaSheet = false // Smart Beta
     @State private var showChironSheet = false // Risk Rejimi
     @State private var showPhoenixSheet = false // Phoenix Detay
-    @State private var showDebateSheet = false // Münazara Simülatörü
     
     // Chart Toggles
     @State private var showSMA = false
@@ -128,11 +127,6 @@ struct StockDetailContent: View {
     var body: some View {
             // Sanctum View (Primary and only view)
             ArgusSanctumView(symbol: symbol, viewModel: viewModel)
-                .sheet(isPresented: $showDebateSheet) {
-                    if let decision = viewModel.grandDecisions[symbol] {
-                        AgoraDebateSheet(decision: decision)
-                    }
-                }
         .background(Theme.background.ignoresSafeArea())
         .task {
             // 1. Standard Data Load
@@ -186,27 +180,6 @@ struct StockDetailContent: View {
                 )
             }
         }
-        .sheet(isPresented: $showDebateSheet) {
-            if let trace = viewModel.agoraTraces[symbol] {
-                DebateSimulatorView(trace: trace)
-            } else {
-                Text("Münazara verisi oluşturuluyor...")
-            }
-        }
-
-
-        .sheet(item: $viewModel.generatedSmartPlan) { plan in
-             if let trade = viewModel.portfolio.first(where: { $0.id == plan.tradeId }) {
-                 PlanEditorSheet(
-                     trade: trade,
-                     currentPrice: viewModel.quotes[trade.symbol]?.currentPrice ?? trade.entryPrice,
-                     plan: plan
-                 )
-             } else {
-                 Text("Hata: Pozisyon bulunamadı")
-             }
-        }
-        
         .sheet(item: $viewModel.activeBacktestResult) { res in
             NavigationView {
                 BacktestResultDetailsView(result: res)

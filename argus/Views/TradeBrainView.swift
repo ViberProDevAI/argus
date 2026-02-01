@@ -10,6 +10,8 @@ struct TradeBrainView: View {
     @State private var selectedPlan: PositionPlan?
     @State private var showPlanDetail = false
     @State private var marketMode: MarketMode = .all
+    @State private var showDrawer = false
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
     
     enum MarketMode: String, CaseIterable {
         case all = "Tümü"
@@ -75,6 +77,12 @@ struct TradeBrainView: View {
             .background(Color(.systemGroupedBackground))
             .navigationTitle("Trade Brain")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showDrawer = true }) {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundColor(.primary)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     AlkindusAvatarView(size: 24, isThinking: false)
                 }
@@ -84,6 +92,14 @@ struct TradeBrainView: View {
                 if let plan = selectedPlan {
                     PositionPlanDetailView(plan: plan)
                 }
+            }
+        }
+        .overlay {
+            if showDrawer {
+                ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                    drawerSections(openSheet: openSheet)
+                }
+                .zIndex(200)
             }
         }
     }
@@ -98,18 +114,9 @@ struct TradeBrainView: View {
                         marketMode = mode
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        if mode == .bist {
-                            Text("🇹🇷")
-                        } else if mode == .global {
-                            Text("🌍")
-                        } else {
-                            Text("📊")
-                        }
-                        Text(mode.rawValue)
-                            .font(.subheadline)
-                            .fontWeight(.semibold)
-                    }
+                    Text(mode.rawValue)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
                     .foregroundColor(marketMode == mode ? .white : .secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
@@ -323,7 +330,7 @@ struct TradeBrainView: View {
             // Suggestions
             if !health.suggestions.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("💡 Öneriler")
+                    Text(" Öneriler")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                     
@@ -612,6 +619,97 @@ struct TradeBrainView: View {
         case .warning: return .orange
         case .critical: return .red
         }
+    }
+    
+    // MARK: - Drawer Sections
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "brain.head.profile") {
+                        deepLinkManager.navigate(to: .alkindus)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Ayarlar", subtitle: "Tercihler", icon: "gearshape") {
+                        deepLinkManager.navigate(to: .settings)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "TRADE BRAIN",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Sekme: Portfoy", subtitle: "Genel gorunum", icon: "chart.pie.fill") {
+                        selectedTab = 0
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sekme: Risk", subtitle: "Risk panosu", icon: "shield") {
+                        selectedTab = 1
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sekme: Takvim", subtitle: "Plan takvimi", icon: "calendar") {
+                        selectedTab = 2
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sekme: Egitim", subtitle: "Strateji notlari", icon: "book") {
+                        selectedTab = 3
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Pazar: Tum", subtitle: "Tum portfoy", icon: "circle.grid.2x2") {
+                        marketMode = .all
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Pazar: Global", subtitle: "Global portfoy", icon: "globe") {
+                        marketMode = .global
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Pazar: BIST", subtitle: "BIST portfoy", icon: "chart.bar") {
+                        marketMode = .bist
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "ARACLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                        openSheet(.calendar)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                        openSheet(.dictionary)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
+                        openSheet(.systemHealth)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                        openSheet(.feedback)
+                    }
+                ]
+            )
+        )
+        
+        return sections
     }
 }
 

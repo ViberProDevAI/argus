@@ -129,45 +129,64 @@ final class PortfolioStore: ObservableObject {
         let portfolioFile = docs.appendingPathComponent(portfolioFileName)
         let txFile = docs.appendingPathComponent(transactionsFileName)
         
-        // 1. Try Loading V6 Files
-        var v6Loaded = false
+        let balanceExists = FileManager.default.fileExists(atPath: balanceFile.path)
+        let portfolioExists = FileManager.default.fileExists(atPath: portfolioFile.path)
+        let txExists = FileManager.default.fileExists(atPath: txFile.path)
+
+        // 1. Check for legacy migration ONLY if no V6 files exist at all
+        if !balanceExists && !portfolioExists && !txExists {
+            print("📂 PortfolioStore: No V6 files found. Attempting migration from V5...")
+            migrateFromV5()
+            return
+        }
         
-        if FileManager.default.fileExists(atPath: balanceFile.path) {
+        print("🚀 PortfolioStore: Loading V6 Data (Granular Load)...")
+        
+        // 2. Load Balances
+        if balanceExists {
             do {
                 let data = try Data(contentsOf: balanceFile)
                 let balances = try decoder.decode([String: Double].self, from: data)
                 if let usd = balances["usd"], let tl = balances["try"] {
                     globalBalance = usd
                     bistBalance = tl
-                    v6Loaded = true
-                    print("✅ PortfolioStore: Balances loaded from V6 File")
+                    print("✅ PortfolioStore: Balances loaded: $\(usd) / ₺\(tl)")
                 }
             } catch {
-                print("❌ PortfolioStore: V6 Balance load failed: \(error)")
+                print("❌ PortfolioStore: Balance Load FAILED: \(error)")
+                // Do NOT reset to default. Keep -1 to prevent 'saveToDisk' from overwriting broken file with defaults.
+            }
+        } else {
+             print("⚠️ PortfolioStore: Balance file missing, but other V6 files exist.")
+             // If we found trades but no balance, maybe it was deleted?
+             // Initialize defaults to allow usage, but this is a rare edge case.
+             globalBalance = 100_000.0
+             bistBalance = 1_000_000.0
+        }
+        
+        // 3. Load Trades
+        if portfolioExists {
+            do {
+                let data = try Data(contentsOf: portfolioFile)
+                trades = try decoder.decode([Trade].self, from: data)
+                print("✅ PortfolioStore: \(trades.count) trades loaded")
+            } catch {
+                print("❌ PortfolioStore: Trades Load FAILED: \(error)")
+                // Keep trades empty [] but don't delete file
             }
         }
         
-        if v6Loaded {
-            // Load Trades
-            if let data = try? Data(contentsOf: portfolioFile) {
-                if let savedTrades = try? decoder.decode([Trade].self, from: data) {
-                    trades = savedTrades
-                    print("✅ PortfolioStore: \(trades.count) trades loaded from V6 File")
-                }
+        // 4. Load Transactions
+        if txExists {
+             do {
+                let data = try Data(contentsOf: txFile)
+                transactions = try decoder.decode([Transaction].self, from: data)
+                print("✅ PortfolioStore: \(transactions.count) transactions loaded")
+            } catch {
+                print("❌ PortfolioStore: Transactions Load FAILED: \(error)")
             }
-            
-            // Load Transactions
-            if let data = try? Data(contentsOf: txFile) {
-                if let savedTx = try? decoder.decode([Transaction].self, from: data) {
-                    transactions = savedTx
-                }
-            }
-        } else {
-            // V6 Missing -> Migrate from V5 (UserDefaults)
-            print("📂 PortfolioStore: V6 not found. Attempting migration from V5...")
-            migrateFromV5()
         }
-
+        
         print("🏁 PortfolioStore: Load Complete - Trades: \(trades.count), USD: $\(globalBalance), TRY: ₺\(bistBalance)")
     }
     

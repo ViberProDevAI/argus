@@ -18,7 +18,7 @@ struct ArgusStrategyCenterView: View {
             switch self {
             case .aether: return "eye.trianglebadge.exclamationmark"
             case .chiron: return "network"
-            case .alkindus: return "brain.head.profile"
+            case .alkindus: return "AlkindusIcon"
             case .backtest: return "flask"
             }
         }

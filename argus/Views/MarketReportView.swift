@@ -3,6 +3,8 @@ import SwiftUI
 struct MarketReportView: View {
     let report: MarketAnalysisReport
     @Environment(\.presentationMode) var presentationMode
+    @State private var showDrawer = false
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
     
     var body: some View {
         NavigationView {
@@ -21,7 +23,7 @@ struct MarketReportView: View {
                     // 1. Trend Opportunities (MACD/SMA)
                     if !report.trendOpportunities.isEmpty {
                         ReportSignalSection(
-                            title: "Trend Fırsatları (MACD/SMA) 📈",
+                            title: "Trend Fırsatları (MACD/SMA) ",
                             subtitle: "Bu hisseler güçlü bir trendde. Trend takipçisi indikatörler (MACD, SMA) en iyi sonucu verir.",
                             signals: report.trendOpportunities,
                             color: Theme.tint
@@ -31,7 +33,7 @@ struct MarketReportView: View {
                     // 2. Reversal Opportunities (RSI/Bollinger)
                     if !report.reversalOpportunities.isEmpty {
                         ReportSignalSection(
-                            title: "Tepki Fırsatları (RSI/Bollinger) ⚡️",
+                            title: "Tepki Fırsatları (RSI/Bollinger)",
                             subtitle: "Bu hisseler aşırı alım/satım bölgesinde. Dönüş sinyalleri (RSI, Bollinger) takip edilmeli.",
                             signals: report.reversalOpportunities,
                             color: Theme.warning
@@ -41,7 +43,7 @@ struct MarketReportView: View {
                     // 3. Breakout Opportunities
                     if !report.breakoutOpportunities.isEmpty {
                         ReportSignalSection(
-                            title: "Sert Hareket Edenler (Breakout) 🚀",
+                            title: "Sert Hareket Edenler (Breakout) ",
                             subtitle: "Fiyat ve hacimde ani değişim var. Volatilite stratejileri uygun.",
                             signals: report.breakoutOpportunities,
                             color: Theme.positive
@@ -50,8 +52,14 @@ struct MarketReportView: View {
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("AI Piyasa Raporu")
+            .navigationTitle("Piyasa Raporu")
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: { showDrawer = true }) {
+                        Image(systemName: "line.3.horizontal")
+                            .foregroundColor(.white)
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Kapat") {
                         presentationMode.wrappedValue.dismiss()
@@ -60,6 +68,80 @@ struct MarketReportView: View {
             }
             .background(Theme.background.edgesIgnoringSafeArea(.all))
         }
+        .overlay {
+            if showDrawer {
+                ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                    drawerSections(openSheet: openSheet)
+                }
+                .zIndex(200)
+            }
+        }
+    }
+
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "brain.head.profile") {
+                        deepLinkManager.navigate(to: .alkindus)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Ayarlar", subtitle: "Tercihler", icon: "gearshape") {
+                        deepLinkManager.navigate(to: .settings)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "RAPOR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Kapat", subtitle: "Raporu kapat", icon: "xmark.circle") {
+                        presentationMode.wrappedValue.dismiss()
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "ARACLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                        openSheet(.calendar)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                        openSheet(.dictionary)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
+                        openSheet(.systemHealth)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                        openSheet(.feedback)
+                    }
+                ]
+            )
+        )
+        
+        return sections
     }
 }
 

@@ -8,6 +8,7 @@
 
 /* Begin PBXFileReference section */
 		D965BC1D2F2CB3E20051704D /* argus.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = argus.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D9A0C0C62F2D000100000001 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -32,6 +33,7 @@
 		D965BC142F2CB3E20051704D = {
 			isa = PBXGroup;
 			children = (
+				D9A0C0C62F2D000100000001 /* Secrets.xcconfig */,
 				D965BC1F2F2CB3E20051704D /* argus */,
 				D965BC1E2F2CB3E20051704D /* Products */,
 			);
@@ -243,6 +245,7 @@
 		};
 		D965BC2E2F2CB3E30051704D /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D9A0C0C62F2D000100000001 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -254,6 +257,21 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ALPHA_VANTAGE_KEY = "$(ALPHA_VANTAGE_KEY)";
+				INFOPLIST_KEY_BORSAPY_KEY = "$(BORSAPY_KEY)";
+				INFOPLIST_KEY_DEEPSEEK_KEY = "$(DEEPSEEK_KEY)";
+				INFOPLIST_KEY_DOVIZCOM_KEY = "$(DOVIZCOM_KEY)";
+				INFOPLIST_KEY_EODHD_KEY = "$(EODHD_KEY)";
+				INFOPLIST_KEY_FINNHUB_KEY = "$(FINNHUB_KEY)";
+				INFOPLIST_KEY_FMP_KEY = "$(FMP_KEY)";
+				INFOPLIST_KEY_FRED_KEY = "$(FRED_KEY)";
+				INFOPLIST_KEY_GEMINI_KEY = "$(GEMINI_KEY)";
+				INFOPLIST_KEY_GROQ_KEY = "$(GROQ_KEY)";
+				INFOPLIST_KEY_MARKETSTACK_KEY = "$(MARKETSTACK_KEY)";
+				INFOPLIST_KEY_PINECONE_KEY = "$(PINECONE_KEY)";
+				INFOPLIST_KEY_SIMFIN_KEY = "$(SIMFIN_KEY)";
+				INFOPLIST_KEY_TIINGO_KEY = "$(TIINGO_KEY)";
+				INFOPLIST_KEY_TWELVE_DATA_KEY = "$(TWELVE_DATA_KEY)";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -287,6 +305,7 @@
 		};
 		D965BC2F2F2CB3E30051704D /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D9A0C0C62F2D000100000001 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -298,6 +317,21 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_ALPHA_VANTAGE_KEY = "$(ALPHA_VANTAGE_KEY)";
+				INFOPLIST_KEY_BORSAPY_KEY = "$(BORSAPY_KEY)";
+				INFOPLIST_KEY_DEEPSEEK_KEY = "$(DEEPSEEK_KEY)";
+				INFOPLIST_KEY_DOVIZCOM_KEY = "$(DOVIZCOM_KEY)";
+				INFOPLIST_KEY_EODHD_KEY = "$(EODHD_KEY)";
+				INFOPLIST_KEY_FINNHUB_KEY = "$(FINNHUB_KEY)";
+				INFOPLIST_KEY_FMP_KEY = "$(FMP_KEY)";
+				INFOPLIST_KEY_FRED_KEY = "$(FRED_KEY)";
+				INFOPLIST_KEY_GEMINI_KEY = "$(GEMINI_KEY)";
+				INFOPLIST_KEY_GROQ_KEY = "$(GROQ_KEY)";
+				INFOPLIST_KEY_MARKETSTACK_KEY = "$(MARKETSTACK_KEY)";
+				INFOPLIST_KEY_PINECONE_KEY = "$(PINECONE_KEY)";
+				INFOPLIST_KEY_SIMFIN_KEY = "$(SIMFIN_KEY)";
+				INFOPLIST_KEY_TIINGO_KEY = "$(TIINGO_KEY)";
+				INFOPLIST_KEY_TWELVE_DATA_KEY = "$(TWELVE_DATA_KEY)";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;

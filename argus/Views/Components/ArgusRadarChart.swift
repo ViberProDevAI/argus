@@ -128,8 +128,7 @@ private struct ModuleLabelSimple: View {
     var body: some View {
         Button(action: onTap) {
             VStack(spacing: 2) {
-                Image(systemName: module.icon)
-                    .font(.system(size: 12))
+                module.iconView(size: 14)
                     .foregroundColor(module.color)
                 
                 Text(module.shortName)
@@ -263,6 +262,18 @@ enum RadarModule: String, CaseIterable {
         }
     }
     
+    /// Custom neon asset icon
+    var assetIcon: String? {
+        switch self {
+        case .orion: return "OrionIcon"
+        case .atlas: return "AtlasIcon"
+        case .aether: return "AetherIcon"
+        case .hermes: return "HermesIcon"
+        default: return nil
+        }
+    }
+
+    /// SF Symbol fallback icon
     var icon: String {
         switch self {
         case .orion: return "telescope.fill"
@@ -272,6 +283,19 @@ enum RadarModule: String, CaseIterable {
         case .phoenix: return "flame.fill"
         case .hermes: return "newspaper.fill"
         case .demeter: return "leaf.fill"
+        }
+    }
+
+    @ViewBuilder
+    func iconView(size: CGFloat = 14) -> some View {
+        if let asset = assetIcon {
+            Image(asset)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+        } else {
+            Image(systemName: icon)
+                .font(.system(size: size * 0.85))
         }
     }
     

@@ -40,7 +40,7 @@ struct ChironInsightsView: View {
             .padding()
         }
         .background(Theme.background)
-        .navigationTitle("🧠 Chiron Öğrenme")
+        .navigationTitle(" Chiron Öğrenme")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { loadData() }
     }

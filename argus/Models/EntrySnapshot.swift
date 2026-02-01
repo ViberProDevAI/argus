@@ -269,7 +269,7 @@ class EntrySnapshotStore {
         snapshots[trade.id] = snapshot
         saveSnapshots()
         
-        print("📸 Entry Snapshot kaydedildi: \(trade.symbol)")
+        print(" Entry Snapshot kaydedildi: \(trade.symbol)")
         print("   Council: \(snapshot.councilAction.rawValue) (\(String(format: "%.0f", snapshot.councilConfidence * 100))%)")
         print("   Orion: \(String(format: "%.0f", snapshot.orionScore))")
         if let atr = snapshot.atr {
@@ -303,7 +303,7 @@ class EntrySnapshotStore {
             for snapshot in loaded {
                 snapshots[snapshot.tradeId] = snapshot
             }
-            print("📸 \(loaded.count) entry snapshot yüklendi")
+            print(" \(loaded.count) entry snapshot yüklendi")
         } catch {
             print("❌ Snapshot yükleme hatası: \(error)")
         }

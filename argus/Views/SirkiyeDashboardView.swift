@@ -170,13 +170,13 @@ struct SirkiyeDashboardView: View {
     
     private var modeDisplayText: String {
         switch atmosphere.mode {
-        case .panic: return "🚨 PANİK MOD"
-        case .extremeFear: return "🔴 AŞIRI KORKU"
-        case .fear: return "⚠️ KORKU MOD"
+        case .panic: return "PANİK MOD"
+        case .extremeFear: return "AŞIRI KORKU"
+        case .fear: return "KORKU MOD"
         case .neutral: return "Politik Atmosfer"
-        case .greed: return "✅ AÇGÖZLÜ MOD"
-        case .extremeGreed: return "🟢 AŞIRI AÇGÖZLÜLÜK"
-        case .complacency: return "😴 REHAVET"
+        case .greed: return "AÇGÖZLÜ MOD"
+        case .extremeGreed: return "AŞIRI AÇGÖZLÜLÜK"
+        case .complacency: return "REHAVET"
         }
     }
     

@@ -64,11 +64,11 @@ enum NewsSentiment: String, Codable, CaseIterable, Sendable {
     
     var emoji: String {
         switch self {
-        case .strongPositive: return "🚀"
-        case .weakPositive: return "📈"
-        case .neutral: return "😐"
-        case .weakNegative: return "📉"
-        case .strongNegative: return "🚨"
+        case .strongPositive: return ""
+        case .weakPositive: return ""
+        case .neutral: return ""
+        case .weakNegative: return ""
+        case .strongNegative: return ""
         }
     }
     

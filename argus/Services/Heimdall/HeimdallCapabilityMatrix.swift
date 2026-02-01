@@ -33,15 +33,15 @@ struct HeimdallCapabilityMatrix {
             quarantineReason: nil
         )
         
-        // 2. FMP (Financial Modeling Prep) - PERMANENTLY QUARANTINED (Account Suspended)
+        // 2. FMP (Financial Modeling Prep) - ACTIVE (New API Key)
         p[.fmp] = ProviderProfile(
             tag: .fmp,
             supportedAssets: [.stock, .etf],
             supportedEndpoints: [.quote, .candles, .fundamentals, .profile, .news],
-            costWeight: 999, // Effectively disabled
-            baseReliability: 0.0,
-            isPermanentlyQuarantined: true,
-            quarantineReason: "FMP Account Suspended - Use TwelveData instead"
+            costWeight: 2, // Secondary to TwelveData
+            baseReliability: 0.90,
+            isPermanentlyQuarantined: false,
+            quarantineReason: nil
         )
         
         // 3. EODHD (Reliable Backup - Demo Key Limit)

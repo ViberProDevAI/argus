@@ -62,7 +62,7 @@ class ArgusReportGenerator {
         // 1. Headline
         let headline: String
         if action == .buy {
-            headline = "🚀 \(symbol): Güçlü Alım Sinyali (\(Int(score)))"
+            headline = " \(symbol): Güçlü Alım Sinyali (\(Int(score)))"
         } else if action == .sell {
             headline = "⚠️ \(symbol): Satış Alarmı (\(Int(score)))"
         } else {
@@ -76,13 +76,13 @@ class ArgusReportGenerator {
         var sections: [String] = []
         
         // Introduction
-        sections.append("## 🎯 Argus Kararı: \(action.rawValue)")
+        sections.append("##  Argus Kararı: \(action.rawValue)")
         sections.append("**Skor:** \(Int(score))/100  |  **Fiyat:** $\(String(format: "%.2f", quote.currentPrice))")
         sections.append("Argus algoritmaları bu hissede belirgin bir \(action.rawValue) fırsatı görüyor.")
         
         // Technicals (Orion)
         let orion = decision.orionScore
-        sections.append("### 📈 Orion Teknik Analiz (\(Int(orion)))")
+        sections.append("###  Orion Teknik Analiz (\(Int(orion)))")
         if orion > 70 {
             sections.append("- Trend pozitif ve momentum güçlü.")
             sections.append("- Hareketli ortalamaların üzerinde fiyatlama.")
@@ -94,7 +94,7 @@ class ArgusReportGenerator {
         
         // Fundamentals (Atlas)
         let atlas = decision.atlasScore
-        sections.append("### 🏢 Atlas Temel Analiz (\(Int(atlas)))")
+        sections.append("###  Atlas Temel Analiz (\(Int(atlas)))")
         if atlas > 70 {
             sections.append("- Şirket finansalları sağlam.")
             sections.append("- Kârlılık ve büyüme verileri sektör üstü.")
@@ -104,7 +104,7 @@ class ArgusReportGenerator {
         
         // Macro (Aether)
         let aether = decision.aetherScore
-        sections.append("### 🌍 Aether Makro Ortam (\(Int(aether)))")
+        sections.append("###  Aether Makro Ortam (\(Int(aether)))")
         sections.append("- Piyasa rejimi: **\(regime)**")
         if aether > 60 {
             sections.append("- Genel piyasa koşulları risk almaya uygun.")
@@ -113,7 +113,7 @@ class ArgusReportGenerator {
         }
         
         // Conclusion
-        sections.append("### 🧠 Sonuç ve Tavsiye")
+        sections.append("###  Sonuç ve Tavsiye")
         if action == .buy {
             sections.append("Mevcut veri seti, risk/getiri profilinin alım yönünde cazip olduğunu gösteriyor. Portföye ekleme yapılması önerilir.")
         } else if action == .sell {

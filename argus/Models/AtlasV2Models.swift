@@ -56,11 +56,11 @@ enum AtlasMetricStatus: String, Codable {
     
     var emoji: String {
         switch self {
-        case .excellent: return "🟢"
-        case .good: return "🟢"
-        case .neutral: return "🟡"
-        case .warning: return "🟠"
-        case .bad: return "🔴"
+        case .excellent: return ""
+        case .good: return ""
+        case .neutral: return ""
+        case .warning: return ""
+        case .bad: return ""
         case .critical: return "⛔"
         case .noData: return "⚪"
         }

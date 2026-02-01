@@ -44,6 +44,18 @@ enum ArgusSystemEntity: String, CaseIterable, Identifiable {
         }
     }
     
+    /// Custom asset icon name (neon icons from Assets.xcassets)
+    var assetIcon: String? {
+        switch self {
+        case .orion: return "OrionIcon"
+        case .aether: return "AetherIcon"
+        case .atlas: return "AtlasIcon"
+        case .hermes: return "HermesIcon"
+        default: return nil
+        }
+    }
+
+    /// SF Symbol fallback icon
     var icon: String {
         switch self {
         case .argus: return "eye.trianglebadge.exclamationmark.fill"

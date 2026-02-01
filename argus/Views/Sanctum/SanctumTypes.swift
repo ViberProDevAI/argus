@@ -44,6 +44,18 @@ enum SanctumModuleType: String, CaseIterable {
     case prometheus = "PROMETHEUS"
     case council = "COUNCIL"
     
+    /// Custom neon asset icon (from Assets.xcassets)
+    var assetIcon: String? {
+        switch self {
+        case .orion: return "OrionIcon"
+        case .atlas: return "AtlasIcon"
+        case .aether: return "AetherIcon"
+        case .hermes: return "HermesIcon"
+        default: return nil
+        }
+    }
+
+    /// SF Symbol fallback icon
     var icon: String {
         switch self {
         case .atlas: return "building.columns.fill"
@@ -107,6 +119,18 @@ enum SanctumBistModuleType: String, CaseIterable {
     case oracle = "ORACLE"      // Makro Sinyal Motoru -> REJIM'e taşınacak
     case moneyflow = "PARA-AKIL" // Para Girisi/Takas -> TAHTA'ya taşındı
 
+    /// Custom neon asset icon (from Assets.xcassets)
+    var assetIcon: String? {
+        switch self {
+        case .tahta, .grafik: return "OrionIcon"       // Teknik = Orion
+        case .kasa, .bilanco: return "AtlasIcon"       // Temel = Atlas
+        case .rejim, .sirkiye: return "AetherIcon"     // Makro = Aether
+        case .kulis: return "HermesIcon"               // Haber = Hermes
+        default: return nil
+        }
+    }
+
+    /// SF Symbol fallback icon
     var icon: String {
         switch self {
         // Yeni modüller
@@ -177,3 +201,42 @@ extension SanctumBistModuleType: Identifiable {
 /// ArgusSanctumView icindeki eski referanslar icin
 typealias ModuleType = SanctumModuleType
 typealias BistModuleType = SanctumBistModuleType
+
+// MARK: - Module Icon View
+/// Reusable view for rendering module icons with custom asset support
+struct SanctumModuleIconView: View {
+    let assetIcon: String?
+    let sfSymbol: String
+    var size: CGFloat = 20
+
+    init(module: SanctumModuleType, size: CGFloat = 20) {
+        self.assetIcon = module.assetIcon
+        self.sfSymbol = module.icon
+        self.size = size
+    }
+
+    init(bistModule: SanctumBistModuleType, size: CGFloat = 20) {
+        self.assetIcon = bistModule.assetIcon
+        self.sfSymbol = bistModule.icon
+        self.size = size
+    }
+
+    init(assetIcon: String?, sfSymbol: String, size: CGFloat = 20) {
+        self.assetIcon = assetIcon
+        self.sfSymbol = sfSymbol
+        self.size = size
+    }
+
+    var body: some View {
+        Group {
+            if let asset = assetIcon {
+                Image(asset)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } else {
+                Image(systemName: sfSymbol)
+            }
+        }
+        .frame(width: size, height: size)
+    }
+}

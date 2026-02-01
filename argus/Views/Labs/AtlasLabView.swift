@@ -54,7 +54,7 @@ struct AtlasLabView: View {
             }
             .padding(.vertical)
         }
-        .navigationTitle("Atlas Lab 🗺️")
+        .navigationTitle("Atlas Lab ")
         .background(Theme.background)
     }
     

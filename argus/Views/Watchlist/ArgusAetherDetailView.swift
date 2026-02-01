@@ -191,70 +191,70 @@ struct ArgusAetherDetailView: View {
         let s = rating.volatilityScore ?? 50
         if s >= 70 { return "✅ VIX düşük, piyasa sakin. Risk almak için uygun ortam." }
         if s >= 50 { return "⚠️ VIX normal seviyelerde. Dikkatli ol." }
-        return "🔴 VIX yüksek, panik havası var. Riskli pozisyonlardan uzak dur."
+        return " VIX yüksek, panik havası var. Riskli pozisyonlardan uzak dur."
     }
     
     private var yieldInterpretation: String {
         let s = rating.interestRateScore ?? 50
         if s >= 70 { return "✅ Verim eğrisi pozitif. Ekonomi sağlıklı görünüyor." }
         if s >= 50 { return "⚠️ Verim eğrisi düzleşiyor. Dikkatli ol." }
-        return "🔴 Verim eğrisi ters! Tarihsel olarak resesyon habercisi."
+        return " Verim eğrisi ters! Tarihsel olarak resesyon habercisi."
     }
     
     private var claimsInterpretation: String {
         let s = rating.claimsScore ?? 50
         if s >= 70 { return "✅ Başvurular düşüyor. İş piyasası güçlü." }
         if s >= 50 { return "⚠️ Başvurular stabil. Normal seyir." }
-        return "🔴 Başvurular artıyor. İş piyasası zayıflıyor olabilir."
+        return " Başvurular artıyor. İş piyasası zayıflıyor olabilir."
     }
     
     private var btcInterpretation: String {
         let s = rating.cryptoRiskScore ?? 50
         if s >= 70 { return "✅ BTC yükselişte. Risk iştahı yüksek." }
         if s >= 50 { return "⚠️ BTC nötr. Piyasa kararsız." }
-        return "🔴 BTC düşüşte. Risk iştahı düşük, dikkatli ol."
+        return " BTC düşüşte. Risk iştahı düşük, dikkatli ol."
     }
     
     private var spyInterpretation: String {
         let s = rating.equityRiskScore ?? 50
         if s >= 70 { return "✅ SPY trend yukarı. Boğa piyasası devam ediyor." }
         if s >= 50 { return "⚠️ SPY kararsız. Trend belirsiz." }
-        return "🔴 SPY trend aşağı. Ayı piyasası sinyalleri var."
+        return " SPY trend aşağı. Ayı piyasası sinyalleri var."
     }
     
     private var jobsInterpretation: String {
         let s = rating.growthScore ?? 50
         if s >= 70 { return "✅ İstihdam artıyor. Ekonomi genişliyor." }
         if s >= 50 { return "⚠️ İstihdam stabil. Normal seyir." }
-        return "🔴 İstihdam azalıyor. Ekonomik daralma riski."
+        return " İstihdam azalıyor. Ekonomik daralma riski."
     }
     
     private var dxyInterpretation: String {
         let s = rating.currencyScore ?? 50
         if s >= 70 { return "✅ Dolar zayıf. Riskli varlıklar için olumlu." }
         if s >= 50 { return "⚠️ Dolar nötr. Normal seyir." }
-        return "🔴 Dolar güçlü. Hisseler üzerinde baskı olabilir."
+        return " Dolar güçlü. Hisseler üzerinde baskı olabilir."
     }
     
     private var cpiInterpretation: String {
         let s = rating.inflationScore ?? 50
         if s >= 70 { return "✅ Enflasyon kontrol altında. Fed rahat." }
         if s >= 50 { return "⚠️ Enflasyon yüksek ama düşüyor." }
-        return "🔴 Enflasyon çok yüksek! Fed agresif olabilir."
+        return " Enflasyon çok yüksek! Fed agresif olabilir."
     }
     
     private var laborInterpretation: String {
         let s = rating.laborScore ?? 50
         if s >= 70 { return "✅ İşsizlik düşük. Tam istihdam." }
         if s >= 50 { return "⚠️ İşsizlik normal seviyelerde." }
-        return "🔴 İşsizlik yükseliyor. Ekonomik sorun işareti."
+        return " İşsizlik yükseliyor. Ekonomik sorun işareti."
     }
     
     private var goldInterpretation: String {
         let s = rating.safeHavenScore ?? 50
         if s >= 70 { return "✅ Altın zayıf. Yatırımcılar risk alıyor." }
         if s >= 50 { return "⚠️ Altın nötr. Karışık sinyaller." }
-        return "🔴 Altın güçlü. Yatırımcılar güvenli limana kaçıyor."
+        return " Altın güçlü. Yatırımcılar güvenli limana kaçıyor."
     }
 }
 
@@ -264,9 +264,9 @@ enum IndicatorCategory {
     
     var title: String {
         switch self {
-        case .leading: return "🟢 ÖNCÜ GÖSTERGELER"
-        case .coincident: return "🟡 EŞZAMANLI GÖSTERGELER"
-        case .lagging: return "🔴 GECİKMELİ GÖSTERGELER"
+        case .leading: return " ÖNCÜ GÖSTERGELER"
+        case .coincident: return " EŞZAMANLI GÖSTERGELER"
+        case .lagging: return " GECİKMELİ GÖSTERGELER"
         }
     }
     
@@ -354,9 +354,9 @@ struct MainScoreHeader: View {
                 
                 // Mini Category Pills
                 HStack(spacing: 6) {
-                    MiniCatPill(emoji: "🟢", label: "Öncü", score: rating.leadingScore ?? 50)
-                    MiniCatPill(emoji: "🟡", label: "Eşzamanlı", score: rating.coincidentScore ?? 50)
-                    MiniCatPill(emoji: "🔴", label: "Gecikmeli", score: rating.laggingScore ?? 50)
+                    MiniCatPill(emoji: "", label: "Öncü", score: rating.leadingScore ?? 50)
+                    MiniCatPill(emoji: "", label: "Eşzamanlı", score: rating.coincidentScore ?? 50)
+                    MiniCatPill(emoji: "", label: "Gecikmeli", score: rating.laggingScore ?? 50)
                 }
             }
         }
@@ -422,7 +422,7 @@ struct CategoryScoreRow: View {
     
     var body: some View {
         HStack(spacing: 8) {
-            Text(category == .leading ? "🟢" : category == .coincident ? "🟡" : "🔴")
+            Text(category == .leading ? "" : category == .coincident ? "" : "")
                 .font(.system(size: 14))
             
             Text(category == .leading ? "Öncü" : category == .coincident ? "Eşzamanlı" : "Gecikmeli")
@@ -473,19 +473,19 @@ struct EducationalIntroCard: View {
             
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .top, spacing: 8) {
-                    Text("🟢")
+                    Text("")
                     Text("**Öncü göstergeler** ekonomiyi 3-6 ay önceden tahmin eder (VIX, Verim Eğrisi, İşsizlik Başvuruları)")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                 }
                 HStack(alignment: .top, spacing: 8) {
-                    Text("🟡")
+                    Text("")
                     Text("**Eşzamanlı göstergeler** ekonominin şu anki durumunu gösterir (SPY, İstihdam, Dolar)")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                 }
                 HStack(alignment: .top, spacing: 8) {
-                    Text("🔴")
+                    Text("")
                     Text("**Gecikmeli göstergeler** trendleri onaylar ama geç bilgi verir (CPI, İşsizlik Oranı, Altın)")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
@@ -819,9 +819,9 @@ struct CouncilMathCard: View {
                     .bold()
                     .foregroundColor(Theme.textPrimary)
                 
-                MathRow(emoji: "🟢", label: "Öncü", value: rating.leadingScore ?? 50, weight: 1.5)
-                MathRow(emoji: "🟡", label: "Eşzamanlı", value: rating.coincidentScore ?? 50, weight: 1.0)
-                MathRow(emoji: "🔴", label: "Gecikmeli", value: rating.laggingScore ?? 50, weight: 0.8)
+                MathRow(emoji: "", label: "Öncü", value: rating.leadingScore ?? 50, weight: 1.5)
+                MathRow(emoji: "", label: "Eşzamanlı", value: rating.coincidentScore ?? 50, weight: 1.0)
+                MathRow(emoji: "", label: "Gecikmeli", value: rating.laggingScore ?? 50, weight: 0.8)
                 
                 Divider().background(Theme.border)
                 

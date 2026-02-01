@@ -206,14 +206,15 @@ struct HoloLearningCardView: View {
     
     private func moduleIcon(_ module: String) -> String {
         switch module.lowercased() {
-        case "orion": return "📊"
-        case "atlas": return "💰"
-        case "aether": return "🌍"
-        case "hermes": return "📰"
-        case "athena": return "🧠"
-        case "demeter": return "🌾"
+        case "orion": return "🏹"
+        case "atlas": return "🏛️"
+        case "aether": return "🌌"
+        case "hermes": return "⚡"
+        case "alkindus": return "🧠"
+        case "athena": return "🦉"
+        case "demeter": return "🌿"
         case "phoenix": return "🔥"
-        default: return "📈"
+        default: return "⚪"
         }
     }
 }

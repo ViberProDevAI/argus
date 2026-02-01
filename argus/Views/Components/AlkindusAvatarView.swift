@@ -30,20 +30,21 @@ struct AlkindusAvatarView: View {
                 .frame(width: size * 0.8, height: size * 0.8)
                 .blur(radius: size * 0.5)
                 .opacity(isThinking ? 0.3 + (Foundation.sin(animPhase) * 0.1) : 0.2)
-            
-            // 2. The Sage (Profil - Neon Line Art)
-            SageShape()
-                .trim(from: 0, to: isThinking ? 0.8 + (Foundation.sin(animPhase) * 0.1) : 1.0)
-                .stroke(activeColor, style: StrokeStyle(lineWidth: size * 0.04, lineCap: .round, lineJoin: .round))
+
+            // 2. The Sage - Custom PNG Icon
+            Image("AlkindusIcon")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
                 .frame(width: size, height: size)
-                .shadow(color: activeColor, radius: 4)
-            
+                .opacity(isThinking ? 0.7 + (Foundation.sin(animPhase) * 0.15) : 1.0)
+                .shadow(color: activeColor, radius: isThinking ? 8 : 4)
+
             // 3. Brain/Idea Spark (Fikir varsa)
             if hasIdea {
                 Circle()
                     .fill(ideaGreen)
                     .frame(width: size * 0.1, height: size * 0.1)
-                    .offset(x: size * 0.1, y: -size * 0.2)
+                    .offset(x: size * 0.2, y: -size * 0.3)
                     .blur(radius: 2)
                     .shadow(color: ideaGreen, radius: 5)
                     .scaleEffect(1.0 + (Foundation.sin(animPhase * 5) * 0.3))

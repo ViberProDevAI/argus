@@ -231,7 +231,7 @@ extension TradingViewModel {
                  symbol: symbol,
                  timestamp: Date(),
                  insights: currentInsights,
-                 articles: [] // Raw articles not strictly needed for voting main sentiment
+                 articles: self.newsBySymbol[symbol] ?? []
              )
         }
         

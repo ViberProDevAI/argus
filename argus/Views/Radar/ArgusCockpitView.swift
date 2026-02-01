@@ -15,6 +15,7 @@ enum MarketTab: String, CaseIterable {
 
 struct ArgusCockpitView: View {
     @EnvironmentObject var viewModel: TradingViewModel
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
     
     // Terminal State
     @State private var sortOption: TerminalSortOption = .councilScore
@@ -22,6 +23,7 @@ struct ArgusCockpitView: View {
     @State private var searchText: String = ""
     @State private var selectedMarket: MarketTab = .global
     @State private var systemLogs: [ChironLearningEvent] = [] // Chiron Feed Data
+    @State private var showDrawer = false
     
     // Overlay State
     @State private var selectedSymbolForModule: String? = nil
@@ -155,6 +157,12 @@ struct ArgusCockpitView: View {
                 .background(Color(hex: "080b14").ignoresSafeArea())
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
+                     ToolbarItem(placement: .navigationBarLeading) {
+                         Button(action: { showDrawer = true }) {
+                             Image(systemName: "line.3.horizontal")
+                                 .foregroundColor(.white.opacity(0.8))
+                         }
+                     }
                      ToolbarItem(placement: .principal) {
                          HStack(spacing: 4) {
                              Image(systemName: toolbarIcon)
@@ -178,6 +186,13 @@ struct ArgusCockpitView: View {
                         }
                     }
                 }
+            }
+            
+            if showDrawer {
+                ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                    drawerSections(openSheet: openSheet)
+                }
+                .zIndex(200)
             }
             
             // Holo Overlay
@@ -221,6 +236,102 @@ struct ArgusCockpitView: View {
             selectedSymbolForModule = symbol
             selectedModuleType = type
         }
+    }
+    
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "AlkindusIcon") {
+                        deepLinkManager.navigate(to: .alkindus)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Ayarlar", subtitle: "Tercihler", icon: "gearshape") {
+                        deepLinkManager.navigate(to: .settings)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "TERMINAL",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Pazar: Global", subtitle: "Global liste", icon: "globe.asia.australia") {
+                        selectedMarket = .global
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Pazar: BIST", subtitle: "Sirkiye liste", icon: "chart.bar") {
+                        selectedMarket = .bist
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Pazar: Fonlar", subtitle: "Fon listesi", icon: "rectangle.stack") {
+                        selectedMarket = .fonlar
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Siralama: Konsey", subtitle: "Konsey skoru", icon: "crown") {
+                        sortOption = .councilScore
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Siralama: Orion", subtitle: "Teknik skor", icon: "waveform.path.ecg") {
+                        sortOption = .orion
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Siralama: Atlas", subtitle: "Temel skor", icon: "chart.bar") {
+                        sortOption = .atlas
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Siralama: Potansiyel", subtitle: "Sembol bazli", icon: "sparkles") {
+                        sortOption = .potential
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Kalite Filtresi", subtitle: hideLowQualityData ? "Acik" : "Kapali", icon: "line.3.horizontal.decrease.circle") {
+                        hideLowQualityData.toggle()
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(commonToolsSection(openSheet: openSheet))
+        
+        return sections
+    }
+    
+    private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
+        ArgusDrawerView.DrawerSection(
+            title: "ARACLAR",
+            items: [
+                ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                    openSheet(.calendar)
+                },
+                ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                    openSheet(.dictionary)
+                },
+                ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
+                    openSheet(.systemHealth)
+                },
+                ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                    openSheet(.feedback)
+                }
+            ]
+        )
     }
     
     // Tab Button Helper
@@ -496,5 +607,3 @@ struct TerminalScoreBadge: View {
         }
     }
 }
-
-

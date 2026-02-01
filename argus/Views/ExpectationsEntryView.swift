@@ -37,7 +37,7 @@ struct ExpectationsEntryView: View {
                     .padding(.top)
                 }
             }
-            .navigationTitle("📅 Ekonomik Takvim")
+            .navigationTitle(" Ekonomik Takvim")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

@@ -28,7 +28,7 @@ struct BISTBilancoDetailView: View {
                     
                     // Bölüm Kartları (Sadece BorsaPy'den çekilebilen veriler)
                     bolumKarti(
-                        baslik: "💰 Değerleme",
+                        baslik: " Değerleme",
                         skor: sonuc.degerleme,
                         metrikler: sonuc.degerlemeVerisi.tumMetrikler,
                         bolumId: "degerleme"

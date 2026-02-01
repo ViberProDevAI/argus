@@ -65,7 +65,7 @@ actor BISTSentimentEngine {
     ]
     
     // Cache
-    private var cache: [String: (result: BISTSentimentResult, timestamp: Date)] = [:]
+    private var cache: [String: (result: BISTSentimentResult, articles: [NewsArticle], timestamp: Date)] = [:]
     private let cacheTTL: TimeInterval = 900 // 15 dakika
     
     private init() {}
@@ -74,12 +74,18 @@ actor BISTSentimentEngine {
     
     /// Sembol için sentiment analizi yapar
     func analyzeSentiment(for symbol: String) async throws -> BISTSentimentResult {
+        let payload = try await analyzeSentimentPayload(for: symbol)
+        return payload.result
+    }
+
+    /// Sembol için sentiment analizi ve kullanilan haberleri birlikte döner
+    func analyzeSentimentPayload(for symbol: String) async throws -> BISTSentimentPayload {
         let cleanSymbol = symbol.uppercased().replacingOccurrences(of: ".IS", with: "")
         
         // Cache kontrolü
         if let cached = cache[cleanSymbol],
            Date().timeIntervalSince(cached.timestamp) < cacheTTL {
-            return cached.result
+            return BISTSentimentPayload(result: cached.result, articles: cached.articles)
         }
         
         // 1. Haberleri çek
@@ -88,8 +94,8 @@ actor BISTSentimentEngine {
         
         guard !articles.isEmpty else {
             let emptyResult = BISTSentimentResult.neutral(for: cleanSymbol)
-            cache[cleanSymbol] = (emptyResult, Date())
-            return emptyResult
+            cache[cleanSymbol] = (emptyResult, [], Date())
+            return BISTSentimentPayload(result: emptyResult, articles: [])
         }
         
         // 2. Sembolle ilgili haberleri filtrele
@@ -124,11 +130,11 @@ actor BISTSentimentEngine {
         }
         
         // 4. Cache'e kaydet
-        cache[cleanSymbol] = (result, Date())
+        cache[cleanSymbol] = (result, relevantArticles, Date())
         
         print("✅ BISTSentiment: \(cleanSymbol) analizi tamamlandı (Genel Piyasa: \(isGeneralMarket)). Skor: \(Int(result.overallScore))")
         
-        return result
+        return BISTSentimentPayload(result: result, articles: relevantArticles)
     }
     
     // MARK: - Private Methods
@@ -300,4 +306,9 @@ enum MentionTrend: String {
     case increasing = "Artıyor"
     case decreasing = "Azalıyor"
     case stable = "Stabil"
+}
+
+struct BISTSentimentPayload {
+    let result: BISTSentimentResult
+    let articles: [NewsArticle]
 }

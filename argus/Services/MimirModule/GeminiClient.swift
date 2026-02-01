@@ -33,17 +33,9 @@ actor GeminiClient {
     /// Used by Argus Voice for Reporting.
     func generateContent(prompt: String) async throws -> String {
         // Correctly access via Enum (Direct Static Access)
-        guard let apiKey = APIKeyStore.getDirectKey(for: .gemini) else {
+        guard let apiKey = APIKeyStore.getDirectKey(for: .gemini), !apiKey.isEmpty else {
             throw URLError(.userAuthenticationRequired)
         }
-        
-        // Use gemini-1.5-flash for speed and higher rate limits
-        let urlString = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\(apiKey)"
-        guard let url = URL(string: urlString) else { throw URLError(.badURL) }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let body: [String: Any] = [
             "contents": [
@@ -51,49 +43,69 @@ actor GeminiClient {
             ]
         ]
         
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        // Model fallback chain (v1beta -> v1)
+        let modelCandidates = [
+            "gemini-1.5-pro",
+            "gemini-1.0-pro"
+        ]
         
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-            let errorText = String(data: data, encoding: .utf8) ?? "Unknown Error"
-            
-            print("❌ Gemini API Error (\(statusCode)): \(errorText)")
-            
-            // Check for Billing/Quota Issues
-            if statusCode == 429 {
-                print("""
-                🚨 GEMINI QUOTA EXCEEDED (429)
-                --------------------------------------------------
-                Google'a kredi kartı eklemek yeterli değildir!
-                Lütfen şu adrese gidip 'Pay-as-you-go' (Faturalı) modunu açın:
-                👉 https://aistudio.google.com/app/plan_information
+        var lastError: Error?
+        for version in ["v1beta", "v1"] {
+            for model in modelCandidates {
+                let urlString = "https://generativelanguage.googleapis.com/\(version)/models/\(model):generateContent?key=\(apiKey)"
+                guard let url = URL(string: urlString) else { continue }
                 
-                Projeyi 'Free of Charge' yerine 'Blaze' veya 'Pay-as-you-go' olarak seçmelisiniz.
-                --------------------------------------------------
-                """)
-            }
-            
-            throw NSError(domain: "GeminiClient", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "Gemini Error: \(errorText)"])
-        }
-        
-        // Parse Response
-        // Structure: { candidates: [ { content: { parts: [ { text: "..." } ] } } ] }
-        struct GeminiResponse: Decodable {
-            struct Candidate: Decodable {
-                struct Content: Decodable {
-                    struct Part: Decodable {
-                        let text: String
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: body)
+                
+                let (data, response) = try await URLSession.shared.data(for: request)
+                
+                if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                    struct GeminiResponse: Decodable {
+                        struct Candidate: Decodable {
+                            struct Content: Decodable {
+                                struct Part: Decodable {
+                                    let text: String
+                                }
+                                let parts: [Part]
+                            }
+                            let content: Content?
+                        }
+                        let candidates: [Candidate]?
                     }
-                    let parts: [Part]
+                    
+                    let result = try JSONDecoder().decode(GeminiResponse.self, from: data)
+                    return result.candidates?.first?.content?.parts.first?.text ?? "No response generated."
                 }
-                let content: Content?
+                
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+                let errorText = String(data: data, encoding: .utf8) ?? "Unknown Error"
+                print("❌ Gemini API Error (\(statusCode)) [\(version)/\(model)]: \(errorText)")
+                
+                if statusCode == 429 {
+                    print("""
+                    🚨 GEMINI QUOTA EXCEEDED (429)
+                    --------------------------------------------------
+                    Google'a kredi kartı eklemek yeterli değildir!
+                    Lütfen şu adrese gidip 'Pay-as-you-go' (Faturalı) modunu açın:
+                    👉 https://aistudio.google.com/app/plan_information
+                    
+                    Projeyi 'Free of Charge' yerine 'Blaze' veya 'Pay-as-you-go' olarak seçmelisiniz.
+                    --------------------------------------------------
+                    """)
+                }
+                
+                lastError = NSError(domain: "GeminiClient", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "Gemini Error: \(errorText)"])
             }
-            let candidates: [Candidate]?
         }
         
-        let result = try JSONDecoder().decode(GeminiResponse.self, from: data)
-        return result.candidates?.first?.content?.parts.first?.text ?? "No response generated."
+        if let lastError {
+            throw lastError
+        }
+        throw URLError(.badServerResponse)
+        
+        // handled by model fallback chain above
     }
 }

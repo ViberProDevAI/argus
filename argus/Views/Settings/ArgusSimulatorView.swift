@@ -124,7 +124,7 @@ struct ArgusSimulatorView: View {
         }
         .background(Theme.background)
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 80) } // Space for CustomTabBar
-        .navigationTitle("Argus Simulator 🧪")
+        .navigationTitle("Argus Simulator ")
         .onAppear {
             loadSnapshots()
         }

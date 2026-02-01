@@ -8,6 +8,18 @@ enum ArgusModule: String, CaseIterable {
     case demeter = "Demeter"
     case hermes = "Hermes"
     
+    /// Custom neon asset icon
+    var assetIcon: String? {
+        switch self {
+        case .orion: return "OrionIcon"
+        case .atlas: return "AtlasIcon"
+        case .aether: return "AetherIcon"
+        case .hermes: return "HermesIcon"
+        default: return nil
+        }
+    }
+
+    /// SF Symbol fallback icon
     var icon: String {
         switch self {
         case .atlas: return "building.columns.fill"
@@ -25,6 +37,22 @@ enum ArgusModule: String, CaseIterable {
         case .aether: return .orange
         case .demeter: return .green
         case .hermes: return .pink
+        }
+    }
+}
+
+// MARK: - ArgusModule Icon View Helper
+extension ArgusModule {
+    @ViewBuilder
+    func iconView(size: CGFloat = 20) -> some View {
+        if let asset = assetIcon {
+            Image(asset)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+        } else {
+            Image(systemName: icon)
+                .frame(width: size, height: size)
         }
     }
 }
@@ -183,8 +211,8 @@ struct ArgusSolarCardView: View {
             if let module = selectedModule {
                 // Module Specific Text
                 HStack {
-                    // Use Eye representation here too? Or stick to Icon + Color
-                    Image(systemName: module.icon)
+                    // Custom neon icon or SF Symbol fallback
+                    module.iconView(size: 20)
                         .foregroundColor(module.color)
                     Text(module.rawValue)
                         .font(.headline)

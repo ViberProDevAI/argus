@@ -8,6 +8,7 @@ struct ArgusSanctumView: View {
     // LEAVING LEGACY VM BUT REMOVING OBSERVATION TO STOP RE-RENDERS
     let viewModel: TradingViewModel 
     @StateObject private var vm: SanctumViewModel
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
     
     init(symbol: String, viewModel: TradingViewModel) {
         self.symbol = symbol
@@ -29,6 +30,7 @@ struct ArgusSanctumView: View {
     @State private var showObservatorySheet = false
     @State private var showAlkindusSheet = false
     @State private var showAnalystReportSheet = false // NEW: Quick Access to AI Report
+    @State private var showDrawer = false // NEW: Contextual Drawer State
     
     // Legacy type alias for internal references
     typealias ModuleType = SanctumModuleType
@@ -73,9 +75,13 @@ struct ArgusSanctumView: View {
             // 2. Main Content
             Group {
                 if vm.isLoading && vm.quote == nil {
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    VStack(spacing: 20) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        
+                        LoadingQuoteView()
+                    }
                 } else {
                     VStack(spacing: 0) {
                         headerView
@@ -161,6 +167,14 @@ struct ArgusSanctumView: View {
 
             // FAB REMOVED
 
+            
+            // LOCAL CONTEXTUAL DRAWER
+            if showDrawer {
+                ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                    drawerSections(openSheet: openSheet)
+                }
+                .zIndex(200) // Highest Z-Index
+            }
         }
         .navigationBarHidden(true)
         .sheet(isPresented: $showTradeSheet) {
@@ -186,6 +200,108 @@ struct ArgusSanctumView: View {
             }
         }
     }
+    
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "OrionIcon") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "AlkindusIcon") {
+                        deepLinkManager.navigate(to: .alkindus)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Ayarlar", subtitle: "Tercihler", icon: "gearshape") {
+                        deepLinkManager.navigate(to: .settings)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "HISSE ISLEMLERI",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Alim Islemi", subtitle: "Pozisyon ac", icon: "arrow.up.circle") {
+                        tradeAction = .buy
+                        showTradeSheet = true
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Satis Islemi", subtitle: "Pozisyon kapat", icon: "arrow.down.circle") {
+                        tradeAction = .sell
+                        showTradeSheet = true
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Analiz Raporu", subtitle: "Detayli rapor", icon: "doc.text.magnifyingglass") {
+                        showAnalystReportSheet = true
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "MODULLER",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Orion", subtitle: "Teknik momentum", icon: "OrionIcon") {
+                        selectedModule = .orion
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Atlas", subtitle: "Temel analiz", icon: "AtlasIcon") {
+                        selectedModule = .atlas
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Hermes", subtitle: "Haber etkisi", icon: "HermesIcon") {
+                        selectedModule = .hermes
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Aether", subtitle: "Makro rejim", icon: "AetherIcon") {
+                        selectedModule = .aether
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(commonToolsSection(openSheet: openSheet))
+        
+        return sections
+    }
+    
+    private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
+        ArgusDrawerView.DrawerSection(
+            title: "ARACLAR",
+            items: [
+                ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                    openSheet(.calendar)
+                },
+                ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                    openSheet(.dictionary)
+                },
+                ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "OrionIcon") {
+                    openSheet(.systemHealth)
+                },
+                ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                    openSheet(.feedback)
+                }
+            ]
+        )
+    }
 
     // MARK: - Subviews (Computed Properties)
     
@@ -206,6 +322,18 @@ struct ArgusSanctumView: View {
                 }
                 Spacer()
                 
+                Spacer()
+                
+                // NEW: Menu/Drawer Button (Opens Contextual Drawer)
+                Button(action: { showDrawer = true }) { // Requires @State showDrawer
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(SanctumTheme.ghostGrey)
+                        .padding(8)
+                        .background(Color.black.opacity(0.3))
+                        .cornerRadius(8)
+                }
+
                 Spacer()
                 
                 // ICONS REMOVED FOR CLEANER UI (User Request)
@@ -396,7 +524,7 @@ struct HoloPanelView: View {
             VStack(spacing: 0) {
                 // Holo Header
                 HStack {
-                    Image(systemName: module.icon)
+                    SanctumModuleIconView(module: module, size: 28)
                         .foregroundColor(module.color)
                     
                     // LOCALIZED NAMES FOR BIST (Eski Borsacı Jargonu)
@@ -1449,7 +1577,7 @@ struct BistHoloPanelView: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
-                    Image(systemName: module.icon)
+                    SanctumModuleIconView(bistModule: module, size: 28)
                         .foregroundColor(module.color)
                     Text(module.rawValue) // TR ISIM
                         .font(.headline)

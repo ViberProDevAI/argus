@@ -108,7 +108,7 @@ struct ChironEventChip: View {
                 }
                 
                 if let engine = event.engine {
-                    Text(engine == .corse ? "🐢" : "⚡")
+                    Text(engine == .corse ? "" : "⚡")
                         .font(.caption)
                 }
             }

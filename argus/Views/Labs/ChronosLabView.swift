@@ -24,7 +24,7 @@ struct ChronosLabView: View {
                 .padding()
             }
         }
-        .navigationTitle("Chronos Lab 🧪")
+        .navigationTitle("Chronos Lab ")
         .navigationBarTitleDisplayMode(.inline)
     }
     

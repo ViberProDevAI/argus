@@ -103,7 +103,7 @@ actor RejimEngine {
                     dxy: await getDXY(),
                     brentOil: await getBrentOil(),
                     globalVix: await getGlobalVIX(),
-                    newsSnapshot: await getNewsSnapshot()
+                    newsSnapshot: await getNewsSnapshot(symbol: cleanSymbol)
                 )
                 let sirkiyeResult = try await SirkiyeEngine.shared.analyze(input: input)
                 sirkiyeScore = sirkiyeResult.netSupport * 100.0
@@ -290,8 +290,10 @@ actor RejimEngine {
         return nil
     }
     
-    private func getNewsSnapshot() async -> HermesNewsSnapshot? {
-        // TODO: Implement from HermesService
+    private func getNewsSnapshot(symbol: String) async -> HermesNewsSnapshot? {
+        if let payload = try? await BISTSentimentEngine.shared.analyzeSentimentPayload(for: symbol) {
+            return BISTSentimentAdapter.adapt(result: payload.result, articles: payload.articles)
+        }
         return nil
     }
 }

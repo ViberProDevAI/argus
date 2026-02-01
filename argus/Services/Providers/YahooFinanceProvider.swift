@@ -341,21 +341,8 @@ final class YahooFinanceProvider: HeimdallProvider {
         return candles
     }
     func fetchNews(symbol: String) async throws -> [NewsArticle] {
-        // Placeholder: Yahoo Finance News Parsing is complex (RSS or HTML scraping).
-        // Returning a generic "Market Watch" item for now to satisfy protocol.
-        // In production, use NewsAPI or parse https://feeds.finance.yahoo.com/rss/2.0/headline?s=SYMBOL
-        return [
-            NewsArticle(
-                 id: UUID().uuidString,
-                 symbol: symbol,
-                 source: "Yahoo Finance",
-                 headline: "Market Update for \(symbol)",
-                 summary: "Latest price action and volume analysis for \(symbol).",
-                 url: "https://finance.yahoo.com/quote/\(symbol)",
-                 publishedAt: Date(),
-                 fetchedAt: Date()
-            )
-        ]
+        // Real news source (Google News RSS via YahooFinanceNewsProvider)
+        return try await YahooFinanceNewsProvider.shared.fetchNews(symbol: symbol, limit: 12)
     }
     
     // MARK: - Heimdall Protocol Adapters

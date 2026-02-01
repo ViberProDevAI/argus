@@ -20,7 +20,7 @@ struct ArgusBacktestView: View {
             VStack(spacing: 24) {
                 // Header
                 VStack(spacing: 8) {
-                    Text("Orion Teknik Laboratuvarı 🧪")
+                    Text("Orion Teknik Laboratuvarı ")
                         .font(.title2)
                         .bold()
                     Text("Fiyat ve hHacim verileriyle teknik strateji testi")

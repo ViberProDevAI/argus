@@ -45,9 +45,9 @@ struct AetherHUDView: View {
                     
                     // Mini Category Pills
                     HStack(spacing: 4) {
-                        MiniPill(emoji: "🟢", score: r.leadingScore ?? 50)
-                        MiniPill(emoji: "🟡", score: r.coincidentScore ?? 50)
-                        MiniPill(emoji: "🔴", score: r.laggingScore ?? 50)
+                        MiniPill(emoji: "", score: r.leadingScore ?? 50)
+                        MiniPill(emoji: "", score: r.coincidentScore ?? 50)
+                        MiniPill(emoji: "", score: r.laggingScore ?? 50)
                     }
                     
                     Image(systemName: "chevron.right")

@@ -12,7 +12,7 @@ enum TabItem: String, CaseIterable {
         switch self {
         case .home: return "house.fill"
         case .markets: return "chart.bar.fill"
-        case .alkindus: return "brain.head.profile"
+        case .alkindus: return "AlkindusIcon"
         case .portfolio: return "briefcase.fill"
         case .settings: return "gearshape.fill"
         }
@@ -34,7 +34,7 @@ class DeepLinkManager: ObservableObject {
     }
     
     func openStockDetail(symbol: String) {
-        self.selectedTab = .markets
+        self.selectedTab = .home
         self.selectedStockSymbol = symbol
     }
 }

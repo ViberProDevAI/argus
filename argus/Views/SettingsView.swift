@@ -4,6 +4,9 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var settingsViewModel: SettingsViewModel
     @AppStorage("isDarkMode") private var isDarkMode = true
+    @State private var showDrawer = false
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
+    @State private var activeSettingsSheet: SettingsSheet?
 
     var body: some View {
         NavigationView {
@@ -22,6 +25,11 @@ struct SettingsView: View {
                                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                                     .foregroundColor(.green)
                                 Spacer()
+                                Button(action: { showDrawer = true }) {
+                                    Image(systemName: "line.3.horizontal")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(.gray)
+                                }
                                 Text("V.2024.1.0")
                                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                                     .foregroundColor(.gray)
@@ -95,12 +103,139 @@ struct SettingsView: View {
                     }
                     .padding(.bottom, 40)
                 }
+                
+                if showDrawer {
+                    ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                        drawerSections(openSheet: openSheet)
+                    }
+                    .zIndex(200)
+                }
             }
             .navigationTitle("")
             .navigationBarHidden(true)
         }
         .preferredColorScheme(isDarkMode ? .dark : .light)
         .navigationViewStyle(StackNavigationViewStyle())
+        .sheet(item: $activeSettingsSheet) { sheet in
+            settingsSheetView(for: sheet)
+        }
+    }
+}
+
+// MARK: - Settings Drawer Support
+extension SettingsView {
+    enum SettingsSheet: Identifiable {
+        case priceAlerts
+        case dataHealth
+        case serviceHealth
+        case guide
+        case signals
+        
+        var id: String {
+            switch self {
+            case .priceAlerts: return "priceAlerts"
+            case .dataHealth: return "dataHealth"
+            case .serviceHealth: return "serviceHealth"
+            case .guide: return "guide"
+            case .signals: return "signals"
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func settingsSheetView(for sheet: SettingsSheet) -> some View {
+        switch sheet {
+        case .priceAlerts:
+            NavigationView { PriceAlertSettingsView() }
+        case .dataHealth:
+            NavigationView { ArgusDataHealthView() }
+        case .serviceHealth:
+            NavigationView { ServiceHealthView() }
+        case .guide:
+            NavigationView { ArgusGuideView() }
+        case .signals:
+            NavigationView { SettingsSignalsView() }
+        }
+    }
+    
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        var sections: [ArgusDrawerView.DrawerSection] = []
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .markets)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "AlkindusIcon") {
+                        deepLinkManager.navigate(to: .alkindus)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(
+            ArgusDrawerView.DrawerSection(
+                title: "AYARLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Fiyat Alarmlari", subtitle: "Alarm ayarlari", icon: "bell") {
+                        activeSettingsSheet = .priceAlerts
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Veri Sagligi", subtitle: "Kaynak durumu", icon: "waveform.path.ecg") {
+                        activeSettingsSheet = .dataHealth
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Servis Durumu", subtitle: "API sagligi", icon: "shield") {
+                        activeSettingsSheet = .serviceHealth
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Argus Rehberi", subtitle: "Kullanim kilavuzu", icon: "book") {
+                        activeSettingsSheet = .guide
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Sinyal Ayarlari", subtitle: "Bildirim ve sinyal", icon: "slider.horizontal.3") {
+                        activeSettingsSheet = .signals
+                        showDrawer = false
+                    }
+                ]
+            )
+        )
+        
+        sections.append(commonToolsSection(openSheet: openSheet))
+        
+        return sections
+    }
+    
+    private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
+        ArgusDrawerView.DrawerSection(
+            title: "ARACLAR",
+            items: [
+                ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
+                    openSheet(.calendar)
+                },
+                ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
+                    openSheet(.dictionary)
+                },
+                ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
+                    openSheet(.systemHealth)
+                },
+                ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                    openSheet(.feedback)
+                }
+            ]
+        )
     }
 }
 
