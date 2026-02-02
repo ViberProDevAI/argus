@@ -5,6 +5,12 @@ import SwiftUI
 /// FAZ 1: Unified Data Store
 /// Argus'un single source of truth'u.
 /// Tüm working features'lar korunmuş, backward compatibility sağlanmış.
+///
+/// DEPRECATED: Use AppStateCoordinator.shared instead.
+/// UnifiedDataStore will be removed in v2.0. This class duplicated data management
+/// and is being consolidated into AppStateCoordinator for a proper Single Source of Truth.
+@available(*, deprecated,
+           message: "Use AppStateCoordinator.shared instead. UnifiedDataStore will be removed in v2.0")
 @MainActor
 final class UnifiedDataStore: ObservableObject {
     

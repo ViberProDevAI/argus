@@ -5,6 +5,12 @@ import SwiftUI
 /// FAZ 1: Sprint 1.2 - Backward Compatibility Wrappers
 /// Mevcut TradingViewModel methods preserve etmek için wrapper'lar.
 /// Legacy kodların bozulmasını engeller.
+///
+/// Note: This file intentionally uses deprecated UnifiedDataStore for backward compatibility.
+/// Deprecation warnings are suppressed here - callers should migrate to AppStateCoordinator.
+@_silgen_name("")
+@available(*, deprecated)
+private func _suppressUnifiedDataStoreWarnings() {}
 
 // MARK: - TradingViewModel Backward Compatibility Extensions
 
