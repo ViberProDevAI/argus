@@ -30,6 +30,7 @@ struct ArgusDrawerView: View {
         case systemHealth
         case feedback
         case alkindusGuide
+        case financeWisdom
 
         var id: String {
             switch self {
@@ -41,6 +42,7 @@ struct ArgusDrawerView: View {
             case .systemHealth: return "systemHealth"
             case .feedback: return "feedback"
             case .alkindusGuide: return "alkindusGuide"
+            case .financeWisdom: return "financeWisdom"
             }
         }
     }
@@ -249,6 +251,8 @@ struct ArgusDrawerView: View {
             FeedbackSheet()
         case .alkindusGuide:
             AlkindusEducationSheet()
+        case .financeWisdom:
+            FinanceWisdomSheet()
         }
     }
 }

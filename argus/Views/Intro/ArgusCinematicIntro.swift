@@ -1,14 +1,14 @@
 import SwiftUI
 import UIKit
 
-///  THE PRISM INTRO 
+///  THE PRISM INTRO
 /// A high-end, holographic reveal of the Argus identity.
 struct ArgusCinematicIntro: View {
     var onFinished: () -> Void
-    
+
     // Animation States
     @State private var phase = 0 // 0: Start, 1: Prism Rise, 2: Eye Open, 3: Flash, 4: Text, 5: End
-    
+
     // Geometry States
     @State private var rotation: Double = 30
     @State private var prismScale: CGFloat = 0.5
@@ -18,7 +18,7 @@ struct ArgusCinematicIntro: View {
     @State private var flashOpacity: Double = 0.0
     @State private var textOpacity: Double = 0.0
     @State private var textSpacing: CGFloat = 20
-    
+
     // Haptics
     private let impact = UIImpactFeedbackGenerator(style: .heavy)
     private let softImpact = UIImpactFeedbackGenerator(style: .light)
@@ -132,7 +132,7 @@ struct ArgusCinematicIntro: View {
     private func runSequence() {
         // Step 1: Initialize
         impact.prepare()
-        
+
         // Step 2: Prism Rise (0.0s -> 1.5s)
         withAnimation(.easeOut(duration: 1.5)) {
             phase = 1
@@ -140,7 +140,7 @@ struct ArgusCinematicIntro: View {
             prismScale = 1.0
             rotation = 0 // Align to flat
         }
-        
+
         // Step 3: Eye Open (1.5s -> 2.0s)
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             softImpact.impactOccurred()
@@ -150,16 +150,16 @@ struct ArgusCinematicIntro: View {
                 eyeScale = 1.0
             }
         }
-        
+
         // Step 4: The Flash (Ignition) (2.0s)
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             impact.impactOccurred()
-            
+
             // Flash Burst
             withAnimation(.easeIn(duration: 0.1)) {
                 flashOpacity = 1.0
             }
-            
+
             // Flash Fade
             withAnimation(.easeOut(duration: 0.5).delay(0.1)) {
                 flashOpacity = 0.0

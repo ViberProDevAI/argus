@@ -2,28 +2,31 @@ import SwiftUI
 
 struct AppTabBar: View {
     @ObservedObject var deepLinkManager = DeepLinkManager.shared
-    
+    @EnvironmentObject var router: NavigationRouter
+
     var body: some View {
         HStack {
             ForEach(TabItem.allCases, id: \.self) { tab in
                 Spacer()
-                
+
                 Button(action: {
                     withAnimation(.spring()) {
                         deepLinkManager.navigate(to: tab)
+                        // Also clear navigation stack when switching tabs
+                        router.popToRoot()
                     }
                 }) {
                     VStack(spacing: 4) {
                         Image(systemName: tab.icon)
                             .font(.system(size: 20))
-                        
+
                         Text(tab.rawValue)
                             .font(DesignTokens.Fonts.caption)
                     }
                     .foregroundColor(deepLinkManager.selectedTab == tab ? DesignTokens.Colors.primary : DesignTokens.Colors.textSecondary)
                     .scaleEffect(deepLinkManager.selectedTab == tab ? 1.1 : 1.0)
                 }
-                
+
                 Spacer()
             }
         }

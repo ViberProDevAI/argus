@@ -15,11 +15,18 @@ final class WisdomService {
             quotes = defaultQuotes
             return
         }
-        quotes = decoded
+        quotes = decoded.isEmpty ? defaultQuotes : decoded
     }
     
     func getQuote(for action: ArgusAction) -> WisdomQuote? {
-        quotes.randomElement()
+        if quotes.isEmpty {
+            return defaultQuotes.randomElement()
+        }
+        return quotes.randomElement()
+    }
+
+    func getAllQuotes() -> [WisdomQuote] {
+        quotes.isEmpty ? defaultQuotes : quotes
     }
     
     func getDailyQuote() -> WisdomQuote? {

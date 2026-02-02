@@ -1,5 +1,5 @@
 import Foundation
-import UIKit // For device model, though UIDevice is basic. ProcessInfo is better for pure Swift.
+import UIKit
 
 /// Exports the Debug Bundle
 actor HeimdallDebugBundleExporter {

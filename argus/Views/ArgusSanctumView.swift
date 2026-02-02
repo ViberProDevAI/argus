@@ -6,30 +6,25 @@ import SwiftUI
 struct ArgusSanctumView: View {
     let symbol: String
     // LEAVING LEGACY VM BUT REMOVING OBSERVATION TO STOP RE-RENDERS
-    let viewModel: TradingViewModel 
+    let viewModel: TradingViewModel
     @StateObject private var vm: SanctumViewModel
     @StateObject private var deepLinkManager = DeepLinkManager.shared
-    
+    @EnvironmentObject var router: NavigationRouter
+
     init(symbol: String, viewModel: TradingViewModel) {
         self.symbol = symbol
         self.viewModel = viewModel
         self._vm = StateObject(wrappedValue: SanctumViewModel(symbol: symbol))
     }
-    
+
     @Environment(\.presentationMode) var presentationMode
-    
+
     // State
     @State private var selectedModule: SanctumModuleType? = nil
     @State private var selectedBistModule: SanctumBistModuleType? = nil
     @State private var pulseAnimation = false
     @State private var rotateOrbit = false
     @State private var showDecision = false
-    @State private var showDebateSheet = false
-    @State private var showChronosLabSheet = false
-    @State private var showArgusLabSheet = false
-    @State private var showObservatorySheet = false
-    @State private var showAlkindusSheet = false
-    @State private var showAnalystReportSheet = false // NEW: Quick Access to AI Report
     @State private var showDrawer = false // NEW: Contextual Drawer State
     
     // Legacy type alias for internal references
@@ -107,8 +102,7 @@ struct ArgusSanctumView: View {
                     viewModel: viewModel,
                     vm: vm,
                     symbol: symbol,
-                    showChronosLabSheet: $showChronosLabSheet,
-                    showArgusLabSheet: $showArgusLabSheet,
+                    router: router,
                     onClose: { withAnimation { selectedModule = nil } }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -133,8 +127,7 @@ struct ArgusSanctumView: View {
                     viewModel: viewModel,
                     vm: vm,
                     symbol: symbol,
-                    showChronosLabSheet: $showChronosLabSheet,
-                    showArgusLabSheet: $showArgusLabSheet,
+                    router: router,
                     onClose: { withAnimation { selectedBistModule = nil } }
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -184,15 +177,7 @@ struct ArgusSanctumView: View {
                 action: tradeAction
             )
         }
-        // Auxiliary Sheets
-        .sheet(isPresented: $showDebateSheet) { debateSheetContent }
-        .sheet(isPresented: $showChronosLabSheet) { chronosLabSheetContent }
-        .sheet(isPresented: $showArgusLabSheet) { argusLabSheetContent }
-        .sheet(isPresented: $showObservatorySheet) { observatorySheetContent }
-        .sheet(isPresented: $showAlkindusSheet) { alkindusSheetContent }
-        .sheet(isPresented: $showAnalystReportSheet) {
-            ArgusAnalystReportView(symbol: symbol, viewModel: viewModel)
-        }
+        // Navigation via Router - Orphaned sheets removed, use router.navigate() instead
         .task {
             // Ensure data is loaded when view appears
             if vm.quote == nil {
@@ -247,7 +232,7 @@ struct ArgusSanctumView: View {
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Analiz Raporu", subtitle: "Detayli rapor", icon: "doc.text.magnifyingglass") {
-                        showAnalystReportSheet = true
+                        router.navigate(to: .analystReport)
                         showDrawer = false
                     }
                 ]
@@ -292,6 +277,9 @@ struct ArgusSanctumView: View {
                 },
                 ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
                     openSheet(.dictionary)
+                },
+                ArgusDrawerView.DrawerItem(title: "Unlu Finans Sozleri", subtitle: "Finans alintilari", icon: "quote.opening") {
+                    openSheet(.financeWisdom)
                 },
                 ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "OrionIcon") {
                     openSheet(.systemHealth)
@@ -339,7 +327,7 @@ struct ArgusSanctumView: View {
                 // ICONS REMOVED FOR CLEANER UI (User Request)
                 
                 // NEW: Argus Analysis Button (Top Right)
-                Button(action: { showAnalystReportSheet = true }) {
+                Button(action: { router.navigate(to: .analystReport) }) {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles.rectangle.stack")
                             .font(.system(size: 16))
@@ -378,7 +366,7 @@ struct ArgusSanctumView: View {
                         .foregroundColor((quote.percentChange ?? 0) >= 0 ? SanctumTheme.auroraGreen : SanctumTheme.crimsonRed)
                     
                     // NEW: SIGNAL CAPSULE (Restored Feature)
-                    Button(action: { showDebateSheet = true }) {
+                    Button(action: { router.navigate(to: .symbolDebate(symbol: symbol)) }) {
                         SanctumSignalCapsule(
                             signal: vm.grandDecision,
                             dataHealth: .healthy
@@ -395,7 +383,7 @@ struct ArgusSanctumView: View {
     private var centerCoreArea: some View {
         ZStack {
             // The Dial
-            CenterCoreView(symbol: symbol, viewModel: viewModel, showDecision: $showDebateSheet)
+            CenterCoreView(symbol: symbol, viewModel: viewModel, showDecision: $showDecision)
             
             // Orbiting Satellites (Modules)
             // BIST vs Global Separation
@@ -436,13 +424,6 @@ struct ArgusSanctumView: View {
     }
     
     // ALKINDUS SHEET CONTENT
-    private var alkindusSheetContent: some View {
-        NavigationView {
-            AlkindusDashboardView()
-                .navigationBarItems(trailing: Button("Kapat") { showAlkindusSheet = false })
-        }
-    }
-    
     // 4. FOOTER (Pantheon)
     private var footerHelper: some View {
          PantheonDeckView(
@@ -452,43 +433,6 @@ struct ArgusSanctumView: View {
             selectedModule: $selectedModule,
             selectedBistModule: $selectedBistModule
         )
-    }
-    
-    // 5. SHEETS
-    private var debateSheetContent: some View {
-        NavigationView {
-             if let decision = viewModel.grandDecisions[symbol] {
-                 SymbolDebateView(decision: decision, viewModel: viewModel, isPresented: $showDebateSheet)
-                     .navigationTitle("Konsey Tartışması")
-                     .navigationBarHidden(true) // Custom header in view
-             } else {
-                 Text("Henüz karar oluşmadı.")
-                     .navigationBarItems(trailing: Button("Kapat") { showDebateSheet = false })
-             }
-        }
-    }
-    
-    private var chronosLabSheetContent: some View {
-         NavigationView {
-             ChronosLabView(viewModel: ChronosLabViewModel())
-                 .environmentObject(viewModel) 
-                 .navigationBarItems(trailing: Button("Kapat") { showChronosLabSheet = false })
-         }
-    }
-    
-    private var argusLabSheetContent: some View {
-         NavigationView {
-             ArgusLabView()
-                 .environmentObject(viewModel)
-                 .navigationBarItems(trailing: Button("Kapat") { showArgusLabSheet = false })
-         }
-    }
-    
-    private var observatorySheetContent: some View {
-         NavigationView {
-             ObservatoryContainerView()
-                 .navigationBarItems(trailing: Button("Kapat") { showObservatorySheet = false })
-         }
     }
 }
 
@@ -507,8 +451,7 @@ struct HoloPanelView: View {
     @ObservedObject var viewModel: TradingViewModel
     @ObservedObject var vm: SanctumViewModel
     let symbol: String
-    @Binding var showChronosLabSheet: Bool
-    @Binding var showArgusLabSheet: Bool
+    let router: NavigationRouter
     let onClose: () -> Void
     
     // State for async data loading
@@ -1237,9 +1180,9 @@ struct HoloPanelView: View {
                 .background(Color.white.opacity(0.03))
                 .cornerRadius(8)
                 
-                // CHRONOS LAB Button (Sheet)
+                // CHRONOS LAB Button (Navigation)
                 Button {
-                    showChronosLabSheet = true
+                    router.navigate(to: .chronosLab)
                 } label: {
                     HStack {
                         Image(systemName: "clock.arrow.2.circlepath")
@@ -1271,9 +1214,9 @@ struct HoloPanelView: View {
                     )
                 }
                 
-                // ARGUS LAB Button (Sheet)
+                // ARGUS LAB Button (Navigation)
                 Button {
-                    showArgusLabSheet = true
+                    router.navigate(to: .argusLab)
                 } label: {
                     HStack {
                         Image(systemName: "flask.fill")

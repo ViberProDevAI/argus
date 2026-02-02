@@ -131,6 +131,9 @@ struct MarketReportView: View {
                     ArgusDrawerView.DrawerItem(title: "Finans Sozlugu", subtitle: "Terimler", icon: "character.book.closed") {
                         openSheet(.dictionary)
                     },
+                    ArgusDrawerView.DrawerItem(title: "Unlu Finans Sozleri", subtitle: "Finans alintilari", icon: "quote.opening") {
+                        openSheet(.financeWisdom)
+                    },
                     ArgusDrawerView.DrawerItem(title: "Sistem Durumu", subtitle: "Servis sagligi", icon: "waveform.path.ecg") {
                         openSheet(.systemHealth)
                     },
