@@ -1455,7 +1455,7 @@ extension TradingViewModel {
                 source: .user,
                 reason: "Sanctum Satış Emri @ \(price)"
             )
-            
+
             // FAZE 1.2: Satış sonrası planları güncelle
             Task {
                 await PositionPlanStore.shared.syncWithPortfolio(
@@ -1464,5 +1464,34 @@ extension TradingViewModel {
                 )
             }
         }
+    }
+}
+
+// MARK: - Plan Execution & Persistence Facades
+
+extension TradingViewModel {
+
+    // MARK: - Plan Execution Facade
+
+    var activePlans: [UUID: PositionPlan] {
+        PortfolioViewModel.shared.activePlans
+    }
+
+    var isCheckingPlanTriggers: Bool {
+        PortfolioViewModel.shared.isCheckingPlanTriggers
+    }
+
+    func addActivePlan(_ plan: PositionPlan) {
+        PortfolioViewModel.shared.addActivePlan(plan)
+    }
+
+    func removeActivePlan(id: UUID) {
+        PortfolioViewModel.shared.removeActivePlan(id: id)
+    }
+
+    // MARK: - Portfolio Persistence Facade
+
+    func exportPortfolioSnapshot() -> [String: Any] {
+        PortfolioViewModel.shared.exportPortfolioSnapshot()
     }
 }

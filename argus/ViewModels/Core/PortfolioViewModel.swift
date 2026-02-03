@@ -268,4 +268,45 @@ class PortfolioViewModel: ObservableObject {
         activePlans.removeValue(forKey: id)
         print("✖️ Plan removed")
     }
+
+    // MARK: - Portfolio Persistence
+
+    func resetAllData() {
+        print("🔄 Resetting all portfolio data...")
+
+        // Clear portfolio
+        portfolio.removeAll()
+        transactionHistory.removeAll()
+
+        // Reset balances
+        balance = 100000.0
+        bistBalance = 1000000.0
+        usdTryRate = 35.0
+
+        // Reset state flags
+        isLoadingPortfolio = false
+        errorMessage = nil
+
+        // Clear plans
+        activePlans.removeAll()
+        planTriggerHistory.removeAll()
+
+        // Clear underlying store
+        PortfolioStore.shared.resetBistPortfolio()
+
+        print("✅ Portfolio data reset complete")
+    }
+
+    func exportPortfolioSnapshot() -> [String: Any] {
+        return [
+            "timestamp": Date(),
+            "portfolio": portfolio,
+            "balance": balance,
+            "bistBalance": bistBalance,
+            "usdTryRate": usdTryRate,
+            "transactionHistory": transactionHistory,
+            "activePlans": Array(activePlans.values),
+            "planTriggerHistory": planTriggerHistory
+        ]
+    }
 }

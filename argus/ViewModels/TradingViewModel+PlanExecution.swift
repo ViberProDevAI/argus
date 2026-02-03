@@ -4,9 +4,9 @@ import Foundation
 /// Pozisyon planlarını otomatik kontrol eder ve tetiklenen aksiyonları uygular
 
 extension TradingViewModel {
-    
+
     // MARK: - Plan Trigger Kontrolü
-    
+
     /// Tüm açık pozisyonların planlarını kontrol et
     /// Bu fonksiyon AutoPilot döngüsünde veya quote güncellemelerinde çağrılmalı
     func checkPlanTriggers() async {
