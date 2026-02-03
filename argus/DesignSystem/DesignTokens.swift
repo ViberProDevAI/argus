@@ -16,6 +16,11 @@ enum DesignTokens {
         static let textPrimary = Color.white
         static let textSecondary = Color.gray
         static let border = Color.gray.opacity(0.3)
+
+        // Glass morphism colors
+        static let glassBase = Color.white.opacity(0.1)
+        static let glassBorder = Color.white.opacity(0.2)
+        static let glassHover = Color.white.opacity(0.15)
     }
     
     // MARK: - Fonts
