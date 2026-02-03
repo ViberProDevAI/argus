@@ -111,15 +111,87 @@ final class MarketViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Watchlist & Search State
+    @Published var watchlist: [String] = [] {
+        didSet {
+            updateDiscoveryLists()
+        }
+    }
+    @Published var searchResults: [SearchResult] = []
+
+    private let watchlistStore = WatchlistStore.shared
+    private var searchTask: Task<Void, Never>?
+
     // MARK: - Public Methods
-    
+
     func refreshMarketRegime() {
         self.marketRegime = ChironRegimeEngine.shared.globalResult.regime
     }
-    
+
     func fetchTCMBData() {
         Task {
             self.tcmbData = await TCMBDataService.shared.getSnapshot()
         }
+    }
+
+    // MARK: - Watchlist Operations
+
+    func addToWatchlist(symbol: String) {
+        watchlistStore.add(symbol)
+        watchlist = watchlistStore.items
+    }
+
+    func removeFromWatchlist(symbol: String) {
+        watchlistStore.remove(symbol)
+        watchlist = watchlistStore.items
+    }
+
+    func deleteFromWatchlist(at offsets: IndexSet) {
+        for index in offsets.sorted(by: >) {
+            let symbolToRemove = watchlist[index]
+            removeFromWatchlist(symbol: symbolToRemove)
+        }
+    }
+
+    func search(query: String, completion: @escaping ([SearchResult]) -> Void) {
+        Task {
+            do {
+                let results = try await marketDataProvider.searchSymbols(query: query)
+                await MainActor.run {
+                    completion(results)
+                }
+            } catch {
+                print("Search error: \(error)")
+            }
+        }
+    }
+
+    func refreshSymbol(_ symbol: String) {
+        Task {
+            await MarketDataStore.shared.ensureQuote(symbol: symbol)
+        }
+    }
+
+    // MARK: - Composite Scores
+
+    var compositeScores: [String: FundamentalScoreResult] {
+        var scores: [String: FundamentalScoreResult] = [:]
+        for symbol in watchlistStore.items {
+            if let score = FundamentalScoreStore.shared.getScore(for: symbol) {
+                scores[symbol] = score
+            }
+        }
+        return scores
+    }
+
+    func getTopPicks() -> [FundamentalScoreResult] {
+        var picks: [FundamentalScoreResult] = []
+        for symbol in watchlistStore.items {
+            if let score = FundamentalScoreStore.shared.getScore(for: symbol),
+               score.totalScore >= 70 {
+                picks.append(score)
+            }
+        }
+        return picks.sorted { $0.totalScore > $1.totalScore }
     }
 }
