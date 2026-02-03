@@ -3,17 +3,17 @@ import SwiftUI
 struct FinanceWisdomSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    private let allCategoryLabel = "Tumu"
+    private let allCategoryLabel = "Tümü"
 
     @State private var allQuotes: [WisdomQuote] = []
     @State private var filteredQuotes: [WisdomQuote] = []
     @State private var availableCategories: [String] = []
 
     @State private var pendingSearchText = ""
-    @State private var pendingCategory = "Tumu"
+    @State private var pendingCategory = "Tümü"
 
     @State private var activeSearchText = ""
-    @State private var activeCategory = "Tumu"
+    @State private var activeCategory = "Tümü"
 
     var body: some View {
         NavigationView {
@@ -22,7 +22,7 @@ struct FinanceWisdomSheet: View {
                 quotesList
             }
             .background(Theme.background)
-            .navigationTitle("Unlu Finans Sozleri")
+            .navigationTitle("Ünlü Finans Sözleri")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -45,7 +45,7 @@ struct FinanceWisdomSheet: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(Theme.textSecondary)
 
-                TextField("Soz ara...", text: $pendingSearchText)
+                TextField("Söz ara...", text: $pendingSearchText)
                     .textFieldStyle(PlainTextFieldStyle())
                     .foregroundColor(.white)
 
@@ -97,7 +97,7 @@ struct FinanceWisdomSheet: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 12) {
                 if filteredQuotes.isEmpty {
-                    Text("Sonuc bulunamadi")
+                    Text("Sonuç bulunamadı")
                         .font(.caption)
                         .foregroundColor(Theme.textSecondary)
                         .padding(.top, 20)

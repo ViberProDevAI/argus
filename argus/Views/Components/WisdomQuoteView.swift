@@ -57,7 +57,7 @@ struct DailyQuoteCard: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("GUNUN SOZU")
+            Text("GÜNÜN SÖZÜ")
                 .font(.caption2)
                 .fontWeight(.semibold)
                 .foregroundColor(.gray)
