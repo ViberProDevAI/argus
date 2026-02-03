@@ -3,13 +3,23 @@ import Foundation
 // MARK: - Position Plan (Trade Brain)
 /// Her açık pozisyon için hafıza ve senaryo planı
 
+// MARK: - Plan Trigger Event
+/// Plan tetiklemesi kaydı
+struct PlanTriggerEvent: Codable, Identifiable {
+    let id: UUID = UUID()
+    let planId: UUID
+    let symbol: String
+    let triggeredAt: Date
+}
+
 struct PositionPlan: Codable, Identifiable {
     let id: UUID
     let tradeId: UUID
+    let symbol: String // For quick access to symbol (from EntrySnapshot)
     let dateCreated: Date
     let originalSnapshot: EntrySnapshot
     let initialQuantity: Double
-    
+
     // Plan Context
     let thesis: String
     let invalidation: String
@@ -37,6 +47,7 @@ struct PositionPlan: Codable, Identifiable {
     init(tradeId: UUID, snapshot: EntrySnapshot, initialQuantity: Double, thesis: String, invalidation: String, bullish: Scenario, bearish: Scenario, neutral: Scenario? = nil, intent: TradeIntent = .undefined) {
         self.id = UUID()
         self.tradeId = tradeId
+        self.symbol = snapshot.symbol
         self.dateCreated = Date()
         self.originalSnapshot = snapshot
         self.initialQuantity = initialQuantity
@@ -54,6 +65,13 @@ struct PositionPlan: Codable, Identifiable {
         self.bearishScenario = bearish
         self.neutralScenario = neutral
         self.isActive = true
+    }
+
+    // MARK: - Computed Properties
+
+    /// Convenience property for accessing quantity (same as initialQuantity)
+    var quantity: Double {
+        return initialQuantity
     }
 }
 

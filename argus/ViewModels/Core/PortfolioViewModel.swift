@@ -13,6 +13,12 @@ class PortfolioViewModel: ObservableObject {
     @Published var isLoadingPortfolio = false
     @Published var errorMessage: String?
 
+    // Plan Execution & Monitoring
+    @Published var activePlans: [UUID: PositionPlan] = [:]
+    @Published var planTriggerHistory: [PlanTriggerEvent] = []
+    @Published var isCheckingPlanTriggers: Bool = false
+    @Published var lastPlanCheckTime: Date?
+
     private let portfolioStore = PortfolioStore.shared
     private var cancellables = Set<AnyCancellable>()
 
@@ -190,5 +196,76 @@ class PortfolioViewModel: ObservableObject {
         bistBalance = 1000000.0
         usdTryRate = 35.0
         errorMessage = nil
+    }
+
+    // MARK: - Plan Execution & Triggers
+
+    func checkPlanTriggers() async {
+        guard !isCheckingPlanTriggers else { return }
+
+        isCheckingPlanTriggers = true
+        defer { isCheckingPlanTriggers = false }
+
+        // Check each active plan
+        for (planId, plan) in activePlans {
+            // Check if trigger condition met (e.g., price reached)
+            if shouldTriggerPlan(plan) {
+                await handleTriggeredAction(planId: planId, plan: plan)
+            }
+        }
+
+        await MainActor.run {
+            self.lastPlanCheckTime = Date()
+        }
+    }
+
+    private func shouldTriggerPlan(_ plan: PositionPlan) -> Bool {
+        // Check plan trigger conditions
+        // Return true if conditions met
+        return false // Placeholder
+    }
+
+    private func handleTriggeredAction(planId: UUID, plan: PositionPlan) async {
+        print("📋 Plan \(planId) triggered: \(plan.symbol)")
+
+        // Log the trigger event
+        let event = PlanTriggerEvent(
+            planId: planId,
+            symbol: plan.symbol,
+            triggeredAt: Date()
+        )
+
+        await MainActor.run {
+            self.planTriggerHistory.append(event)
+        }
+
+        // Delegate to ExecutionStateViewModel for order execution
+        // await ExecutionStateViewModel.shared.executePlan(plan)
+    }
+
+    private func executePlanSell(for plan: PositionPlan) async {
+        print("🔴 Executing sell for plan: \(plan.symbol)")
+
+        // Get current quote for market conditions
+        let marketVM = MarketViewModel()
+        if let quote = marketVM.quotes[plan.symbol] {
+            // Create execution order
+            let currentPrice = quote.c
+            print("   Current price: \(currentPrice)")
+            print("   Executing \(plan.quantity) shares at market")
+
+            // Delegate to ExecutionStateViewModel
+            // await ExecutionStateViewModel.shared.executeMarketSell(symbol: plan.symbol, quantity: plan.quantity)
+        }
+    }
+
+    func addActivePlan(_ plan: PositionPlan) {
+        activePlans[plan.id] = plan
+        print("📌 Plan added: \(plan.symbol)")
+    }
+
+    func removeActivePlan(id: UUID) {
+        activePlans.removeValue(forKey: id)
+        print("✖️ Plan removed")
     }
 }
