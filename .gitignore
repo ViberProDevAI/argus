@@ -1,1 +1,4 @@
 Secrets.xcconfig
+
+# Git worktrees
+.worktrees/
