@@ -1,5 +1,9 @@
 import Foundation
 
+fileprivate extension ExecutionModel {
+    static var defaultModel: ExecutionModel { .marketWrapper } // plain, non-isolated default
+}
+
 // MARK: - Paper Broker
 /// Simulated broker for paper trading - gerçek para kullanmadan test
 
@@ -13,7 +17,7 @@ actor PaperBroker: BrokerProtocol {
     private var cash: Double = 100_000.0
     private var positions: [String: PaperPosition] = [:]
     private var orderStateMachine = OrderStateMachine()
-    private var executionModel: ExecutionModel = ExecutionModel.marketWrapper // Safe default, configured later
+    private var executionModel: ExecutionModel = .defaultModel // Safe default, configured later
     private var tradeHistory: [PaperTrade] = []
     
     var isConnected: Bool { true }
@@ -43,7 +47,6 @@ actor PaperBroker: BrokerProtocol {
         let quote = try await getQuote(symbol: symbol)
         
         // Calculate execution price with slippage
-        // Calculate execution price with slippage
         let executionPrice: Double = {
             switch side {
             case .buy:
@@ -64,7 +67,6 @@ actor PaperBroker: BrokerProtocol {
             quantity: quantity
         )
         
-        // Simulate instant fill for market order
         // Simulate instant fill for market order
         let tradeValue = executionPrice * quantity
         let commission = executionModel.calculateCommission(tradeValue: tradeValue)
@@ -497,3 +499,4 @@ struct PaperPerformance: Codable {
     let totalSlippage: Double
     let generatedAt: Date
 }
+
