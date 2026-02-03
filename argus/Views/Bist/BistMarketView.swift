@@ -250,11 +250,11 @@ struct BistMarketView: View {
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
-                        deepLinkManager.navigate(to: .markets)
+                        deepLinkManager.navigate(to: .kokpit)
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "brain.head.profile") {
-                        deepLinkManager.navigate(to: .alkindus)
+                        deepLinkManager.navigate(to: .home)
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {

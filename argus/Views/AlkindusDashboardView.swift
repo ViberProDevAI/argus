@@ -112,7 +112,7 @@ struct AlkindusDashboardView: View {
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Piyasalar", subtitle: "Market ekranı", icon: "chart.line.uptrend.xyaxis") {
-                        deepLinkManager.navigate(to: .markets)
+                        deepLinkManager.navigate(to: .kokpit)
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {

@@ -6,14 +6,10 @@ extension NavigationRouter {
         switch route {
         // MARK: - Main Tabs
         case .home:
-            MarketView()
-                .environmentObject(viewModel)
-
-        case .markets:
-            ArgusCockpitView()
-
-        case .alkindus:
             AlkindusDashboardView()
+
+        case .kokpit:
+            ArgusCockpitView()
 
         case .portfolio:
             PortfolioView(viewModel: viewModel)

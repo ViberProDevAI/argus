@@ -3,16 +3,14 @@ import Combine
 
 enum TabItem: String, CaseIterable {
     case home = "Ana Sayfa"
-    case markets = "Piyasalar"
-    case alkindus = "Alkindus"
+    case kokpit = "Kokpit"
     case portfolio = "Portföy"
     case settings = "Ayarlar"
-    
+
     var icon: String {
         switch self {
         case .home: return "house.fill"
-        case .markets: return "chart.bar.fill"
-        case .alkindus: return "AlkindusIcon"
+        case .kokpit: return "radar.fill"
         case .portfolio: return "briefcase.fill"
         case .settings: return "gearshape.fill"
         }
@@ -22,7 +20,7 @@ enum TabItem: String, CaseIterable {
 class DeepLinkManager: ObservableObject {
     static let shared = DeepLinkManager()
     
-    @Published var selectedTab: TabItem = .alkindus // Varsayılan olarak Alkindus
+    @Published var selectedTab: TabItem = .home // Default to Home view
     
     // Sayfa içi navigasyon için kullanılabilir (örn. belirli bir hisseye git)
     @Published var selectedStockSymbol: String?

@@ -5,8 +5,7 @@ enum NavigationRoute: Hashable, Identifiable {
     var id: Self { self }
     // MARK: - Main Tabs
     case home
-    case markets
-    case alkindus
+    case kokpit
     case portfolio
     case settings
 
