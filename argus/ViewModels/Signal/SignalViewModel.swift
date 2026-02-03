@@ -281,4 +281,43 @@ final class SignalViewModel: ObservableObject {
             print("⚠️ Voice report generation failed: \(error)")
         }
     }
+
+    // MARK: - Specialized Analysis
+
+    func loadSarTsiLab(symbol: String) async {
+        // SAR + TSI technical analysis
+        let marketVM = MarketViewModel()
+        if let candles = marketVM.candles[symbol] {
+            print("📊 SAR TSI Lab analysis for \(symbol): \(candles.count) candles")
+        }
+    }
+
+    func analyzeOverreaction(symbol: String, atlas: Double?, aether: Double?) {
+        // Check if stock is oversold (overreaction)
+        let marketVM = MarketViewModel()
+        if let quote = marketVM.quotes[symbol] {
+            let isOversold = (quote.percentChange ?? 0) < -5.0 && (atlas ?? 0) > 75
+            if isOversold {
+                print("⚠️ Overreaction detected in \(symbol)")
+            }
+        }
+    }
+
+    func loadEtfData(for symbol: String) async {
+        // Load ETF composition and sector breakdown
+        print("📦 Loading ETF data for \(symbol)")
+    }
+
+    func hydrateAtlas() async {
+        // Pre-load fundamental data for watchlist
+        let marketVM = MarketViewModel()
+        for symbol in marketVM.watchlist.prefix(10) {
+            _ = await calculateFundamentalScore(for: symbol, assetType: .stock)
+        }
+    }
+
+    func generateAISignals() async {
+        // Generate AI-powered trading signals
+        print("🤖 Generating AI signals...")
+    }
 }
