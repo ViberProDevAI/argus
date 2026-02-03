@@ -23,15 +23,28 @@ enum DesignTokens {
         static let glassHover = Color.white.opacity(0.15)
     }
     
-    // MARK: - Fonts
+    // MARK: - Fonts (Modern Premium Typography)
     enum Fonts {
-        static let headline = Font.system(size: 24, weight: .bold, design: .rounded)
-        static let title = Font.system(size: 20, weight: .semibold, design: .rounded)
+        // Display & Headlines
+        static let display = Font.system(size: 32, weight: .bold, design: .default)
+        static let headline = Font.system(size: 24, weight: .bold, design: .default)
+
+        // Body & Content
+        static let title = Font.system(size: 20, weight: .semibold, design: .default)
         static let body = Font.system(size: 16, weight: .regular, design: .default)
-        static let caption = Font.system(size: 12, weight: .medium, design: .monospaced)
-        
+        static let bodyMedium = Font.system(size: 14, weight: .medium, design: .default)
+
+        // UI & Controls
+        static let tabLabel = Font.system(size: 12, weight: .semibold, design: .default)
+        static let caption = Font.system(size: 11, weight: .medium, design: .default)
+        static let micro = Font.system(size: 10, weight: .regular, design: .default)
+
+        // Bloomberg Terminal monospace
+        static let monospace = Font.system(size: 13, weight: .regular, design: .monospaced)
+        static let monospaceBold = Font.system(size: 13, weight: .semibold, design: .monospaced)
+
         static func custom(size: CGFloat, weight: Font.Weight = .regular) -> Font {
-            return Font.system(size: size, weight: weight, design: .rounded)
+            return Font.system(size: size, weight: weight, design: .default)
         }
     }
     
