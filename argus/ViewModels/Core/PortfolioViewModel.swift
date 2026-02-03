@@ -191,4 +191,65 @@ class PortfolioViewModel: ObservableObject {
         usdTryRate = 35.0
         errorMessage = nil
     }
+
+    // MARK: - Portfolio Reset & Persistence
+
+    func resetAllData() {
+        print("🔄 Resetting all portfolio data...")
+
+        // Clear portfolio
+        portfolio.removeAll()
+        transactionHistory.removeAll()
+
+        // Reset balances
+        balance = 100000.0
+        bistBalance = 1000000.0
+        usdTryRate = 35.0
+
+        // Reset state flags
+        isLoadingPortfolio = false
+        errorMessage = nil
+
+        // Clear underlying store
+        PortfolioStore.shared.resetBistPortfolio()
+
+        print("✅ Portfolio data reset complete")
+    }
+
+    func exportPortfolioSnapshot() -> [String: Any] {
+        return [
+            "timestamp": Date(),
+            "portfolio": portfolio,
+            "balance": balance,
+            "bistBalance": bistBalance,
+            "usdTryRate": usdTryRate,
+            "transactionHistory": transactionHistory
+        ]
+    }
+
+    func importPortfolioSnapshot(_ snapshot: [String: Any]) async {
+        print("📥 Importing portfolio snapshot...")
+
+        if let trades = snapshot["portfolio"] as? [Trade] {
+            portfolio = trades
+        }
+
+        if let bal = snapshot["balance"] as? Double {
+            balance = bal
+        }
+
+        if let bistBal = snapshot["bistBalance"] as? Double {
+            bistBalance = bistBal
+        }
+
+        if let rate = snapshot["usdTryRate"] as? Double {
+            usdTryRate = rate
+        }
+
+        if let transactions = snapshot["transactionHistory"] as? [Transaction] {
+            transactionHistory = transactions
+        }
+
+        print("✅ Portfolio snapshot imported")
+    }
 }
