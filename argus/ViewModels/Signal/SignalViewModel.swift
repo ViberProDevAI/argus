@@ -18,6 +18,11 @@ final class SignalViewModel: ObservableObject {
     @Published var isScoutRunning: Bool = false
     private var scoutTimer: Timer?
 
+    // MARK: - Argus Data Loading
+    @Published var isLoadingArgus: Bool = false
+    @Published var loadedAssetTypes: [String: SafeAssetType] = [:]
+    @Published var loadingProgress: Double = 0.0
+
     // Scout universe for scanning
     let scoutUniverse = ScoutUniverse.dailyRotation(count: 20)
 
@@ -160,5 +165,80 @@ final class SignalViewModel: ObservableObject {
         // This would delegate to ExecutionStateViewModel for high-conviction trading
         // For now, just log
         print("🔭 Scout found \(symbol) with score \(score)")
+    }
+
+    // MARK: - Argus Data Loading
+
+    @MainActor
+    func loadArgusData(for symbol: String) async {
+        isLoadingArgus = true
+        defer { isLoadingArgus = false }
+
+        // 1. Detect asset type
+        let assetType = await detectAssetType(for: symbol)
+
+        // 2. Load candles if missing
+        let marketVM = MarketViewModel()
+        if marketVM.candles[symbol]?.isEmpty ?? true {
+            await marketVM.loadCandles(for: symbol, timeframe: "1D")
+        }
+
+        // 3. Load Orion score
+        if orionScores[symbol] == nil {
+            await loadOrionScore(for: symbol, assetType: assetType)
+        }
+
+        // 4. Load fundamental score (for stocks/ETFs only)
+        if assetType == .stock || assetType == .etf {
+            if FundamentalScoreStore.shared.getScore(for: symbol) == nil {
+                _ = await calculateFundamentalScore(for: symbol, assetType: assetType)
+            }
+        }
+
+        // 5. Update asset type cache
+        await updateAssetType(for: symbol, to: assetType)
+    }
+
+    private func detectAssetType(for symbol: String) async -> SafeAssetType {
+        // Check cache first
+        if let cached = loadedAssetTypes[symbol] {
+            return cached
+        }
+
+        // Check if ETF
+        let isEtf = await checkIsEtf(symbol: symbol)
+        if isEtf { return .etf }
+
+        // Default to stock for US symbols
+        return .stock
+    }
+
+    private func checkIsEtf(symbol: String) async -> Bool {
+        let marketVM = MarketViewModel()
+        return marketVM.isETF(symbol: symbol)
+    }
+
+    private func updateAssetType(for symbol: String, to type: SafeAssetType) async {
+        await MainActor.run {
+            self.loadedAssetTypes[symbol] = type
+        }
+    }
+
+    func calculateFundamentalScore(for symbol: String, assetType: SafeAssetType = .stock) async -> FundamentalScoreResult? {
+        // Fetch financials data for the symbol
+        if let financialsData = FundamentalScoreStore.shared.getRawData(for: symbol) {
+            // Calculate score using FundamentalScoreEngine
+            let score = FundamentalScoreEngine.shared.calculate(data: financialsData)
+            if let score = score {
+                FundamentalScoreStore.shared.setScore(score)
+            }
+            return score
+        }
+        return nil
+    }
+
+    func loadOrionScore(for symbol: String, assetType: SafeAssetType = .stock) async {
+        // Load via OrionStore
+        await OrionStore.shared.ensureAnalysis(for: symbol)
     }
 }
