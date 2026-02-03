@@ -13,6 +13,14 @@ final class SignalViewModel: ObservableObject {
     // MARK: - Decision & Signal State
     @Published var searchResults: [SearchResult] = []
 
+    // MARK: - Scout Loop Management
+    @Published var scoutCandidates: [String: Double] = [:]
+    @Published var isScoutRunning: Bool = false
+    private var scoutTimer: Timer?
+
+    // Scout universe for scanning
+    let scoutUniverse = ScoutUniverse.dailyRotation(count: 20)
+
     // MARK: - Demeter (Sector) State
     @Published var demeterScores: [DemeterScore] = []
     @Published var demeterMatrix: CorrelationMatrix?
@@ -89,5 +97,68 @@ final class SignalViewModel: ObservableObject {
     func getDemeterScore(for symbol: String) -> DemeterScore? {
         guard let sector = SectorMap.getSector(for: symbol) else { return nil }
         return demeterScores.first(where: { $0.sector == sector })
+    }
+
+    // MARK: - Scout Loop Management
+
+    func startScoutLoop() {
+        guard !isScoutRunning else { return }
+        isScoutRunning = true
+
+        // Run immediately
+        Task {
+            await runScout()
+        }
+
+        // Then every 5 minutes
+        scoutTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            Task {
+                await self?.runScout()
+            }
+        }
+    }
+
+    func stopScoutLoop() {
+        scoutTimer?.invalidate()
+        scoutTimer = nil
+        isScoutRunning = false
+    }
+
+    func runScout() async {
+        // 1. Refresh market pulse
+        let marketVM = MarketViewModel()
+        await marketVM.refreshMarketPulse()
+
+        // 2. Gather symbols from multiple sources
+        let discoverySymbols = (marketVM.topGainers + marketVM.topLosers + marketVM.mostActive)
+            .compactMap { $0.symbol }
+        let universeSymbols = ScoutUniverse.dailyRotation(count: 20)
+        let allSymbols = Array(Set(marketVM.watchlist + discoverySymbols + universeSymbols))
+
+        guard !allSymbols.isEmpty else { return }
+
+        // 3. Scout for opportunities
+        let candidates = await ArgusScoutService.shared.scoutOpportunities(
+            watchlist: allSymbols,
+            currentQuotes: marketVM.quotes
+        )
+
+        // 4. Store results and handover to execution
+        await MainActor.run {
+            self.scoutCandidates = Dictionary(uniqueKeysWithValues: candidates)
+        }
+
+        if !candidates.isEmpty {
+            // Handover to ExecutionStateViewModel if available
+            for (symbol, score) in candidates {
+                await processScoutCandidate(symbol: symbol, score: score)
+            }
+        }
+    }
+
+    private func processScoutCandidate(symbol: String, score: Double) async {
+        // This would delegate to ExecutionStateViewModel for high-conviction trading
+        // For now, just log
+        print("🔭 Scout found \(symbol) with score \(score)")
     }
 }
