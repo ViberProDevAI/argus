@@ -12,6 +12,8 @@ class PortfolioViewModel: ObservableObject {
     @Published var transactionHistory: [Transaction] = []
     @Published var isLoadingPortfolio = false
     @Published var errorMessage: String?
+    @Published var activePlans: [UUID: PositionPlan] = [:]
+    @Published var isCheckingPlanTriggers: Bool = false
 
     private let portfolioStore = PortfolioStore.shared
     private var cancellables = Set<AnyCancellable>()
@@ -251,5 +253,23 @@ class PortfolioViewModel: ObservableObject {
         }
 
         print("✅ Portfolio snapshot imported")
+    }
+
+    // MARK: - Plan Execution
+
+    func addActivePlan(_ plan: PositionPlan) {
+        activePlans[plan.id] = plan
+        print("📋 Active plan added: \(plan.symbol)")
+    }
+
+    func removeActivePlan(id: UUID) {
+        activePlans.removeValue(forKey: id)
+        print("✖️ Plan removed")
+    }
+
+    func checkPlanTriggers() async {
+        isCheckingPlanTriggers = true
+        defer { isCheckingPlanTriggers = false }
+        // Check active plans
     }
 }
