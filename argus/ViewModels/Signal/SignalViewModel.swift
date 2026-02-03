@@ -23,6 +23,10 @@ final class SignalViewModel: ObservableObject {
     @Published var loadedAssetTypes: [String: SafeAssetType] = [:]
     @Published var loadingProgress: Double = 0.0
 
+    // MARK: - Voice Report Generation
+    @Published var voiceReports: [String: String] = [:]
+    @Published var isGeneratingVoiceReport: Bool = false
+
     // Scout universe for scanning
     let scoutUniverse = ScoutUniverse.dailyRotation(count: 20)
 
@@ -240,5 +244,41 @@ final class SignalViewModel: ObservableObject {
     func loadOrionScore(for symbol: String, assetType: SafeAssetType = .stock) async {
         // Load via OrionStore
         await OrionStore.shared.ensureAnalysis(for: symbol)
+    }
+
+    // MARK: - Voice Report Generation
+
+    @MainActor
+    func generateVoiceReport(for symbol: String, tradeId: UUID? = nil) async {
+        isGeneratingVoiceReport = true
+        defer { isGeneratingVoiceReport = false }
+
+        do {
+            let marketVM = MarketViewModel()
+            let quote = marketVM.quotes[symbol]
+            let atlas = FundamentalScoreStore.shared.getScore(for: symbol)
+            let orion = orionScores[symbol]
+
+            var reportParts: [String] = []
+
+            if let q = quote {
+                reportParts.append("📊 \(symbol): \(q.c) - \(q.dp ?? 0)%")
+            }
+
+            if let a = atlas {
+                reportParts.append("📈 Atlas: \(a.totalScore)")
+            }
+
+            if let o = orion {
+                reportParts.append("🔮 Orion: \(o.score)")
+            }
+
+            let report = reportParts.joined(separator: " | ")
+            self.voiceReports[symbol] = report
+
+            print("🎙️ Voice Report for \(symbol): \(report)")
+        } catch {
+            print("⚠️ Voice report generation failed: \(error)")
+        }
     }
 }
