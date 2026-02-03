@@ -56,8 +56,8 @@ struct PremiumGlassmorphicTabBar: View {
                     HStack {
                         Spacer()
                         PulsingFABView {
-                            // Voice button action - can navigate to voice settings
-                            // For now, just plays haptic
+                            // Voice button action - navigate to voice settings
+                            selectTab(.home)  // Or .kokpit for terminal, adjust as needed
                             let haptic = UIImpactFeedbackGenerator(style: .medium)
                             haptic.impactOccurred()
                         }

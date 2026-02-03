@@ -10,7 +10,7 @@ enum TabItem: String, CaseIterable {
     var icon: String {
         switch self {
         case .home: return "house.fill"
-        case .kokpit: return "radar.fill"
+        case .kokpit: return "gauge.with.dots.needle.bottom.50percent"  // Terminal gauge
         case .portfolio: return "briefcase.fill"
         case .settings: return "gearshape.fill"
         }
