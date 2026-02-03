@@ -229,4 +229,32 @@ final class TradingViewModelFacadeTests: XCTestCase {
 
         observation.cancel()
     }
+
+    // MARK: - Facade Scout Tests
+
+    func testFacadeExposesScoutData() {
+        // TradingViewModel should expose scout data through facade
+        XCTAssertNotNil(sut.isScoutRunning)
+        XCTAssertNotNil(sut.scoutCandidates)
+    }
+
+    func testFacadeCanStartScoutLoop() async {
+        // When
+        await sut.startScoutLoop()
+
+        // Then - no exceptions thrown
+        XCTAssertTrue(sut.isScoutRunning)
+    }
+
+    func testFacadeCanStopScoutLoop() async {
+        // Given
+        await sut.startScoutLoop()
+        XCTAssertTrue(sut.isScoutRunning)
+
+        // When
+        sut.stopScoutLoop()
+
+        // Then
+        XCTAssertFalse(sut.isScoutRunning)
+    }
 }

@@ -203,4 +203,44 @@ final class SignalViewModelTests: XCTestCase {
         // Then
         XCTAssertNil(result)
     }
+
+    // MARK: - Scout Loop Tests
+
+    func testScoutLoopInitial() {
+        XCTAssertFalse(sut.isScoutRunning)
+        XCTAssertEqual(sut.scoutCandidates, [:])
+    }
+
+    func testStartScoutLoop() async {
+        // When
+        await sut.startScoutLoop()
+
+        // Then
+        XCTAssertTrue(sut.isScoutRunning)
+    }
+
+    func testStopScoutLoop() async {
+        // Given
+        await sut.startScoutLoop()
+        XCTAssertTrue(sut.isScoutRunning)
+
+        // When
+        sut.stopScoutLoop()
+
+        // Then
+        XCTAssertFalse(sut.isScoutRunning)
+    }
+
+    func testLoadArgusDataInitial() {
+        XCTAssertFalse(sut.isLoadingArgus)
+        XCTAssertEqual(sut.loadedAssetTypes, [:])
+    }
+
+    func testDetectAssetType() async {
+        // When
+        let assetType = await sut.detectAssetType(for: "AAPL")
+
+        // Then
+        XCTAssertNotNil(assetType)
+    }
 }
