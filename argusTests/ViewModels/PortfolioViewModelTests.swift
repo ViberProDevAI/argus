@@ -220,4 +220,80 @@ final class PortfolioViewModelTests: XCTestCase {
         // Then (no exceptions thrown)
         XCTAssertEqual(sut.portfolio.count, 2)
     }
+
+    // MARK: - Plan Execution Tests
+
+    func testActivePlansInitial() {
+        XCTAssertEqual(sut.activePlans, [:])
+    }
+
+    func testAddActivePlan() {
+        // Given
+        let plan = PositionPlan(
+            id: UUID(),
+            symbol: "AAPL",
+            quantity: 10,
+            entryPrice: 150.0,
+            targetPrice: 160.0,
+            stopPrice: 140.0,
+            createdAt: Date()
+        )
+
+        // When
+        sut.addActivePlan(plan)
+
+        // Then
+        XCTAssertEqual(sut.activePlans.count, 1)
+        XCTAssertNotNil(sut.activePlans[plan.id])
+    }
+
+    func testRemoveActivePlan() {
+        // Given
+        let planId = UUID()
+        sut.activePlans[planId] = PositionPlan(
+            id: planId,
+            symbol: "AAPL",
+            quantity: 10,
+            entryPrice: 150.0,
+            targetPrice: 160.0,
+            stopPrice: 140.0,
+            createdAt: Date()
+        )
+
+        // When
+        sut.removeActivePlan(id: planId)
+
+        // Then
+        XCTAssertEqual(sut.activePlans.count, 0)
+    }
+
+    func testIsCheckingPlanTriggersInitial() {
+        XCTAssertFalse(sut.isCheckingPlanTriggers)
+    }
+
+    // MARK: - Portfolio Persistence Tests
+
+    func testResetAllData() {
+        // Given
+        sut.balance = 50000.0
+        sut.bistBalance = 500000.0
+
+        // When
+        sut.resetAllData()
+
+        // Then
+        XCTAssertEqual(sut.balance, 100000.0)
+        XCTAssertEqual(sut.bistBalance, 1000000.0)
+        XCTAssertEqual(sut.activePlans, [:])
+    }
+
+    func testExportPortfolioSnapshot() {
+        // When
+        let snapshot = sut.exportPortfolioSnapshot()
+
+        // Then
+        XCTAssertNotNil(snapshot["timestamp"])
+        XCTAssertNotNil(snapshot["balance"])
+        XCTAssertNotNil(snapshot["portfolio"])
+    }
 }

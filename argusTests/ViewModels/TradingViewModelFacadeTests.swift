@@ -257,4 +257,41 @@ final class TradingViewModelFacadeTests: XCTestCase {
         // Then
         XCTAssertFalse(sut.isScoutRunning)
     }
+
+    // MARK: - Facade Plan Execution Tests
+
+    func testFacadeExposesActivePlans() {
+        XCTAssertNotNil(sut.activePlans)
+        XCTAssertNotNil(sut.isCheckingPlanTriggers)
+    }
+
+    func testFacadeCanAddPlan() {
+        // Given
+        let plan = PositionPlan(
+            id: UUID(),
+            symbol: "AAPL",
+            quantity: 10,
+            entryPrice: 150.0,
+            targetPrice: 160.0,
+            stopPrice: 140.0,
+            createdAt: Date()
+        )
+
+        // When
+        sut.addActivePlan(plan)
+
+        // Then
+        XCTAssertEqual(sut.activePlans.count, 1)
+    }
+
+    func testFacadeCanResetPortfolio() {
+        // Given
+        sut.balance = 50000.0
+
+        // When
+        sut.resetAllData()
+
+        // Then
+        XCTAssertEqual(sut.balance, 100000.0)
+    }
 }
