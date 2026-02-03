@@ -56,8 +56,8 @@ struct PremiumGlassmorphicTabBar: View {
                     HStack {
                         Spacer()
                         PulsingFABView {
-                            // Voice button action - open Argus Voice view
-                            router.navigate(to: .voice)
+                            // Voice button action - placeholder
+                            // TODO: Implement voice routing when NavigationStack supports it
                             let haptic = UIImpactFeedbackGenerator(style: .medium)
                             haptic.impactOccurred()
                         }
