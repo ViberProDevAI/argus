@@ -6,6 +6,8 @@ import Combine
 @MainActor
 final class SignalViewModel: ObservableObject {
 
+    static let shared = SignalViewModel()
+
     // MARK: - Orion Analysis State
     @Published var isOrionLoading = false
     @Published var prometheusForecastBySymbol: [String: PrometheusForecast] = [:]
@@ -41,7 +43,7 @@ final class SignalViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
-    init(analysisViewModel: AnalysisViewModel? = nil) {
+    private init(analysisViewModel: AnalysisViewModel? = nil) {
         self.analysisViewModel = analysisViewModel ?? AnalysisViewModel()
         setupBindings()
     }

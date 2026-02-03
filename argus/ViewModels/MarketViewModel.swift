@@ -444,7 +444,7 @@ final class MarketViewModel: ObservableObject {
 
     func getRadarPicks(strategy: ArgusRadarStrategy) -> [String] {
         let allSymbols = quotes.keys
-        let signalVM = SignalViewModel()
+        let signalVM = SignalViewModel.shared
 
         return allSymbols.filter { symbol in
             guard let quote = quotes[symbol] else { return false }

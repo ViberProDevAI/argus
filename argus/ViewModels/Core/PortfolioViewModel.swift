@@ -126,7 +126,7 @@ class PortfolioViewModel: ObservableObject {
     func triggerSmartPlan(for trade: Trade) {
         Task {
             // Retrieve decision from SignalViewModel if available
-            if let decision = SignalViewModel().grandDecisions[trade.symbol] {
+            if let decision = SignalViewModel.shared.grandDecisions[trade.symbol] {
                 _ = PositionPlanStore.shared.createPlan(for: trade, decision: decision)
             }
             await MainActor.run {
