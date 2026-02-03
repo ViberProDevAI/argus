@@ -72,7 +72,16 @@ class TradingViewModel: ObservableObject {
     var orionScores: [String: OrionScoreResult] {
         return orionAnalysis.mapValues { $0.daily }
     }
-    
+
+    // Scout Loop Facade
+    var isScoutRunning: Bool {
+        SignalViewModel.shared.isScoutRunning
+    }
+
+    var scoutCandidates: [String: Double] {
+        SignalViewModel.shared.scoutCandidates
+    }
+
     // Terminal Optimized Data Source
     @Published var terminalItems: [TerminalItem] = []
     
@@ -599,13 +608,13 @@ class TradingViewModel: ObservableObject {
     // Helper for ETF Detection (SSoT Aware)
     // isETF moved to TradingViewModel+MarketData.swift
 // MARK: - Hermes Integration
-    
+
     func loadHermes(for symbol: String) async {
         await HermesStateViewModel.shared.loadHermes(for: symbol)
     }
-    
+
     // fetchRawNews moved to HermesStateViewModel
-    
+
     deinit {
         // Timer cleanup - memory leak prevention
         stopAutoPilotTimer()
