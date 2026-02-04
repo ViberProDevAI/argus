@@ -56,8 +56,8 @@ struct PremiumGlassmorphicTabBar: View {
                     HStack {
                         Spacer()
                         PulsingFABView {
-                            // Voice button action - placeholder
-                            // TODO: Implement voice routing when NavigationStack supports it
+                            // Voice button action - navigate to Kokpit for now
+                            selectTab(.kokpit)
                             let haptic = UIImpactFeedbackGenerator(style: .medium)
                             haptic.impactOccurred()
                         }
