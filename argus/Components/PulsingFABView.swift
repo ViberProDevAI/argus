@@ -27,7 +27,7 @@ struct PulsingFABView: View {
                         .fill(DesignTokens.Colors.primary)
                         .frame(width: 56, height: 56)
 
-                    Image(systemName: "mic.fill")
+                    Image(systemName: "waveform.circle.fill")
                         .font(.system(size: 24))
                         .foregroundColor(.black)
                 }
