@@ -34,6 +34,8 @@ struct DebugPersistenceView: View {
         let relevant = defaults.compactMap { (key, value) -> (String, String)? in
             if key.starts(with: "Apple") || key.starts(with: "NS") { return nil }
             
+            let sensitive = isSensitiveKey(key)
+
             // Try to describe content
             var desc = "\(type(of: value))"
             if let array = value as? [Any] {
@@ -43,20 +45,26 @@ struct DebugPersistenceView: View {
             } else if let data = value as? Data {
                 desc += " [Size: \(data.count) bytes]"
             } else if let str = value as? String {
-                desc += " \"\(str.prefix(50))...\""
+                if sensitive {
+                    desc += " \"[REDACTED]\""
+                } else {
+                    desc += " \"\(str.prefix(50))...\""
+                }
             }
             
             return (key, desc)
         }
         .sorted { $0.0 < $1.0 }
         
-        // Print to console for Agent inspection
-        print("------- USER_DEFAULTS_DUMP_START -------")
-        for (key, desc) in relevant {
-            print("KEY: \(key) | VAL: \(desc)")
-        }
-        print("------- USER_DEFAULTS_DUMP_END -------")
-        
         self.keys = relevant
+    }
+
+    private func isSensitiveKey(_ key: String) -> Bool {
+        let lowercasedKey = key.lowercased()
+        return lowercasedKey.contains("key")
+            || lowercasedKey.contains("token")
+            || lowercasedKey.contains("secret")
+            || lowercasedKey.contains("auth")
+            || lowercasedKey.contains("password")
     }
 }

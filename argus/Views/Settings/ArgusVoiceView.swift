@@ -148,7 +148,7 @@ struct ArgusVoiceView: View {
                             
                             // Send Button or Mic
                             if viewModel.inputMessage.isEmpty {
-                                SpeechButton()
+                                SpeechButton(inputMessage: $viewModel.inputMessage)
                             } else {
                                 Button(action: {
                                     viewModel.sendMessage()
@@ -187,12 +187,9 @@ struct ArgusVoiceView: View {
 // MARK: - Subviews
 
 struct SpeechButton: View {
-    @StateObject private var speechService = ArgusSpeechService.shared
-    @EnvironmentObject var viewModel: ChatViewModel // Needs to be injected or accessed
-    // Wait, ChatViewModel is StateObject in parent. We need to pass it or accessible.
-    // Changing approach slightly to keep logic in parent or use binding.
-    // But for cleaner code, let's keep SpeechService logic here.
-    
+    @ObservedObject private var speechService = ArgusSpeechService.shared
+    @Binding var inputMessage: String
+
     var body: some View {
         Button(action: { toggleRecording() }) {
             ZStack {
@@ -202,7 +199,7 @@ struct SpeechButton: View {
                         .stroke(Theme.negative.opacity(0.5), lineWidth: 4)
                         .frame(width: 54 + CGFloat(speechService.audioLevel * 40), height: 54 + CGFloat(speechService.audioLevel * 40))
                         .animation(.linear(duration: 0.1), value: speechService.audioLevel)
-                    
+
                     Image(systemName: "waveform")
                         .font(.title2)
                         .foregroundColor(.white)
@@ -216,19 +213,15 @@ struct SpeechButton: View {
             .background(speechService.isRecording ? Theme.negative : Theme.tint)
             .clipShape(Circle())
         }
-        .onChange(of: speechService.recognizedText) {
-             // Live Transcription Update (Optional: could verify if we want live update in textfield)
-             // Let's assume we want to fill the Parent's viewModel.inputMessage
-             // This requires binding.
+        .onChange(of: speechService.recognizedText) { _, newText in
+            // Live transcription update
+            inputMessage = newText
         }
     }
-    
+
     func toggleRecording() {
         if speechService.isRecording {
             speechService.stopRecording()
-            // Send the text
-            // Need a way to convert partial text to inputMessage
-             NotificationCenter.default.post(name: NSNotification.Name("SpeechFinished"), object: speechService.recognizedText)
         } else {
             try? speechService.startRecording()
         }

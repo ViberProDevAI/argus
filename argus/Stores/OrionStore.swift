@@ -12,6 +12,10 @@ struct MultiTimeframeAnalysis {
     let h4: OrionScoreResult
     let daily: OrionScoreResult
     let weekly: OrionScoreResult
+    /// Timeframe button -> gerçek skorun üretildiği kaynak timeframe
+    let sourceTimeframes: [TimeframeMode: TimeframeMode]
+    /// Argus konsey kararında baz alınan teknik zaman dilimi.
+    let argusReportingTimeframe: TimeframeMode
     let generatedAt: Date
     
     // Legacy support
@@ -27,6 +31,14 @@ struct MultiTimeframeAnalysis {
         case .daily: return daily
         case .weekly: return weekly
         }
+    }
+
+    func sourceFor(timeframe: TimeframeMode) -> TimeframeMode {
+        sourceTimeframes[timeframe] ?? timeframe
+    }
+
+    func isFallback(timeframe: TimeframeMode) -> Bool {
+        sourceFor(timeframe: timeframe) != timeframe
     }
 
     // Strategic Synthesis (The "Brain" Advice)
@@ -89,15 +101,34 @@ final class OrionStore: ObservableObject {
                     // Fetch candles
                     let candles = await MarketDataStore.shared.ensureCandles(symbol: symbol, timeframe: tfParam).value
                     if let data = candles, !data.isEmpty {
+                        let analysisCandles: [Candle]
+                        if key == "h4" {
+                            // Yahoo 4h native desteklemediği için 1h veriyi 4h barlara topluyoruz.
+                            analysisCandles = OrionStore.aggregateCandles(data, bucketSize: 4)
+                        } else {
+                            analysisCandles = data
+                        }
+
                         // SPY Benchmark only for Daily/Weekly
-                        let spyTimeframe = (key == "daily" || key == "weekly") ? "1day" : nil
+                        let spyTimeframe: String?
+                        if key == "weekly" {
+                            spyTimeframe = "1week"
+                        } else if key == "daily" {
+                            spyTimeframe = "1day"
+                        } else {
+                            spyTimeframe = nil
+                        }
                         var spyCandles: [Candle]? = nil
                         
                         if let spyTf = spyTimeframe {
                             spyCandles = await MarketDataStore.shared.ensureCandles(symbol: "SPY", timeframe: spyTf).value
                         }
                         
-                        let score = await OrionAnalysisService.shared.calculateOrionScoreAsync(symbol: symbol, candles: data, spyCandles: spyCandles)
+                        let score = await OrionAnalysisService.shared.calculateOrionScoreAsync(
+                            symbol: symbol,
+                            candles: analysisCandles,
+                            spyCandles: spyCandles
+                        )
                         return (key, score)
                     }
                     return (key, nil)
@@ -113,21 +144,71 @@ final class OrionStore: ObservableObject {
             return collected
         }
         
-        // 3. Fallback Logic (Propagate Daily if others missing to prevent crash)
-        guard let daily = results["daily"] ?? results["h4"] ?? results["h1"] else {
-             print("⚠️ OrionStore: Analysis Failed for \(symbol) - No Daily/H4/H1 Data")
-             return
+        // 3. Fallback Logic (Per-timeframe nearest fallback; UI bu fallback'i görebilir)
+        let keyToMode: [String: TimeframeMode] = [
+            "m5": .m5,
+            "m15": .m15,
+            "h1": .h1,
+            "h4": .h4,
+            "daily": .daily,
+            "weekly": .weekly
+        ]
+        let fallbackOrder: [String: [String]] = [
+            "m5": ["m5", "m15", "h1", "h4", "daily", "weekly"],
+            "m15": ["m15", "m5", "h1", "h4", "daily", "weekly"],
+            "h1": ["h1", "m15", "h4", "daily", "weekly", "m5"],
+            "h4": ["h4", "h1", "daily", "weekly", "m15", "m5"],
+            "daily": ["daily", "h4", "h1", "weekly", "m15", "m5"],
+            "weekly": ["weekly", "daily", "h4", "h1", "m15", "m5"]
+        ]
+
+        func resolved(for key: String) -> (score: OrionScoreResult, source: TimeframeMode)? {
+            guard let order = fallbackOrder[key] else { return nil }
+            for candidate in order {
+                if let score = results[candidate], let sourceMode = keyToMode[candidate] {
+                    return (score, sourceMode)
+                }
+            }
+            return nil
         }
-        
+
+        guard
+            let m5Resolved = resolved(for: "m5"),
+            let m15Resolved = resolved(for: "m15"),
+            let h1Resolved = resolved(for: "h1"),
+            let h4Resolved = resolved(for: "h4"),
+            let dailyResolved = resolved(for: "daily"),
+            let weeklyResolved = resolved(for: "weekly")
+        else {
+            print("⚠️ OrionStore: Analysis Failed for \(symbol) - No timeframe produced usable result")
+            return
+        }
+
         let finalAnalysis = MultiTimeframeAnalysis(
-            m5: results["m5"] ?? daily,
-            m15: results["m15"] ?? daily,
-            h1: results["h1"] ?? daily,
-            h4: results["h4"] ?? daily,
-            daily: daily,
-            weekly: results["weekly"] ?? daily,
+            m5: m5Resolved.score,
+            m15: m15Resolved.score,
+            h1: h1Resolved.score,
+            h4: h4Resolved.score,
+            daily: dailyResolved.score,
+            weekly: weeklyResolved.score,
+            sourceTimeframes: [
+                .m5: m5Resolved.source,
+                .m15: m15Resolved.source,
+                .h1: h1Resolved.source,
+                .h4: h4Resolved.source,
+                .daily: dailyResolved.source,
+                .weekly: weeklyResolved.source
+            ],
+            argusReportingTimeframe: .daily,
             generatedAt: Date()
         )
+
+        for mode in TimeframeMode.allCases {
+            let source = finalAnalysis.sourceFor(timeframe: mode)
+            if source != mode {
+                print("⚠️ OrionStore: \(symbol) \(mode.displayLabel) fallback -> \(source.displayLabel)")
+            }
+        }
         
         self.analysis[symbol] = finalAnalysis
 
@@ -141,5 +222,37 @@ final class OrionStore: ObservableObject {
     
     func getAnalysis(for symbol: String) -> MultiTimeframeAnalysis? {
         return analysis[symbol]
+    }
+
+    private nonisolated static func aggregateCandles(_ candles: [Candle], bucketSize: Int) -> [Candle] {
+        guard bucketSize > 1, candles.count >= bucketSize else { return candles }
+
+        let sorted = candles.sorted { $0.date < $1.date }
+        var aggregated: [Candle] = []
+        aggregated.reserveCapacity(sorted.count / bucketSize + 1)
+
+        var index = 0
+        while index < sorted.count {
+            let end = min(index + bucketSize, sorted.count)
+            let slice = sorted[index..<end]
+            guard let first = slice.first, let last = slice.last else { break }
+
+            let high = slice.map(\.high).max() ?? first.high
+            let low = slice.map(\.low).min() ?? first.low
+            let volume = slice.reduce(0.0) { $0 + $1.volume }
+
+            aggregated.append(
+                Candle(
+                    date: last.date,
+                    open: first.open,
+                    high: high,
+                    low: low,
+                    close: last.close,
+                    volume: volume
+                )
+            )
+            index += bucketSize
+        }
+        return aggregated
     }
 }

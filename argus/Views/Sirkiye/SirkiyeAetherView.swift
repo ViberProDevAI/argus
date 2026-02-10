@@ -8,13 +8,17 @@ struct SirkiyeAetherView: View {
     @State private var macroScore: SirkiyeAetherEngine.TurkeyMacroScore = .empty
     @State private var snapshot: TCMBDataService.TCMBMacroSnapshot = .empty
     @State private var isLoading = true
-    @State private var selectedComponent: SirkiyeAetherEngine.ScoreComponent?
     
     var body: some View {
         ScrollView {
             VStack(spacing: Theme.Spacing.large) {
                 // Hero Section
                 heroSection
+
+                // Neden Böyle? + Etki Dağılımı
+                if !isLoading {
+                    rationaleSection
+                }
                 
                 // 4 Mini Kartlar
                 miniCardsGrid
@@ -35,8 +39,8 @@ struct SirkiyeAetherView: View {
             }
             .padding()
         }
-        .background(Theme.background)
-        .navigationTitle("Sirkiye Aether")
+        .background(InstitutionalTheme.Colors.background)
+        .navigationTitle("Aether • Türkiye Makro")
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await loadData()
@@ -220,8 +224,11 @@ struct SirkiyeAetherView: View {
                 .tracking(2)
                 .foregroundColor(Theme.textSecondary)
             
-            ForEach(macroScore.components) { component in
-                SirkiyeComponentRow(component: component)
+            ForEach(impactDrivers) { driver in
+                SirkiyeComponentRow(
+                    component: driver.component,
+                    weightedImpact: driver.weightedImpact
+                )
             }
         }
         .padding()
@@ -234,7 +241,7 @@ struct SirkiyeAetherView: View {
     private var insightsBanner: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.small) {
             HStack {
-                Image(systemName: "sparkles")
+                Image(systemName: "text.bubble.fill")
                     .foregroundColor(Theme.primary)
                 
                 Text("SIRKIYE INSIGHTS")
@@ -244,7 +251,7 @@ struct SirkiyeAetherView: View {
                     .foregroundColor(Theme.textSecondary)
             }
             
-            ForEach(macroScore.insights, id: \.self) { insight in
+            ForEach(sanitizedInsights, id: \.self) { insight in
                 Text(insight)
                     .font(.subheadline)
                     .foregroundColor(Theme.textPrimary)
@@ -269,6 +276,85 @@ struct SirkiyeAetherView: View {
                 .stroke(Theme.primary.opacity(0.3), lineWidth: 1)
         )
     }
+
+    private var rationaleSection: some View {
+        let drivers = topImpactDrivers(limit: 5)
+        return VStack(alignment: .leading, spacing: Theme.Spacing.medium) {
+            HStack {
+                Text("NEDEN BÖYLE?")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .tracking(2)
+                    .foregroundColor(Theme.textSecondary)
+                Spacer()
+                Text("İlk \(min(3, drivers.count)) etki")
+                    .font(.caption2)
+                    .foregroundColor(Theme.textSecondary)
+            }
+
+            if drivers.isEmpty {
+                Text("Bileşen etkisi hesaplanamadı. Veri akışı tamamlanınca katkı dağılımı gösterilecek.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(drivers.prefix(3))) { driver in
+                            SirkiyeDriverChip(
+                                title: driver.name,
+                                subtitle: "Ağırlık %\(Int(driver.component.weight * 100)) • Trend \(driver.component.trend.rawValue)",
+                                impactText: String(format: "%+.1f", driver.weightedImpact),
+                                tint: impactColor(for: driver.weightedImpact)
+                            )
+                        }
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    let slices = contributionSlices(from: Array(drivers.prefix(4)))
+                    ZStack {
+                        Circle()
+                            .stroke(Theme.border.opacity(0.5), lineWidth: 9)
+                            .frame(width: 72, height: 72)
+                        ForEach(slices) { slice in
+                            Circle()
+                                .trim(from: slice.start, to: slice.end)
+                                .stroke(slice.color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        Text("Katkı")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("ETKİ DAĞILIMI")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(Theme.textSecondary)
+                        ForEach(Array(drivers.prefix(3))) { driver in
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(impactColor(for: driver.weightedImpact))
+                                    .frame(width: 6, height: 6)
+                                Text(driver.name)
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textSecondary)
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
+                                Text(String(format: "%+.1f", driver.weightedImpact))
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundColor(impactColor(for: driver.weightedImpact))
+                                    .monospacedDigit()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(glassBackground)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.large))
+    }
     
     // MARK: - Data Loading
     
@@ -290,13 +376,13 @@ struct SirkiyeAetherView: View {
         let colors: [Color]
         
         if score >= 70 {
-            colors = [Color(hex: "00FFA3"), Color(hex: "00D9FF")]
+            colors = [InstitutionalTheme.Colors.positive, InstitutionalTheme.Colors.primary]
         } else if score >= 50 {
-            colors = [Color(hex: "FFD700"), Color(hex: "FFA500")]
+            colors = [InstitutionalTheme.Colors.warning, InstitutionalTheme.Colors.primary]
         } else if score >= 30 {
-            colors = [Color(hex: "FFA500"), Color(hex: "FF6B35")]
+            colors = [InstitutionalTheme.Colors.warning, InstitutionalTheme.Colors.negative]
         } else {
-            colors = [Color(hex: "FF3B3B"), Color(hex: "FF2E55")]
+            colors = [InstitutionalTheme.Colors.negative, InstitutionalTheme.Colors.warning]
         }
         
         return LinearGradient(colors: colors, startPoint: .leading, endPoint: .trailing)
@@ -304,19 +390,19 @@ struct SirkiyeAetherView: View {
     
     private var riskColor: Color {
         switch macroScore.investmentRisk {
-        case .low: return Theme.positive
-        case .moderate: return Theme.warning
-        case .elevated: return .orange
-        case .high: return Theme.negative
+        case .low: return InstitutionalTheme.Colors.positive
+        case .moderate: return InstitutionalTheme.Colors.warning
+        case .elevated: return InstitutionalTheme.Colors.warning
+        case .high: return InstitutionalTheme.Colors.negative
         }
     }
     
     private var glassBackground: some View {
         RoundedRectangle(cornerRadius: Theme.Radius.large)
-            .fill(Theme.cardBackground)
+            .fill(InstitutionalTheme.Colors.surface1)
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.Radius.large)
-                    .stroke(Theme.border, lineWidth: 1)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
             )
     }
     
@@ -353,6 +439,118 @@ struct SirkiyeAetherView: View {
         case .severe: return Theme.negative
         }
     }
+
+    private var impactDrivers: [SirkiyeImpactDriver] {
+        macroScore.components.map { component in
+            SirkiyeImpactDriver(component: component)
+        }
+    }
+
+    private func topImpactDrivers(limit: Int) -> [SirkiyeImpactDriver] {
+        impactDrivers
+            .sorted { abs($0.weightedImpact) > abs($1.weightedImpact) }
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    private func contributionSlices(from drivers: [SirkiyeImpactDriver]) -> [SirkiyeContributionSlice] {
+        let magnitudes = drivers.map { max(abs($0.weightedImpact), 0.01) }
+        let total = max(magnitudes.reduce(0, +), 0.001)
+        var cursor = 0.0
+
+        return zip(drivers, magnitudes).map { driver, magnitude in
+            let start = cursor / total
+            cursor += magnitude
+            let end = cursor / total
+            return SirkiyeContributionSlice(
+                id: driver.id,
+                start: start,
+                end: end,
+                color: impactColor(for: driver.weightedImpact)
+            )
+        }
+    }
+
+    private func impactColor(for impact: Double) -> Color {
+        if impact > 0.8 { return InstitutionalTheme.Colors.positive }
+        if impact < -0.8 { return InstitutionalTheme.Colors.negative }
+        return InstitutionalTheme.Colors.warning
+    }
+
+    private var sanitizedInsights: [String] {
+        macroScore.insights
+            .map(sanitizeInsight)
+            .filter { !$0.isEmpty }
+    }
+
+    private func sanitizeInsight(_ text: String) -> String {
+        text.replacingOccurrences(
+            of: #"^[^\p{L}\p{N}]+"#,
+            with: "",
+            options: .regularExpression
+        )
+    }
+}
+
+private struct SirkiyeImpactDriver: Identifiable {
+    let component: SirkiyeAetherEngine.ScoreComponent
+    let weightedImpact: Double
+
+    var id: String { component.id }
+    var name: String { component.name }
+
+    init(component: SirkiyeAetherEngine.ScoreComponent) {
+        self.component = component
+        self.weightedImpact = (component.score - 50.0) * component.weight
+    }
+}
+
+private struct SirkiyeContributionSlice: Identifiable {
+    let id: String
+    let start: CGFloat
+    let end: CGFloat
+    let color: Color
+
+    init(id: String, start: Double, end: Double, color: Color) {
+        self.id = id
+        self.start = CGFloat(start)
+        self.end = CGFloat(end)
+        self.color = color
+    }
+}
+
+private struct SirkiyeDriverChip: View {
+    let title: String
+    let subtitle: String
+    let impactText: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title.uppercased())
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(tint)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .lineLimit(1)
+            }
+            Text(impactText)
+                .font(.caption2.weight(.bold))
+                .foregroundColor(tint)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(InstitutionalTheme.Colors.surface2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(tint.opacity(0.22), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
 }
 
 // MARK: - Sirkiye Mini Card
@@ -383,11 +581,11 @@ struct SirkiyeMiniCard: View {
                 .foregroundColor(Theme.textSecondary)
         }
         .padding()
-        .background(Theme.cardBackground)
+        .background(InstitutionalTheme.Colors.surface2)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.medium))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.medium)
-                .stroke(color.opacity(0.3), lineWidth: 1)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
         )
     }
 }
@@ -396,6 +594,7 @@ struct SirkiyeMiniCard: View {
 
 struct SirkiyeComponentRow: View {
     let component: SirkiyeAetherEngine.ScoreComponent
+    let weightedImpact: Double
     
     var body: some View {
         HStack(spacing: Theme.Spacing.medium) {
@@ -415,6 +614,10 @@ struct SirkiyeComponentRow: View {
                 Text(formattedValue)
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
+
+                Text(String(format: "Etki %+.1f", weightedImpact))
+                    .font(.caption2)
+                    .foregroundColor(impactColor)
             }
             
             Spacer()
@@ -446,17 +649,17 @@ struct SirkiyeComponentRow: View {
     }
     
     private var scoreColor: Color {
-        if component.score >= 70 { return Theme.positive }
-        if component.score >= 50 { return Theme.warning }
+        if component.score >= 70 { return InstitutionalTheme.Colors.positive }
+        if component.score >= 50 { return InstitutionalTheme.Colors.warning }
         if component.score >= 30 { return .orange }
-        return Theme.negative
+        return InstitutionalTheme.Colors.negative
     }
     
     private var trendColor: Color {
         switch component.trend {
-        case .up: return Theme.positive
-        case .stable: return Theme.textSecondary
-        case .down: return Theme.negative
+        case .up: return InstitutionalTheme.Colors.positive
+        case .stable: return InstitutionalTheme.Colors.textSecondary
+        case .down: return InstitutionalTheme.Colors.negative
         }
     }
     
@@ -475,6 +678,12 @@ struct SirkiyeComponentRow: View {
             return String(format: "%.1f", val)
         }
     }
+
+    private var impactColor: Color {
+        if weightedImpact > 0.8 { return InstitutionalTheme.Colors.positive }
+        if weightedImpact < -0.8 { return InstitutionalTheme.Colors.negative }
+        return InstitutionalTheme.Colors.warning
+    }
 }
 
 // MARK: - Sirkiye Sparkline
@@ -486,37 +695,43 @@ struct SirkiyeSparkline: View {
     
     var body: some View {
         GeometryReader { geometry in
-            Path { path in
-                guard data.count > 1 else { return }
-                
-                let stepX = geometry.size.width / CGFloat(data.count - 1)
-                let minVal = data.min() ?? 0
-                let maxVal = data.max() ?? 100
-                let range = maxVal - minVal
-                
-                guard range > 0 else { return }
-                
-                let points = data.enumerated().map { index, value in
-                    CGPoint(
-                        x: CGFloat(index) * stepX,
-                        y: geometry.size.height - (CGFloat(value - minVal) / CGFloat(range) * geometry.size.height)
-                    )
+            ZStack {
+                Path { path in
+                    guard data.count > 1 else { return }
+                    
+                    let stepX = geometry.size.width / CGFloat(data.count - 1)
+                    let minVal = data.min() ?? 0
+                    let maxVal = data.max() ?? 100
+                    let range = maxVal - minVal
+                    
+                    guard range > 0 else { return }
+                    
+                    let points = data.enumerated().map { index, value in
+                        CGPoint(
+                            x: CGFloat(index) * stepX,
+                            y: geometry.size.height - (CGFloat(value - minVal) / CGFloat(range) * geometry.size.height)
+                        )
+                    }
+                    
+                    path.addLines(points)
                 }
-                
-                path.addLines(points)
+                .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
+
+                if data.count < 2 {
+                    Text("Veri yok")
+                        .font(.caption2)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                }
             }
-            .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
         }
         .task {
             let points = await TCMBDataService.shared.getSeriesHistory(serieCode)
-            // Sadece değerleri al ve normalize et
             if !points.isEmpty {
                 withAnimation {
                     self.data = points.map { $0.value }
                 }
             } else {
-                // Mock data for preview if no API key
-                self.data = (0..<30).map { _ in Double.random(in: 10...12) }
+                self.data = []
             }
         }
     }
@@ -533,7 +748,7 @@ struct SirkiyeDataGrid: View {
                 .font(.caption)
                 .fontWeight(.bold)
                 .tracking(2)
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .padding(.bottom, 4)
             
             LazyVGrid(columns: [
@@ -554,9 +769,9 @@ struct SirkiyeDataGrid: View {
                 
                 // Rows
                 gridRow(name: "Enflasyon", value: snapshot.inflation, format: "%.1f%%", trend: .down) // Trend logic basitleştirildi
+                gridRow(name: "Çekirdek Enflasyon", value: snapshot.coreInflation, format: "%.1f%%", trend: .down)
                 gridRow(name: "Politika Faizi", value: snapshot.policyRate, format: "%.0f%%", trend: .up)
                 gridRow(name: "USD/TRY", value: snapshot.usdTry, format: "%.2f₺", trend: .up)
-                gridRow(name: "CDS Risk", value: 280, format: "%.0f", trend: .stable) // Mock CDS
                 gridRow(name: "Rezervler", value: snapshot.reserves, format: "%.1fB$", trend: .up)
                 gridRow(name: "Cari Denge", value: snapshot.currentAccount, format: "%.1fB$", trend: .down)
                 gridRow(name: "Sanayi Üretimi", value: snapshot.industrialProduction, format: "%.1f", trend: .stable)
@@ -564,11 +779,11 @@ struct SirkiyeDataGrid: View {
             }
         }
         .padding()
-        .background(Theme.cardBackground)
+        .background(InstitutionalTheme.Colors.surface1)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.large))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.large)
-                .stroke(Theme.border, lineWidth: 1)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
         )
     }
     
@@ -584,7 +799,11 @@ struct SirkiyeDataGrid: View {
             
             Image(systemName: trend.icon)
                 .font(.caption)
-                .foregroundColor(trend == .up ? Theme.positive : (trend == .down ? Theme.negative : .gray))
+                .foregroundColor(
+                    trend == .up
+                    ? InstitutionalTheme.Colors.positive
+                    : (trend == .down ? InstitutionalTheme.Colors.negative : InstitutionalTheme.Colors.textSecondary)
+                )
         }
     }
 }

@@ -5,67 +5,61 @@ struct SanctumTradePanel: View {
     let currentPrice: Double
     let onBuy: () -> Void
     let onSell: () -> Void
-    
+
     var body: some View {
-        HStack(spacing: 16) {
-            // Price Display (Mini)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(symbol)
-                    .font(.caption2)
-                    .bold()
-                    .foregroundColor(.gray)
-                Text(String(format: "%.2f", currentPrice))
-                    .font(.caption)
-                    .bold()
-                    .foregroundColor(.white)
-                    .monospacedDigit()
-            }
-            .padding(.leading, 8)
-            
-            Spacer()
-            
-            // Sell Button
+        HStack(spacing: 0) {
             Button(action: onSell) {
-                Text("SAT")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(width: 80, height: 44)
-                    .background(SanctumTheme.crimsonRed.opacity(0.8))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
+                HStack(spacing: 6) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(String(format: "%.2f", currentPrice))
+                            .font(InstitutionalTheme.Typography.dataSmall)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
+                            .monospacedDigit()
+                    }
+                    Text("SAT")
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(SanctumTheme.crimsonRed.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(SanctumTheme.crimsonRed.opacity(0.45), lineWidth: 1)
+                        )
+                )
             }
-            
-            // Buy Button
+
+            Spacer()
+            Spacer()
+
             Button(action: onBuy) {
-                Text("AL")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.black)
-                    .frame(width: 80, height: 44)
-                    .background(SanctumTheme.auroraGreen)
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                    )
-                    .shadow(color: SanctumTheme.auroraGreen.opacity(0.4), radius: 8, x: 0, y: 0)
+                HStack(spacing: 6) {
+                    Text("AL")
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    VStack(alignment: .trailing, spacing: 0) {
+                        Text(String(format: "%.2f", currentPrice))
+                            .font(InstitutionalTheme.Typography.dataSmall)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
+                            .monospacedDigit()
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(SanctumTheme.auroraGreen.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(SanctumTheme.auroraGreen.opacity(0.45), lineWidth: 1)
+                        )
+                )
+                .shadow(color: SanctumTheme.auroraGreen.opacity(0.2), radius: 4, x: 0, y: 0)
             }
         }
-        .padding(12)
-        .background(
-            ZStack {
-                // Glassmorphism Background
-                Rectangle()
-                    .fill(Color(hex: "0F172A").opacity(0.8))
-                
-                Rectangle()
-                    .stroke(LinearGradient(colors: [.white.opacity(0.1), .clear], startPoint: .top, endPoint: .bottom), lineWidth: 1)
-            }
-            .background(.ultraThinMaterial)
-        )
-        .cornerRadius(24)
-        .shadow(color: Color.black.opacity(0.3), radius: 10, y: 5)
+        .padding(.horizontal, 16)
     }
 }

@@ -132,7 +132,7 @@ final class PortfolioViewModel: ObservableObject {
 **Step 2: Run build to verify structure**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild build -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | head -50
 ```
 

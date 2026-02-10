@@ -19,7 +19,7 @@ struct SentimentPulseCard: View {
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .foregroundColor(.purple)
                 Spacer()
-                Text("HERMES AI")
+                Text(sourceBadgeText())
                     .font(.system(size: 8, weight: .medium))
                     .foregroundColor(.gray)
             }
@@ -154,6 +154,12 @@ struct SentimentPulseCard: View {
                         }
                     }
                 }
+                
+                if sentiment.newsCount == 0 {
+                    Text("Bu skor haber analizi olmadan varsayilan nodan geliyor.")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundColor(.orange.opacity(0.9))
+                }
             } else {
                 // No Data - Still show helpful message
                 VStack(spacing: 8) {
@@ -184,22 +190,43 @@ struct SentimentPulseCard: View {
             await loadSentiment()
         }
     }
+
+    private func sourceBadgeText() -> String {
+        guard let sentiment else { return "HERMES" }
+        switch sentiment.source {
+        case .llm:
+            return "LLM • \(sentiment.newsCount) HABER"
+        case .finnhub:
+            return "FINNHUB • \(sentiment.newsCount)"
+        case .fallback:
+            return "FALLBACK"
+        }
+    }
     
     private func loadSentiment() async {
         isLoading = true
         
         // UX: Ensure loading message is visible
         try? await Task.sleep(nanoseconds: 2_000_000_000)
-        
-        // Fetch sentiment from Hermes cache
-        sentiment = await HermesLLMService.shared.getQuickSentiment(for: symbol)
-        
-        // Fetch recent cached news summaries
+
+        // Fetch recent cached news summaries first.
+        // If no analyzed news exists, do not pin/show a sentiment score.
         cachedNews = HermesLLMService.shared.getCachedSummaries(for: symbol, count: 3)
-        
-        // Generate commentary based on score
-        if let sentiment = sentiment {
-            commentary = generateCommentary(for: sentiment.score)
+        guard !cachedNews.isEmpty else {
+            sentiment = nil
+            commentary = ""
+            isLoading = false
+            return
+        }
+
+        // Fetch sentiment from analyzed Hermes cache
+        let quick = await HermesLLMService.shared.getQuickSentiment(for: symbol)
+        if quick.newsCount > 0 {
+            sentiment = quick
+            commentary = generateCommentary(for: quick.score)
+        } else {
+            sentiment = nil
+            commentary = ""
         }
         
         isLoading = false

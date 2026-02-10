@@ -56,6 +56,8 @@ final class MacroRegimeService: @unchecked Sendable {
         let startTime = Date()
 
         
+        let previousRating = cachedResult?.legacyRating
+
         // 2. Fetch Data (Parallel)
         async let fredPayload = fetchFredData()
         async let marketPayload = fetchMarketData()
@@ -65,7 +67,12 @@ final class MacroRegimeService: @unchecked Sendable {
         
         // 3. Compute Deterministic Score
         let config = AetherScoringConfig.load()
-        let detResult = computeDeterministicScore(fred: fredData, market: marketData, config: config)
+        let detResult = computeDeterministicScore(
+            fred: fredData,
+            market: marketData,
+            config: config,
+            previousRating: previousRating
+        )
         
         var explain: [String] = []
         
@@ -83,6 +90,21 @@ final class MacroRegimeService: @unchecked Sendable {
             explain.append("⚠️ STALE veri cezası uygulandı (\(Int(detResult.penalty)) birim).")
             print("⚠️ AETHER: STALE penalty = \(Int(detResult.penalty))")
         }
+
+        if detResult.shockState != .stable {
+            var shockText = "VIX şok kapısı aktif: \(detResult.shockState.rawValue)"
+            if let pulse = detResult.vixPulse {
+                shockText += String(
+                    format: " (VIX %.1f | 1G %+.1f | 5G %+.1f)",
+                    pulse.level,
+                    pulse.oneDayChangePct,
+                    pulse.fiveDayChangePct
+                )
+            }
+            explain.append(shockText)
+        }
+
+        explain.append(contentsOf: detResult.adjustmentNotes)
         
         // 5. Construct EngineOutput
         let finalScore10 = detResult.totalScore / 10.0
@@ -133,11 +155,11 @@ final class MacroRegimeService: @unchecked Sendable {
         let coincidentContrib = (coincidentAvg * 1.0) / totalWeight
         let laggingContrib = (laggingAvg * 0.8) / totalWeight
         
-        // Calculate regime
-        let regime: MacroRegime
-        if detResult.totalScore > 60 { regime = .riskOn }
-        else if detResult.totalScore < 40 { regime = .riskOff }
-        else { regime = .neutral }
+        let regime = determineRegime(
+            score: detResult.totalScore,
+            previous: previousRating?.regime,
+            shockState: detResult.shockState
+        )
         
         let legacy = MacroEnvironmentRating(
             equityRiskScore: trendScore,
@@ -206,6 +228,11 @@ final class MacroRegimeService: @unchecked Sendable {
         print("[09] Dolar (DXY):       \(Int(breakdown["dxy"] ?? 0))/100 [\(detResult.statuses["dxy"] ?? "MISSING")]")
         print("[10] Claims:            \(Int(breakdown["claims"] ?? 0))/100 [\(detResult.statuses["claims"] ?? "MISSING")]")
         print("[11] Credit:            \(Int(breakdown["credit"] ?? 0))/100 [\(detResult.statuses["credit"] ?? "MISSING")]")
+        if let pulse = detResult.vixPulse {
+            print("[12] Shock Gate:        \(detResult.shockState.rawValue) (VIX \(String(format: "%.1f", pulse.level)) | 1G \(String(format: "%+.1f%%", pulse.oneDayChangePct)) | 5G \(String(format: "%+.1f%%", pulse.fiveDayChangePct)))")
+        } else {
+            print("[12] Shock Gate:        \(detResult.shockState.rawValue)")
+        }
         print("───────────────────────────────────────────────────────────────")
         print("📊 FINAL SCORE: \(Int(detResult.totalScore))/100 → Grade: \(MacroEnvironmentRating.letterGrade(for: detResult.totalScore))")
         print("⏱️ Duration: \(Int(duration))ms")
@@ -257,6 +284,21 @@ final class MacroRegimeService: @unchecked Sendable {
         let strength: Double      // 0-100 trend gücü
         let percentChange: Double // % değişim
     }
+
+    private enum ShockState: String {
+        case stable = "STABLE"
+        case caution = "CAUTION"
+        case riskOff = "RISK_OFF"
+        case panic = "PANIC"
+    }
+
+    private struct VixPulse {
+        let level: Double
+        let oneDayChangePct: Double
+        let fiveDayChangePct: Double
+        let oneDayChangePoints: Double
+        let fiveDayChangePoints: Double
+    }
     
     /// Trend analizi - son N gözlemin yönü ve gücünü hesaplar
     private func analyzeTrend(_ values: [(Date, Double)], periods: Int = 3) -> TrendResult? {
@@ -296,60 +338,84 @@ final class MacroRegimeService: @unchecked Sendable {
     // MARK: - Fetching
     
     private func fetchFredData() async -> (FredDataBundle, [String]) {
-        // Heimdall 6.2: SEQUENTIAL FRED Fetching with Rate Limiting Protection
-        // FRED API bazen rate limiting uyguluyor, istekleri sıralı + gecikmeli yapıyoruz
-        
-        var rCpi: [(Date, Double)] = []
-        var rUnrate: [(Date, Double)] = []
-        var rPayems: [(Date, Double)] = []
-        var rFed: [(Date, Double)] = []
-        var rDgs10: [(Date, Double)] = []
-        var rDgs2: [(Date, Double)] = []
-        var rClaims: [(Date, Double)] = []
-        var rGdp: [(Date, Double)] = []
-        
-        // Sıralı istekler - aralarına 500ms gecikme
-        rCpi = await fetchSeriesSafe(instrument: .cpi)
-        try? await Task.sleep(nanoseconds: 500_000_000) // 500ms
-        
-        rUnrate = await fetchSeriesSafe(instrument: .labor)
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        
-        rPayems = await fetchSeriesSafe(instrument: CanonicalInstrument(internalId: "PAYEMS", displayName: "Payrolls", assetType: .index, yahooSymbol: nil, fredSeriesId: "PAYEMS", twelveDataSymbol: nil, sourceType: .macroSeries))
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        
-        rFed = await fetchSeriesSafe(instrument: CanonicalInstrument(internalId: "FEDFUNDS", displayName: "Fed Funds", assetType: .index, yahooSymbol: nil, fredSeriesId: "FEDFUNDS", twelveDataSymbol: nil, sourceType: .macroSeries))
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        
-        rDgs10 = await fetchSeriesSafe(instrument: .rates) // DGS10
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        
-        rDgs2 = await fetchSeriesSafe(instrument: .bond2y) // DGS2
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        
-        rClaims = await fetchSeriesSafe(instrument: .claims) // ICSA
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        
-        rGdp = await fetchSeriesSafe(instrument: .growth) // GDPC1
+        // Heimdall 6.3: Parallel + Timeout fetch.
+        // Amaç: tek bir seri geciktiğinde tüm Aether pipeline'ının 15-30sn kilitlenmesini önlemek.
+        async let rCpi = fetchSeriesSafe(instrument: .cpi)
+        async let rUnrate = fetchSeriesSafe(instrument: .labor)
+        async let rPayems = fetchSeriesSafe(
+            instrument: CanonicalInstrument(
+                internalId: "PAYEMS",
+                displayName: "Payrolls",
+                assetType: .index,
+                yahooSymbol: nil,
+                fredSeriesId: "PAYEMS",
+                twelveDataSymbol: nil,
+                sourceType: .macroSeries
+            )
+        )
+        async let rFed = fetchSeriesSafe(
+            instrument: CanonicalInstrument(
+                internalId: "FEDFUNDS",
+                displayName: "Fed Funds",
+                assetType: .index,
+                yahooSymbol: nil,
+                fredSeriesId: "FEDFUNDS",
+                twelveDataSymbol: nil,
+                sourceType: .macroSeries
+            )
+        )
+        async let rDgs10 = fetchSeriesSafe(instrument: .rates)
+        async let rDgs2 = fetchSeriesSafe(instrument: .bond2y)
+        async let rClaims = fetchSeriesSafe(instrument: .claims)
+        async let rGdp = fetchSeriesSafe(instrument: .growth)
+
+        let cpi = await rCpi
+        let unrate = await rUnrate
+        let payems = await rPayems
+        let fedFunds = await rFed
+        let dgs10 = await rDgs10
+        let dgs2 = await rDgs2
+        let claims = await rClaims
+        let gdp = await rGdp
         
         var missing: [String] = []
-        if rCpi.isEmpty { missing.append("CPI") }
-        if rUnrate.isEmpty { missing.append("UNRATE") }
-        if rGdp.isEmpty { missing.append("GDP") }
-        if rClaims.isEmpty { missing.append("ICSA") }
+        if cpi.isEmpty { missing.append("CPI") }
+        if unrate.isEmpty { missing.append("UNRATE") }
+        if gdp.isEmpty { missing.append("GDP") }
+        if claims.isEmpty { missing.append("ICSA") }
         
-        return (FredDataBundle(cpi: rCpi, unrate: rUnrate, payems: rPayems, fedfunds: rFed, dgs10: rDgs10, dgs2: rDgs2, claims: rClaims), missing)
+        return (
+            FredDataBundle(
+                cpi: cpi,
+                unrate: unrate,
+                payems: payems,
+                fedfunds: fedFunds,
+                dgs10: dgs10,
+                dgs2: dgs2,
+                claims: claims
+            ),
+            missing
+        )
     }
     
     // Helper to safely fetch series or return empty
-    private func fetchSeriesSafe(instrument: CanonicalInstrument) async -> [(Date, Double)] {
-        do {
-            let result = try await HeimdallOrchestrator.shared.requestMacroSeries(instrument: instrument, limit: 12)
-            // DEBUG: print("✅ FRED: \(instrument.internalId) -> \(result.count) observations")
+    private func fetchSeriesSafe(instrument: CanonicalInstrument, timeoutSeconds: Double = 7.0) async -> [(Date, Double)] {
+        await withTaskGroup(of: [(Date, Double)].self) { group in
+            group.addTask {
+                do {
+                    return try await HeimdallOrchestrator.shared.requestMacroSeries(instrument: instrument, limit: 12)
+                } catch {
+                    return []
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+                return []
+            }
+
+            let result = await group.next() ?? []
+            group.cancelAll()
             return result
-        } catch {
-            // DEBUG: print("❌ FRED FAIL: \(instrument.internalId) -> \(error.localizedDescription)")
-            return []
         }
     }
     
@@ -384,19 +450,104 @@ final class MacroRegimeService: @unchecked Sendable {
     
     // MARK: - Aether 4.0 Deterministic Scoring
     
-    struct DeterministicResult {
+    private struct DeterministicResult {
         let totalScore: Double
         let breakdown: [String: Double]
         let statuses: [String: String]
         let penalty: Double
+        let shockState: ShockState
+        let vixPulse: VixPulse?
+        let adjustmentNotes: [String]
     }
 
-    private func computeDeterministicScore(fred: FredDataBundle, market: MarketDataBundle, config: AetherScoringConfig) -> DeterministicResult {
+    private func calculateChange(candles: [Candle], lookbackDays: Int) -> (pct: Double, points: Double)? {
+        let ordered = normalizeCandles(candles)
+        guard ordered.count > lookbackDays else { return nil }
+        let current = ordered[ordered.count - 1].close
+        let previous = ordered[ordered.count - 1 - lookbackDays].close
+        guard previous != 0 else { return nil }
+        let pct = ((current - previous) / previous) * 100.0
+        let points = current - previous
+        return (pct, points)
+    }
+
+    private func buildVixPulse(from candles: [Candle]) -> VixPulse? {
+        let ordered = normalizeCandles(candles)
+        guard let level = ordered.last?.close else { return nil }
+        let oneDay = calculateChange(candles: ordered, lookbackDays: 1) ?? (0.0, 0.0)
+        let fiveDay = calculateChange(candles: ordered, lookbackDays: 5) ?? (0.0, 0.0)
+        return VixPulse(
+            level: level,
+            oneDayChangePct: oneDay.pct,
+            fiveDayChangePct: fiveDay.pct,
+            oneDayChangePoints: oneDay.points,
+            fiveDayChangePoints: fiveDay.points
+        )
+    }
+
+    private func classifyShock(vixPulse: VixPulse?) -> ShockState {
+        guard let pulse = vixPulse else { return .stable }
+
+        let severeVelocity = pulse.oneDayChangePct >= 18 || pulse.fiveDayChangePct >= 35 || pulse.oneDayChangePoints >= 4 || pulse.fiveDayChangePoints >= 8
+        let moderateVelocity = pulse.oneDayChangePct >= 10 || pulse.fiveDayChangePct >= 20 || pulse.oneDayChangePoints >= 2.5 || pulse.fiveDayChangePoints >= 5
+
+        if pulse.level >= 35 || (pulse.level >= 28 && severeVelocity) {
+            return .panic
+        }
+        if pulse.level >= 28 || (pulse.level >= 24 && moderateVelocity) {
+            return .riskOff
+        }
+        if pulse.level >= 22 || (pulse.level >= 18 && moderateVelocity) {
+            return .caution
+        }
+
+        return .stable
+    }
+
+    private func determineRegime(score: Double, previous: MacroRegime?, shockState: ShockState) -> MacroRegime {
+        if shockState == .panic || shockState == .riskOff {
+            return .riskOff
+        }
+
+        let riskOnEntry = 62.0
+        let riskOnExit = 48.0
+        let riskOffEntry = 38.0
+        let riskOffExit = 52.0
+
+        switch previous {
+        case .riskOn:
+            if score <= riskOnExit {
+                return score <= riskOffEntry ? .riskOff : .neutral
+            }
+            return .riskOn
+
+        case .riskOff:
+            if score >= riskOffExit {
+                return score >= riskOnEntry ? .riskOn : .neutral
+            }
+            return .riskOff
+
+        case .neutral, .none:
+            if score >= riskOnEntry { return .riskOn }
+            if score <= riskOffEntry { return .riskOff }
+            return .neutral
+        }
+    }
+
+    private func computeDeterministicScore(
+        fred: FredDataBundle,
+        market: MarketDataBundle,
+        config: AetherScoringConfig,
+        previousRating: MacroEnvironmentRating?
+    ) -> DeterministicResult {
         var weightedSum = 0.0
         var totalWeight = 0.0
         var breakdown: [String: Double] = [:]
         var statuses: [String: String] = [:]
         var penaltyFlag = 0.0
+        var adjustmentNotes: [String] = []
+        let vixPulse = buildVixPulse(from: market.vix)
+        let shockState = classifyShock(vixPulse: vixPulse)
         
         let now = Date()
         
@@ -564,15 +715,41 @@ final class MacroRegimeService: @unchecked Sendable {
         
         // 6. VIX (Fear Gauge)
         var vixScore = 50.0
-        if let v = market.vix.last?.close {
-             // VIX < 15 -> Calm (Score 90)
-             // VIX > 30 -> Panic (Score 10)
-             // Linear interpolation 15...30
-             if v < 15 { vixScore = 90 }
-             else if v > 30 { vixScore = 10 }
-             else {
-                 vixScore = 90 - ((v - 15) / 15.0 * 80.0)
+        if let pulse = vixPulse {
+             let v = pulse.level
+
+             // Seviye skoru: VIX yükseldikçe skor monoton düşer.
+             if v < 12 {
+                 vixScore = 95
+             } else if v < 18 {
+                 vixScore = 95 - ((v - 12) / 6.0 * 20.0) // 95 -> 75
+             } else if v < 24 {
+                 vixScore = 75 - ((v - 18) / 6.0 * 25.0) // 75 -> 50
+             } else if v < 30 {
+                 vixScore = 50 - ((v - 24) / 6.0 * 25.0) // 50 -> 25
+             } else if v < 40 {
+                 vixScore = 25 - ((v - 30) / 10.0 * 20.0) // 25 -> 5
+             } else {
+                 vixScore = 5
              }
+
+             // İvme etkisi: VIX yukarı hızlanıyorsa ekstra ceza, düşüyorsa sınırlı bonus.
+             let upwardPenalty1D = max(0, pulse.oneDayChangePct - 4) * 0.8
+             let upwardPenalty5D = max(0, pulse.fiveDayChangePct - 8) * 0.35
+             let downwardBonus1D = max(0, -pulse.oneDayChangePct - 4) * 0.3
+             let downwardBonus5D = max(0, -pulse.fiveDayChangePct - 8) * 0.15
+
+             vixScore -= min(20, upwardPenalty1D)
+             vixScore -= min(14, upwardPenalty5D)
+             vixScore += min(8, downwardBonus1D + downwardBonus5D)
+             vixScore = max(0, min(100, vixScore))
+
+             statuses["vix_pulse"] = String(
+                 format: "L%.1f 1G%+.1f 5G%+.1f",
+                 pulse.level,
+                 pulse.oneDayChangePct,
+                 pulse.fiveDayChangePct
+             )
         }
         process("vix", vixScore, market.vix.last?.date, "Daily", config.weights.vix)
         
@@ -631,39 +808,50 @@ final class MacroRegimeService: @unchecked Sendable {
         }
         process("gld", gldScore, market.gld.last?.date, "Daily", config.weights.gld)
         
-        // 8. BTC (Risk Appetite Proxy) - Granular vs SMA
-        // BTC rising = Risk On appetite, BTC falling = Risk Off
+        // 8. BTC (Risk Appetite Proxy)
+        // Trend (SMA sapması) + Momentum (1G/5G) birlikte değerlendirilir.
         var btcScore = 50.0
         if let last = market.btc.last?.close, !market.btc.isEmpty {
             let count = market.btc.count
             if count >= 20 {
                 let sma = market.btc.suffix(20).reduce(0) { $0 + $1.close } / 20.0
-                let deviation = (last - sma) / sma * 100 // % deviation
-                
-                // BTC above SMA = risk appetite = bullish
-                if deviation > 10 {
-                    btcScore = 95 // Strong risk on
-                } else if deviation > 5 {
-                    btcScore = 80 + ((deviation - 5) * 3) // 5-10% = 80-95
-                } else if deviation > 0 {
-                    btcScore = 60 + (deviation * 4) // 0-5% = 60-80
-                } else if deviation > -5 {
-                    btcScore = 40 + ((5 + deviation) * 4) // -5-0% = 40-60
-                } else if deviation > -10 {
-                    btcScore = 20 + ((10 + deviation) * 4) // -10--5% = 20-40
-                } else {
-                    btcScore = 10 // Crypto crash = risk off
-                }
-                statuses["btc"] = "OK"
-                // DEBUG: print("📊 AETHER BTC: Deviation=\(String(format: "%.1f", deviation))% -> Score=\(Int(btcScore))")
+                let deviation = sma != 0 ? ((last - sma) / sma * 100.0) : 0.0
+
+                // Trend skoru: SMA üstü yüksek, altı düşük.
+                let trendScore = 50.0 + max(-45.0, min(45.0, deviation * 3.2))
+
+                // Momentum skoru: kısa vadeli ivme.
+                let oneDayPct = calculateChange(candles: market.btc, lookbackDays: 1)?.pct ?? 0.0
+                let fiveDayPct = calculateChange(candles: market.btc, lookbackDays: 5)?.pct ?? 0.0
+                let momentumMix = (oneDayPct * 0.35) + (fiveDayPct * 0.65)
+                let momentumScore = 50.0 + max(-35.0, min(35.0, momentumMix * 2.1))
+
+                btcScore = (trendScore * 0.65) + (momentumScore * 0.35)
+
+                // Aynı yönde güçleniyorsa ekstra etki; çatışma varsa yumuşatma.
+                if momentumMix > 3, deviation > 0 { btcScore += 4 }
+                if momentumMix < -3, deviation < 0 { btcScore -= 4 }
+                if momentumMix > 0, deviation < -8 { btcScore = max(btcScore, 42) }
+
+                btcScore = max(0, min(100, btcScore))
+                statuses["btc_signal"] = String(
+                    format: "d%+.1f 1G%+.1f 5G%+.1f",
+                    deviation,
+                    oneDayPct,
+                    fiveDayPct
+                )
             } else {
-                statuses["btc"] = "FLASH (\(count))"
+                let first = market.btc.first?.close ?? last
+                let flashPct = first != 0 ? ((last - first) / first) * 100.0 : 0.0
+                btcScore = 50.0 + max(-20.0, min(20.0, flashPct * 1.8))
+                btcScore = max(0, min(100, btcScore))
+                statuses["btc_signal"] = "FLASH (\(count))"
             }
         } else {
-            statuses["btc"] = "MISSING"
+            statuses["btc_signal"] = "MISSING"
         }
         process("btc", btcScore, market.btc.last?.date, "Daily", config.weights.btc)
-        
+
         // 9. CREDIT SPREAD (NEW - Financial Stress Indicator)
         // HYG (High Yield) vs LQD (Investment Grade)
         // Widening spread = Risk Off, Narrowing = Risk On
@@ -715,18 +903,62 @@ final class MacroRegimeService: @unchecked Sendable {
         // AETHER v5: KATEGORİZE SKOR HESAPLAMA
         // ═══════════════════════════════════════════════════════════════════
         
+        // Şok döneminde trend/BTC katkı tavanı sadece final skora uygulanır.
+        // UI kartındaki ham bileşen skoru korunur.
+        let rawTrendScore = breakdown["trend"] ?? 50
+        let rawBtcScore = breakdown["btc"] ?? 50
+        var effectiveTrendScore = rawTrendScore
+        var effectiveBtcScore = rawBtcScore
+
+        if shockState != .stable {
+            let trendCeiling: Double
+            let btcCeiling: Double
+            switch shockState {
+            case .panic:
+                trendCeiling = 52
+                btcCeiling = 48
+            case .riskOff:
+                trendCeiling = 58
+                btcCeiling = 55
+            case .caution:
+                trendCeiling = 65
+                btcCeiling = 62
+            case .stable:
+                trendCeiling = 100
+                btcCeiling = 100
+            }
+
+            if effectiveTrendScore > trendCeiling {
+                effectiveTrendScore = trendCeiling
+                adjustmentNotes.append("Şok filtresi: Trend katkısı sınırlandı.")
+            }
+
+            if effectiveBtcScore > btcCeiling {
+                effectiveBtcScore = btcCeiling
+                adjustmentNotes.append("Şok filtresi: BTC katkısı sınırlandı.")
+            }
+
+            statuses["shock_filter"] = String(
+                format: "trend %.0f->%.0f btc %.0f->%.0f",
+                rawTrendScore,
+                effectiveTrendScore,
+                rawBtcScore,
+                effectiveBtcScore
+            )
+        }
+
         // 🟢 ÖNCÜ (Leading) - x1.5 ağırlık - Geleceği tahmin eder
         let leadingScores: [Double] = [
             breakdown["rates"] ?? 50,   // Yield Curve
             breakdown["vix"] ?? 50,     // VIX
             breakdown["claims"] ?? 50,  // Initial Claims
-            breakdown["btc"] ?? 50      // Bitcoin
+            effectiveBtcScore           // Bitcoin (şok filtresiyle efektif)
         ]
         let leadingAvg = leadingScores.reduce(0.0, +) / Double(leadingScores.count)
         
         // 🟡 EŞZAMANLI (Coincident) - x1.0 ağırlık - Şu anı gösterir
         let coincidentScores: [Double] = [
-            breakdown["trend"] ?? 50,   // SPY Trend
+            effectiveTrendScore,        // SPY Trend (şok filtresiyle efektif)
             breakdown["growth"] ?? 50,  // Payrolls
             breakdown["dxy"] ?? 50      // DXY
         ]
@@ -743,6 +975,43 @@ final class MacroRegimeService: @unchecked Sendable {
         // Ağırlıklı ortalama: Leading x1.5, Coincident x1.0, Lagging x0.8
         let totalCatWeight = 1.5 + 1.0 + 0.8
         let categorizedScore = (leadingAvg * 1.5 + coincidentAvg * 1.0 + laggingAvg * 0.8) / totalCatWeight
+
+        var finalScore = categorizedScore
+        var scoreCap: Double?
+        var shockPenalty = 0.0
+
+        switch shockState {
+        case .panic:
+            shockPenalty = 18
+            scoreCap = 28
+            adjustmentNotes.append("Şok kapısı: PANIC modunda skor üst limiti 28.")
+        case .riskOff:
+            shockPenalty = 10
+            scoreCap = 38
+            adjustmentNotes.append("Şok kapısı: RISK_OFF modunda skor üst limiti 38.")
+        case .caution:
+            shockPenalty = 4
+            scoreCap = 48
+            adjustmentNotes.append("Şok kapısı: CAUTION modunda skor üst limiti 48.")
+        case .stable:
+            break
+        }
+
+        if shockPenalty > 0 {
+            finalScore -= shockPenalty
+        }
+        if let cap = scoreCap {
+            finalScore = min(finalScore, cap)
+        }
+        finalScore = min(100, max(0, finalScore))
+
+        if let previous = previousRating {
+            let delta = finalScore - previous.numericScore
+            if abs(delta) >= 12 {
+                adjustmentNotes.append(String(format: "Skor geçiş filtresi: Δ %+.1f", delta))
+            }
+        }
+        statuses["shock"] = shockState.rawValue
         
         // DEBUG: print("═══════════════════════════════════════════════════════════════")
         // DEBUG: print("📊 AETHER v5 KATEGORİ SKORLARI:")
@@ -753,21 +1022,43 @@ final class MacroRegimeService: @unchecked Sendable {
         // DEBUG: print("   📈 FİNAL SKOR:      \(String(format: "%.0f", categorizedScore))/100")
         // DEBUG: print("═══════════════════════════════════════════════════════════════")
         
-        return DeterministicResult(totalScore: categorizedScore, breakdown: breakdown, statuses: statuses, penalty: penaltyFlag)
+        return DeterministicResult(
+            totalScore: finalScore,
+            breakdown: breakdown,
+            statuses: statuses,
+            penalty: penaltyFlag,
+            shockState: shockState,
+            vixPulse: vixPulse,
+            adjustmentNotes: adjustmentNotes
+        )
     }
 
     private func fetchWithResilience(asset: CanonicalInstrument, count: Int) async -> [Candle]? {
-        // Heimdall 5.4: Use Canonical Resolver via Orchestrator
-        return try? await HeimdallTelepresence.shared.trace(
-            engine: .aether,
-            provider: .unknown,
-            symbol: asset.rawValue,
-            canonicalAsset: asset
-        ) {
-            let candles = try await HeimdallOrchestrator.shared.requestInstrumentCandles(instrument: asset, timeframe: "1D", limit: count)
-            // HEIMDALL 6.3: "No Missing" Policy
-            // We accept whatever data we have. Logic layer will handle low-resolution data.
-            return candles
+        // Heimdall 6.3: per-asset timeout guard to avoid long UI stalls.
+        return await withTaskGroup(of: [Candle]?.self) { group in
+            group.addTask {
+                try? await HeimdallTelepresence.shared.trace(
+                    engine: .aether,
+                    provider: .unknown,
+                    symbol: asset.rawValue,
+                    canonicalAsset: asset
+                ) {
+                    let candles = try await HeimdallOrchestrator.shared.requestInstrumentCandles(
+                        instrument: asset,
+                        timeframe: "1D",
+                        limit: count
+                    )
+                    return await self.normalizeCandles(candles)
+                }
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 8_000_000_000) // 8s timeout
+                return nil
+            }
+
+            let result = await group.next() ?? nil
+            group.cancelAll()
+            return result
         }
     }
     
@@ -778,7 +1069,7 @@ final class MacroRegimeService: @unchecked Sendable {
             summary: rating.summary,
             lastUpdated: Date(),
             spyChange: calculateReturn(candles: market.spy), 
-            vixValue: market.vix.last?.close ?? 0,
+            vixValue: normalizeCandles(market.vix).last?.close ?? 0,
             gldChange: calculateReturn(candles: market.gld), 
             btcChange: calculateReturn(candles: market.btc)
         )
@@ -787,11 +1078,16 @@ final class MacroRegimeService: @unchecked Sendable {
     
     private func calculateReturn(candles: [Candle]) -> Double {
         // FIX: Günlük değişim hesapla (son 2 candle), 60 günlük DEĞİL!
-        guard candles.count >= 2 else { return 0 }
-        let current = candles[candles.count - 1].close
-        let previous = candles[candles.count - 2].close
+        let ordered = normalizeCandles(candles)
+        guard ordered.count >= 2 else { return 0 }
+        let current = ordered[ordered.count - 1].close
+        let previous = ordered[ordered.count - 2].close
         guard previous != 0 else { return 0 }
         return ((current - previous) / previous) * 100
+    }
+
+    private func normalizeCandles(_ candles: [Candle]) -> [Candle] {
+        candles.sorted { $0.date < $1.date }
     }
 }
 

@@ -1,7 +1,6 @@
 import Foundation
 
-// MARK: - Legacy Models (Restored)
-// Bu modeller projenin diğer kısımlarında kullanıldığı için geri getirildi.
+// MARK: - Models (Tüm projedeki bağımlılıklar korunuyor)
 
 struct BistQuote: Codable {
     let symbol: String
@@ -90,8 +89,7 @@ struct BistAnalystConsensus: Codable {
     var totalAnalysts: Int { buyCount + holdCount + sellCount }
     
     var consensusScore: Double {
-        guard totalAnalysts > 0 else { return 50.0 } // Neutral default
-        // Simple weighted score: Buy=100, Hold=50, Sell=0
+        guard totalAnalysts > 0 else { return 50.0 }
         let score = (Double(buyCount) * 1.0 + Double(holdCount) * 0.5) / Double(totalAnalysts)
         return score * 100.0
     }
@@ -131,6 +129,9 @@ struct BistFinancials: Codable {
     let eps: Double?
     let timestamp: Date
     
+    // Backward-compat computed properties
+    var peRatio: Double? { pe }
+    
     var cashRatio: Double? {
         guard let c = cash, let d = shortTermDebt, d > 0 else { return nil }
         return c / d
@@ -154,6 +155,7 @@ enum BorsaPyError: Error, LocalizedError {
     case decodingError
     case missingApiKey
     case dataUnavailable
+    case backendUnavailable
     
     var errorDescription: String? {
         switch self {
@@ -161,6 +163,7 @@ enum BorsaPyError: Error, LocalizedError {
         case .invalidResponse: return "Geçersiz yanıt"
         case .missingApiKey: return "API anahtarı eksik"
         case .dataUnavailable: return "Veri bulunamadı"
+        case .backendUnavailable: return "Borsapy backend erişilemez"
         default: return "Bir hata oluştu"
         }
     }
@@ -171,235 +174,319 @@ enum GoldType: String {
     case ons = "ons"
 }
 
-// MARK: - BorsaPyProvider (Renamed from BorsaDataService for Compatibility)
-/// Hem yeni Is Yatırım temel analiz fonksiyonlarını hem de eski legacy çağrı fonksiyonlarını içerir.
-/// İleride refactor edilecek.
+// MARK: - BorsaPyProvider (borsapy FastAPI Backend Entegrasyonu)
+/// borsapy Python backend'ine HTTP üzerinden bağlanır.
+/// Backend: Scripts/borsapy_server/main.py
 actor BorsaPyProvider {
     static let shared = BorsaPyProvider()
     
-    // MARK: - Endpoints
-    private let baseURL = "https://www.isyatirim.com.tr"
-    private let stockInfoURL = "https://www.isyatirim.com.tr/_layouts/15/IsYatirim.Website/StockInfo/CompanyInfoAjax.aspx"
-    private let maliTabloURL = "https://www.isyatirim.com.tr/_Layouts/15/IsYatirim.Website/Common/Data.aspx/MaliTablo"
-    private let isyatirimBaseURL = "https://www.isyatirim.com.tr/_Layouts/15/IsYatirim.Website/Common"
+    // MARK: - Backend Config
+    private let backendBaseURL: String
     
     // Cache
     private var quoteCache: [String: (quote: BistQuote, timestamp: Date)] = [:]
     private let cacheTTL: TimeInterval = 120
     
-    private init() {}
-    
-    // MARK: - NEW: Fundamentals (Sermaye, Temettü, Bilanço)
-    
-    func getCapitalIncreases(symbol: String) async throws -> [BistCapitalIncrease] {
-         let result = try await getCapitalAndDividends(symbol: symbol)
-         return result.increases
+    private init() {
+        // Configurable via environment or default
+        self.backendBaseURL = ProcessInfo.processInfo.environment["BORSAPY_URL"]
+            ?? "http://localhost:8899"
     }
     
-    func getDividends(symbol: String) async throws -> [BistDividend] {
-        let result = try await getCapitalAndDividends(symbol: symbol)
-        return result.dividends
-    }
+    // MARK: - Public API: Quote
     
-    private func getCapitalAndDividends(symbol: String) async throws -> (dividends: [BistDividend], increases: [BistCapitalIncrease]) {
-        let cleanSymbol = cleanSymbol(symbol)
-        guard let url = URL(string: "\(stockInfoURL)/GetSermayeArttirimlari") else { throw BorsaPyError.invalidURL }
-        
-        let payload: [String: Any] = [
-            "hisseKodu": cleanSymbol,
-            "hisseTanimKodu": "",
-            "yil": 0,
-            "zaman": "HEPSI",
-            "endeksKodu": "09",
-            "sektorKodu": ""
-        ]
-        
-        // İş Yatırım genellikle "d" parametresi içinde JSON string döndürür
-        let rawData = try await performRequest(url: url, method: "POST", payload: payload, referer: stockPageURL(symbol: cleanSymbol))
-        
-        // Response formatı: {"d": "[{...}, {...}]"}
-        guard let jsonObject = try JSONSerialization.jsonObject(with: rawData) as? [String: Any],
-              let jsonString = jsonObject["d"] as? String,
-              let jsonData = jsonString.data(using: .utf8),
-              let items = try? JSONSerialization.jsonObject(with: jsonData) as? [[String: Any]] else {
-            return ([], [])
-        }
-        
-        return (parseDividends(from: items), parseCapitalIncreases(from: items))
-    }
-    
-    func getFinancialStatements(symbol: String) async throws -> BistFinancials {
-        // En son açıklanan dönemi bulmaya çalışalım (Örn: 2024/9)
-        // Basitlik için hardcoded deneme yapıyoruz veya parametrik olmalıydı.
-        // Legacy uyumluluğu için parametresiz signature tutuyoruz, içeride mantık kuruyoruz.
-        
-        let year = Calendar.current.component(.year, from: Date())
-        // Genelde bir önceki yılın son çeyreği veya bu yılın ilk çeyreği.
-        // Şimdilik 2024/9'u deneyelim (daha dinamik olmalı)
-        return try await getFinancialStatements(symbol: symbol, year: year, period: 9)
-    }
-    
-    func getFinancialStatements(symbol: String, year: Int, period: Int) async throws -> BistFinancials {
-        let cleanSymbol = cleanSymbol(symbol)
-        
-        guard let url = URL(string: maliTabloURL) else { throw BorsaPyError.invalidURL }
-        
-        let payload: [String: Any] = [
-            "companyCode": cleanSymbol,
-            "exchange": "TRY",
-            "financialGroup": "XI_29",
-            "kur": "",
-            "isConsolidated": true,
-            "year1": year,
-            "period1": period,
-            "year2": year - 1,
-            "period2": period
-        ]
-        
-        let rawData = try await performRequest(url: url, method: "POST", payload: payload, referer: stockPageURL(symbol: cleanSymbol))
-        
-        var items: [[String: Any]] = []
-        if let jsonObject = try? JSONSerialization.jsonObject(with: rawData) as? [String: Any] {
-             if let dString = jsonObject["d"] as? String,
-                let data = dString.data(using: .utf8),
-                let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-                 items = list
-             } else if let value = jsonObject["value"] as? [[String: Any]] {
-                 items = value
-             }
-        } else if let list = try? JSONSerialization.jsonObject(with: rawData) as? [[String: Any]] {
-            items = list
-        }
-        
-        guard !items.isEmpty else { throw BorsaPyError.invalidResponse }
-        
-        return parseFinancials(from: items, symbol: cleanSymbol, period: "\(year)/\(period)")
-    }
-    
-    // MARK: - Legacy Compatibility Methods (BistQuote, FX, History)
-    
-    /// BIST Hisse Anlık Fiyat (Eski Endpoint deneniyor, çalışmazsa fallback)
     func getBistQuote(symbol: String) async throws -> BistQuote {
-        let cleanSymbol = cleanSymbol(symbol)
+        let clean = cleanSymbol(symbol)
         
         // Cache Check
-        if let cached = quoteCache[cleanSymbol], Date().timeIntervalSince(cached.timestamp) < cacheTTL {
+        if let cached = quoteCache[clean], Date().timeIntervalSince(cached.timestamp) < cacheTTL {
             return cached.quote
         }
         
-        // Burası eski endpoint, muhtemelen çalışmayacak ama kodun derlenmesi için tutuyoruz.
-        // Gerçek implementasyon TradingView WebSocket olmalı.
-        // Şimdilik boş değer veya hata.
-        // Projeyi kırmamak için dummy veri dönelim veya eski endpointi deneyelim.
+        let json = try await fetchJSON(path: "/ticker/\(clean)/quote")
         
-        let url = URL(string: "\(isyatirimBaseURL)/ChartData.aspx/OneEndeks?endeks=\(cleanSymbol)")!
-        var request = URLRequest(url: url)
-        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+        let quote = BistQuote(
+            symbol: clean,
+            last: json["last"] as? Double ?? 0,
+            open: json["open"] as? Double ?? 0,
+            high: json["high"] as? Double ?? 0,
+            low: json["low"] as? Double ?? 0,
+            previousClose: json["previousClose"] as? Double ?? 0,
+            volume: json["volume"] as? Double ?? 0,
+            change: json["change"] as? Double ?? 0,
+            bid: 0, ask: 0,
+            timestamp: Date()
+        )
         
-        do {
-            let (data, _) = try await URLSession.shared.data(for: request)
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                let quote = BistQuote(
-                    symbol: cleanSymbol,
-                    last: json["son"] as? Double ?? json["last"] as? Double ?? 0,
-                    open: json["acilis"] as? Double ?? 0,
-                    high: json["yuksek"] as? Double ?? 0,
-                    low: json["dusuk"] as? Double ?? 0,
-                    previousClose: json["oncekiKapanis"] as? Double ?? 0,
-                    volume: json["hacim"] as? Double ?? 0,
-                    change: json["yuzdeDegisim"] as? Double ?? 0,
-                    bid: 0, ask: 0, timestamp: Date()
-                )
-                quoteCache[cleanSymbol] = (quote, Date())
-                return quote
-            }
-        } catch {}
-        
-        // Failover
-        throw BorsaPyError.requestFailed
+        quoteCache[clean] = (quote, Date())
+        return quote
     }
     
-    func getXU100() async throws -> BistQuote { try await getBistQuote(symbol: "XU100") }
+    func getXU100() async throws -> BistQuote {
+        try await getBistQuote(symbol: "XU100")
+    }
     
-    func getSectorIndex(code: String) async throws -> BistQuote { try await getBistQuote(symbol: code) }
+    func getSectorIndex(code: String) async throws -> BistQuote {
+        try await getBistQuote(symbol: code)
+    }
+    
+    // MARK: - Public API: History
+    
+    func getBistHistory(symbol: String, days: Int = 30) async throws -> [BorsaPyCandle] {
+        let clean = cleanSymbol(symbol)
+        let period = periodFromDays(days)
+        
+        let json = try await fetchJSON(path: "/ticker/\(clean)/history?period=\(period)&interval=1d")
+        
+        guard let candlesArray = json["candles"] as? [[String: Any]] else {
+            throw BorsaPyError.dataUnavailable
+        }
+        
+        let candles = candlesArray.compactMap { parseCandle($0) }
+        guard !candles.isEmpty else { throw BorsaPyError.dataUnavailable }
+        return candles
+    }
+    
+    // MARK: - Public API: FX
     
     func getFXRate(asset: String) async throws -> FXRate {
-        let ySymbol = mapYahooSymbol(for: asset)
-        let candles = try await YahooFinanceProvider.shared.fetchCandles(symbol: ySymbol, timeframe: "1d", limit: 1)
-        guard let latest = candles.first else { throw BorsaPyError.dataUnavailable }
+        let mapped = mapFXSymbol(asset)
+        let json = try await fetchJSON(path: "/fx/\(mapped)")
+        
         return FXRate(
             symbol: asset,
-            last: latest.close,
-            open: latest.open,
-            high: latest.high,
-            low: latest.low,
-            timestamp: latest.date
+            last: json["last"] as? Double
+                ?? json["satis"] as? Double
+                ?? json["selling"] as? Double ?? 0,
+            open: json["open"] as? Double ?? 0,
+            high: json["high"] as? Double ?? 0,
+            low: json["low"] as? Double ?? 0,
+            timestamp: Date()
         )
     }
     
     func getBrentPrice() async throws -> FXRate {
-         try await getFXRate(asset: "BRENT")
+        let json = try await fetchJSON(path: "/gold/BRENT")
+        return FXRate(
+            symbol: "BRENT",
+            last: json["last"] as? Double ?? 0,
+            open: json["open"] as? Double ?? 0,
+            high: json["high"] as? Double ?? 0,
+            low: json["low"] as? Double ?? 0,
+            timestamp: Date()
+        )
     }
     
-    func getBistHistory(symbol: String, days: Int = 30) async throws -> [BorsaPyCandle] {
-        let s = normalizeBistYahooSymbol(symbol)
-        let candles = try await YahooFinanceProvider.shared.fetchCandles(symbol: s, timeframe: "1d", limit: days)
-        guard !candles.isEmpty else { throw BorsaPyError.dataUnavailable }
-        return candles.map { candle in
-            BorsaPyCandle(
-                date: candle.date,
-                open: candle.open,
-                high: candle.high,
-                low: candle.low,
-                close: candle.close,
-                volume: candle.volume
+    // MARK: - Public API: Gold
+    
+    func getGoldPrice(type: GoldType = .gramAltin) async throws -> FXRate {
+        let json = try await fetchJSON(path: "/gold/\(type.rawValue)")
+        return FXRate(
+            symbol: type.rawValue,
+            last: json["last"] as? Double ?? 0,
+            open: json["open"] as? Double ?? 0,
+            high: json["high"] as? Double ?? 0,
+            low: json["low"] as? Double ?? 0,
+            timestamp: Date()
+        )
+    }
+    
+    // MARK: - Public API: Financials
+    
+    func getFinancialStatements(symbol: String) async throws -> BistFinancials {
+        let clean = cleanSymbol(symbol)
+        let json = try await fetchJSON(path: "/ticker/\(clean)/financials")
+        return parseFinancials(json, symbol: clean)
+    }
+    
+    func getFinancialStatements(symbol: String, year: Int, period: Int) async throws -> BistFinancials {
+        // Backend çeyreklik veri destekliyorsa quarterly parametresi ile
+        let clean = cleanSymbol(symbol)
+        let quarterly = (period != 12)
+        let json = try await fetchJSON(path: "/ticker/\(clean)/financials?quarterly=\(quarterly)")
+        return parseFinancials(json, symbol: clean)
+    }
+    
+    // MARK: - Public API: Dividends
+    
+    func getDividends(symbol: String) async throws -> [BistDividend] {
+        let clean = cleanSymbol(symbol)
+        let json = try await fetchJSON(path: "/ticker/\(clean)/dividends")
+        
+        guard let items = json["dividends"] as? [[String: Any]] else {
+            return []
+        }
+        
+        return items.compactMap { item -> BistDividend? in
+            guard let dateStr = item["date"] as? String else { return nil }
+            let date = ISO8601DateFormatter().date(from: dateStr) ?? Date()
+            return BistDividend(
+                date: date,
+                grossRate: item["grossRate"] as? Double
+                    ?? item["Brüt Kar Payı Oranı (%)"] as? Double ?? 0,
+                netRate: item["netRate"] as? Double
+                    ?? item["Net Kar Payı Oranı (%)"] as? Double ?? 0,
+                totalAmount: item["totalAmount"] as? Double
+                    ?? item["Toplam Kar Payı Tutarı (TL)"] as? Double ?? 0,
+                perShare: item["perShare"] as? Double
+                    ?? item["Hisse Başına Kar Payı (TL)"] as? Double ?? 0
             )
         }
     }
     
-    func getAnalystRecommendations(symbol: String) async throws -> BistAnalystConsensus {
-        let key = APIKeyStore.shared.getKey(for: .fmp) ?? Secrets.fmpKey
-        guard !key.isEmpty else { throw BorsaPyError.missingApiKey }
-        
+    // MARK: - Public API: Capital Increases (Splits)
+    
+    func getCapitalIncreases(symbol: String) async throws -> [BistCapitalIncrease] {
         let clean = cleanSymbol(symbol)
-        let fmpSymbol = clean.contains(".") ? clean : "\(clean).IS"
+        let json = try await fetchJSON(path: "/ticker/\(clean)/splits")
         
-        let grades = try await fetchFMPGradesConsensus(symbol: fmpSymbol, apiKey: key)
-        let targets = try await fetchFMPPriceTargetConsensus(symbol: fmpSymbol, apiKey: key)
-        
-        let strongBuy = grades.strongBuy
-        let buy = grades.buy
-        let hold = grades.hold
-        let sell = grades.sell
-        let strongSell = grades.strongSell
-        
-        let buyCount = strongBuy + buy
-        let sellCount = strongSell + sell
-        let holdCount = hold
-        let total = buyCount + holdCount + sellCount
-        
-        if total == 0 && targets.average == nil && targets.high == nil && targets.low == nil {
-            throw BorsaPyError.dataUnavailable
+        guard let items = json["splits"] as? [[String: Any]] else {
+            return []
         }
         
-        let currentPrice = (try? await getBistQuote(symbol: clean)).map { $0.last }
-        let potentialReturn = computePotentialReturn(currentPrice: currentPrice, target: targets.average)
+        return items.compactMap { item -> BistCapitalIncrease? in
+            guard let dateStr = item["date"] as? String ?? item["index"] as? String else { return nil }
+            let date = ISO8601DateFormatter().date(from: dateStr) ?? Date()
+            return BistCapitalIncrease(
+                date: date,
+                capitalAfter: item["capitalAfter"] as? Double ?? 0,
+                rightsIssueRate: item["rightsIssueRate"] as? Double ?? 0,
+                bonusFromCapitalRate: item["bonusFromCapitalRate"] as? Double ?? 0,
+                bonusFromDividendRate: item["bonusFromDividendRate"] as? Double ?? 0
+            )
+        }
+    }
+    
+    // MARK: - Public API: Analyst Recommendations
+    
+    func getAnalystRecommendations(symbol: String) async throws -> BistAnalystConsensus {
+        let clean = cleanSymbol(symbol)
+        let json = try await fetchJSON(path: "/ticker/\(clean)/analysts")
+        
+        let targets = json["priceTargets"] as? [String: Any] ?? [:]
+        let recs = json["recommendations"] as? [String: Any] ?? [:]
+        
+        let avgTarget = targets["targetMeanPrice"] as? Double
+            ?? targets["averageTargetPrice"] as? Double
+        let highTarget = targets["targetHighPrice"] as? Double
+        let lowTarget = targets["targetLowPrice"] as? Double
+        
+        let buyCount = (recs["buy"] as? Int ?? 0) + (recs["strongBuy"] as? Int ?? 0)
+        let holdCount = recs["hold"] as? Int ?? 0
+        let sellCount = (recs["sell"] as? Int ?? 0) + (recs["strongSell"] as? Int ?? 0)
+        
+        let recommendation = recs["recommendationKey"] as? String
+            ?? recs["consensus"] as? String ?? "N/A"
+        
+        // Potansiyel getiri hesapla
+        var potentialReturn = 0.0
+        if let target = avgTarget {
+            let currentQuote = try? await getBistQuote(symbol: clean)
+            if let price = currentQuote?.last, price > 0 {
+                potentialReturn = ((target - price) / price) * 100.0
+            }
+        }
         
         return BistAnalystConsensus(
             symbol: clean,
-            averageTargetPrice: targets.average,
-            highTargetPrice: targets.high,
-            lowTargetPrice: targets.low,
+            averageTargetPrice: avgTarget,
+            highTargetPrice: highTarget,
+            lowTargetPrice: lowTarget,
             potentialReturn: potentialReturn,
-            recommendation: grades.recommendation ?? "N/A",
+            recommendation: recommendation,
             buyCount: buyCount,
             holdCount: holdCount,
             sellCount: sellCount,
             timestamp: Date()
         )
     }
-
-    // MARK: - Internal Helpers
+    
+    // MARK: - NEW: Inflation
+    
+    func getInflation() async throws -> [String: Any] {
+        return try await fetchJSON(path: "/inflation")
+    }
+    
+    // MARK: - NEW: Bond Yields
+    
+    func getBondYields() async throws -> [[String: Any]] {
+        let json = try await fetchJSON(path: "/bond")
+        return json["yields"] as? [[String: Any]] ?? []
+    }
+    
+    // MARK: - NEW: News (KAP Haberleri)
+    
+    struct BistNewsItem: Codable, Identifiable {
+        let id: String
+        let title: String
+        let summary: String
+        let date: String
+        let source: String
+        
+        init(id: String = UUID().uuidString, title: String, summary: String, date: String, source: String) {
+            self.id = id
+            self.title = title
+            self.summary = summary
+            self.date = date
+            self.source = source
+        }
+    }
+    
+    func getNews(symbol: String) async throws -> [BistNewsItem] {
+        let clean = cleanSymbol(symbol)
+        let json = try await fetchJSON(path: "/ticker/\(clean)/news")
+        let newsArray = json["news"] as? [[String: Any]] ?? []
+        
+        return newsArray.compactMap { item in
+            guard let title = item["title"] as? String else { return nil }
+            return BistNewsItem(
+                title: title,
+                summary: item["summary"] as? String ?? "",
+                date: item["date"] as? String ?? "",
+                source: item["source"] as? String ?? "KAP"
+            )
+        }
+    }
+    
+    // MARK: - Internal: HTTP Client
+    
+    private func fetchJSON(path: String) async throws -> [String: Any] {
+        let urlString = backendBaseURL + path
+        guard let url = URL(string: urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? urlString) else {
+            throw BorsaPyError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        
+        let data: Data
+        let response: URLResponse
+        
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch {
+            print("BorsaPyProvider: Backend erişilemez — \(error.localizedDescription)")
+            throw BorsaPyError.backendUnavailable
+        }
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BorsaPyError.requestFailed
+        }
+        
+        guard (200...299).contains(httpResponse.statusCode) else {
+            print("BorsaPyProvider: HTTP \(httpResponse.statusCode) — \(urlString)")
+            throw BorsaPyError.requestFailed
+        }
+        
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw BorsaPyError.invalidResponse
+        }
+        
+        return json
+    }
+    
+    // MARK: - Internal: Helpers
     
     private func cleanSymbol(_ symbol: String) -> String {
         return symbol.uppercased()
@@ -407,290 +494,117 @@ actor BorsaPyProvider {
             .replacingOccurrences(of: ".E", with: "")
     }
     
-    private func stockPageURL(symbol: String) -> String {
-        return "\(baseURL)/tr-tr/analiz/hisse/Sayfalar/sirket-karti.aspx?hisse=\(symbol)"
-    }
-
-    private func mapYahooSymbol(for asset: String) -> String {
+    private func mapFXSymbol(_ asset: String) -> String {
         let clean = asset.uppercased().replacingOccurrences(of: "/", with: "")
-        if clean.contains("USDTRY") || clean == "USD" {
-            return "USDTRY=X"
-        }
-        if clean.contains("EURTRY") || clean == "EUR" {
-            return "EURTRY=X"
-        }
-        if clean.contains("GBPTRY") || clean == "GBP" {
-            return "GBPTRY=X"
-        }
-        if clean.contains("BRENT") || clean.contains("BRN") {
-            return "BZ=F"
-        }
-        return asset
-    }
-
-    private func normalizeBistYahooSymbol(_ symbol: String) -> String {
-        let s = symbol.uppercased()
-        if s.hasSuffix(".IS") { return s }
-        return "\(s).IS"
-    }
-
-    private func computePotentialReturn(currentPrice: Double?, target: Double?) -> Double {
-        guard let price = currentPrice, let target = target, price > 0 else { return 0 }
-        return ((target - price) / price) * 100
-    }
-
-    private struct FMPGradesConsensus {
-        let strongBuy: Int
-        let buy: Int
-        let hold: Int
-        let sell: Int
-        let strongSell: Int
-        let recommendation: String?
+        if clean.contains("USDTRY") || clean == "USD" { return "USD" }
+        if clean.contains("EURTRY") || clean == "EUR" { return "EUR" }
+        if clean.contains("GBPTRY") || clean == "GBP" { return "GBP" }
+        if clean.contains("BRENT") || clean.contains("BRN") { return "BRENT" }
+        return clean
     }
     
-    private struct FMPPriceTargets {
-        let average: Double?
-        let high: Double?
-        let low: Double?
+    private func periodFromDays(_ days: Int) -> String {
+        switch days {
+        case 0...7: return "1h"
+        case 8...35: return "1ay"
+        case 36...100: return "3ay"
+        case 101...370: return "1y"
+        default: return "max"
+        }
     }
     
-    private func fetchFMPGradesConsensus(symbol: String, apiKey: String) async throws -> FMPGradesConsensus {
-        let stableURL = try fmpURL(path: "stable/grades-consensus", symbol: symbol, apiKey: apiKey)
-        if let first = try? await fetchFMPFirstObject(url: stableURL) {
-            let strongBuy = intValue(first, keys: ["strongBuy", "strong_buy", "analystRatingsStrongBuy"])
-            let buy = intValue(first, keys: ["buy", "analystRatingsBuy"])
-            let hold = intValue(first, keys: ["hold", "analystRatingsHold", "neutral"])
-            let sell = intValue(first, keys: ["sell", "analystRatingsSell"])
-            let strongSell = intValue(first, keys: ["strongSell", "strong_sell", "analystRatingsStrongSell"])
-            let recommendation = stringValue(first, keys: ["consensus", "recommendation"])
-            return FMPGradesConsensus(
-                strongBuy: strongBuy,
-                buy: buy,
-                hold: hold,
-                sell: sell,
-                strongSell: strongSell,
-                recommendation: recommendation
-            )
-        }
+    private func parseCandle(_ dict: [String: Any]) -> BorsaPyCandle? {
+        guard let dateStr = dict["date"] as? String else { return nil }
         
-        let legacyURL = try fmpURL(path: "api/v3/analyst-stock-recommendations/\(symbol)", apiKey: apiKey)
-        if let first = try? await fetchFMPFirstObject(url: legacyURL) {
-            let strongBuy = intValue(first, keys: ["strongBuy", "analystRatingsStrongBuy"])
-            let buy = intValue(first, keys: ["buy", "analystRatingsBuy"])
-            let hold = intValue(first, keys: ["hold", "analystRatingsHold", "neutral"])
-            let sell = intValue(first, keys: ["sell", "analystRatingsSell"])
-            let strongSell = intValue(first, keys: ["strongSell", "analystRatingsStrongSell"])
-            let recommendation = stringValue(first, keys: ["consensus", "recommendation"])
-            return FMPGradesConsensus(
-                strongBuy: strongBuy,
-                buy: buy,
-                hold: hold,
-                sell: sell,
-                strongSell: strongSell,
-                recommendation: recommendation
-            )
-        }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = formatter.date(from: dateStr)
+            ?? ISO8601DateFormatter().date(from: dateStr)
+            ?? Date()
         
-        return FMPGradesConsensus(strongBuy: 0, buy: 0, hold: 0, sell: 0, strongSell: 0, recommendation: nil)
+        return BorsaPyCandle(
+            date: date,
+            open: dict["open"] as? Double ?? 0,
+            high: dict["high"] as? Double ?? 0,
+            low: dict["low"] as? Double ?? 0,
+            close: dict["close"] as? Double ?? 0,
+            volume: dict["volume"] as? Double ?? 0
+        )
     }
     
-    private func fetchFMPPriceTargetConsensus(symbol: String, apiKey: String) async throws -> FMPPriceTargets {
-        let stableURL = try fmpURL(path: "stable/price-target-consensus", symbol: symbol, apiKey: apiKey)
-        if let first = try? await fetchFMPFirstObject(url: stableURL) {
-            let average = doubleValue(first, keys: ["priceTarget", "targetPrice", "targetConsensus", "averageTargetPrice", "targetMeanPrice"])
-            let high = doubleValue(first, keys: ["targetHigh", "targetHighPrice", "highPriceTarget"])
-            let low = doubleValue(first, keys: ["targetLow", "targetLowPrice", "lowPriceTarget"])
-            return FMPPriceTargets(average: average, high: high, low: low)
-        }
+    private func parseFinancials(_ json: [String: Any], symbol: String) -> BistFinancials {
+        let ratios = json["ratios"] as? [String: Any] ?? [:]
+        let balanceItems = json["balanceSheet"] as? [[String: Any]] ?? []
+        let incomeItems = json["incomeStatement"] as? [[String: Any]] ?? []
         
-        let legacyURL = try fmpURL(path: "api/v3/price-target-consensus/\(symbol)", apiKey: apiKey)
-        if let first = try? await fetchFMPFirstObject(url: legacyURL) {
-            let average = doubleValue(first, keys: ["priceTarget", "targetMeanPrice", "targetPrice", "averageTargetPrice"])
-            let high = doubleValue(first, keys: ["targetHighPrice", "highPriceTarget"])
-            let low = doubleValue(first, keys: ["targetLowPrice", "lowPriceTarget"])
-            return FMPPriceTargets(average: average, high: high, low: low)
-        }
-        
-        return FMPPriceTargets(average: nil, high: nil, low: nil)
-    }
-    
-    private func fmpURL(path: String, symbol: String? = nil, apiKey: String) throws -> URL {
-        var components: URLComponents
-        if path.hasPrefix("http") {
-            components = URLComponents(string: path) ?? URLComponents()
-        } else if path.hasPrefix("api/v3") {
-            components = URLComponents(string: "https://financialmodelingprep.com/\(path)") ?? URLComponents()
-        } else {
-            components = URLComponents(string: "https://financialmodelingprep.com/\(path)") ?? URLComponents()
-        }
-        var items = components.queryItems ?? []
-        if let symbol { items.append(URLQueryItem(name: "symbol", value: symbol)) }
-        items.append(URLQueryItem(name: "apikey", value: apiKey))
-        components.queryItems = items
-        guard let url = components.url else { throw BorsaPyError.invalidURL }
-        return url
-    }
-    
-    private func fmpURL(path: String, apiKey: String) throws -> URL {
-        guard let url = URL(string: "https://financialmodelingprep.com/\(path)?apikey=\(apiKey)") else {
-            throw BorsaPyError.invalidURL
-        }
-        return url
-    }
-    
-    private func fetchFMPFirstObject(url: URL) async throws -> [String: Any]? {
-        let (data, response) = try await URLSession.shared.data(from: url)
-        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
-            throw BorsaPyError.invalidResponse
-        }
-        let json = try JSONSerialization.jsonObject(with: data, options: [])
-        if let arr = json as? [[String: Any]] {
-            return arr.first
-        }
-        if let obj = json as? [String: Any] {
-            return obj
-        }
-        return nil
-    }
-    
-    private func intValue(_ dict: [String: Any], keys: [String]) -> Int {
-        for key in keys {
-            if let v = dict[key] as? Int { return v }
-            if let v = dict[key] as? Double { return Int(v) }
-            if let v = dict[key] as? String, let i = Int(v) { return i }
-        }
-        return 0
-    }
-    
-    private func doubleValue(_ dict: [String: Any], keys: [String]) -> Double? {
-        for key in keys {
-            if let v = dict[key] as? Double { return v }
-            if let v = dict[key] as? Int { return Double(v) }
-            if let v = dict[key] as? String, let d = Double(v) { return d }
-        }
-        return nil
-    }
-    
-    private func stringValue(_ dict: [String: Any], keys: [String]) -> String? {
-        for key in keys {
-            if let v = dict[key] as? String, !v.isEmpty { return v }
-        }
-        return nil
-    }
-    
-    private func performRequest(url: URL, method: String, payload: [String: Any]? = nil, referer: String? = nil) async throws -> Data {
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json; charset=UTF-8", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json, text/javascript, */*; q=0.01", forHTTPHeaderField: "Accept")
-        request.setValue("XMLHttpRequest", forHTTPHeaderField: "X-Requested-With")
-        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36", forHTTPHeaderField: "User-Agent")
-        
-        if let referer = referer {
-            request.setValue(referer, forHTTPHeaderField: "Referer")
-        }
-        
-        if let payload = payload {
-            request.httpBody = try JSONSerialization.data(withJSONObject: payload)
-        }
-        
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw BorsaPyError.requestFailed
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            print("HTTP Error: \(httpResponse.statusCode)")
-            throw BorsaPyError.requestFailed
-        }
-        
-        return data
-    }
-    
-    // Parsers (Same as before)
-    private func parseDividends(from items: [[String: Any]]) -> [BistDividend] {
-        var dividends: [BistDividend] = []
-        for item in items {
-            guard let type = item["SHT_KODU"] as? String, type == "04",
-                  let timestamp = item["SHHE_TARIH"] as? Double else { continue }
-            
-            let date = Date(timeIntervalSince1970: timestamp / 1000)
-            let grossRate = (item["SHHE_NAKIT_TM_ORAN"] as? Double) ?? 0
-            
-            dividends.append(BistDividend(
-                date: date,
-                grossRate: grossRate,
-                netRate: (item["SHHE_NAKIT_TM_ORAN_NET"] as? Double) ?? 0,
-                totalAmount: (item["SHHE_NAKIT_TM_TUTAR"] as? Double) ?? 0,
-                perShare: grossRate / 100.0
-            ))
-        }
-        return dividends.sorted { $0.date > $1.date }
-    }
-    
-    private func parseCapitalIncreases(from items: [[String: Any]]) -> [BistCapitalIncrease] {
-        var increases: [BistCapitalIncrease] = []
-        for item in items {
-            guard let type = item["SHT_KODU"] as? String, ["03", "09"].contains(type),
-                  let timestamp = item["SHHE_TARIH"] as? Double else { continue }
-            
-            let date = Date(timeIntervalSince1970: timestamp / 1000)
-            
-            increases.append(BistCapitalIncrease(
-                date: date,
-                capitalAfter: (item["HSP_BOLUNME_SONRASI_SERMAYE"] as? Double) ?? 0,
-                rightsIssueRate: (item["SHHE_BDLI_ORAN"] as? Double) ?? 0,
-                bonusFromCapitalRate: (item["SHHE_BDSZ_IK_ORAN"] as? Double) ?? 0,
-                bonusFromDividendRate: (item["SHHE_BDSZ_TM_ORAN"] as? Double) ?? 0
-            ))
-        }
-        return increases.sorted { $0.date > $1.date }
-    }
-    
-    private func parseFinancials(from items: [[String: Any]], symbol: String, period: String) -> BistFinancials {
-        func val(_ keys: [String]) -> Double? {
+        // Helper: bilanço/gelir tablosundan değer çek
+        func val(from items: [[String: Any]], keys: [String]) -> Double? {
             for item in items {
-                if let desc = item["itemDescTr"] as? String {
+                if let idx = item["index"] as? String {
                     for key in keys {
-                        if desc.localizedCaseInsensitiveContains(key) {
-                            return item["value1"] as? Double
+                        if idx.localizedCaseInsensitiveContains(key) {
+                            // İlk sütun değerini bul (index dışındaki)
+                            for (k, v) in item where k != "index" {
+                                if let d = v as? Double { return d }
+                            }
                         }
                     }
                 }
             }
             return nil
         }
-        let revenue = val(["Satış Gelirleri", "Hasılat"])
-        let netProfit = val(["Dönem Karı", "DÖNEM KARI"])
+        
+        let revenue = val(from: incomeItems, keys: ["Satış Gelirleri", "Hasılat", "Revenue"])
+        let netProfit = val(from: incomeItems, keys: ["Dönem Karı", "Net Profit", "Net Income"])
+        let grossProfit = val(from: incomeItems, keys: ["Brüt Kar", "Gross Profit"])
+        let operatingProfit = val(from: incomeItems, keys: ["Esas Faaliyet", "Operating"])
+        let ebitda = val(from: incomeItems, keys: ["FAVÖK", "EBITDA"])
+        
+        let totalAssets = val(from: balanceItems, keys: ["Toplam Varlık", "Total Assets"])
+        let totalEquity = val(from: balanceItems, keys: ["Toplam Özkaynak", "Total Equity"])
+        let totalDebt = val(from: balanceItems, keys: ["Toplam Yükümlülük", "Total Liabilities"])
+        let cash = val(from: balanceItems, keys: ["Nakit", "Cash"])
+        let currentAssets = val(from: balanceItems, keys: ["Dönen Varlık", "Current Assets"])
+        let shortTermDebt = val(from: balanceItems, keys: ["Kısa Vadeli", "Short Term"])
+        let longTermDebt = val(from: balanceItems, keys: ["Uzun Vadeli", "Long Term"])
+        let operatingCashFlow = val(from: incomeItems, keys: ["İşletme Faaliyet", "Operating Cash"])
+        
+        let pe = ratios["pe"] as? Double
+        let marketCap = ratios["marketCap"] as? Double
         
         return BistFinancials(
             symbol: symbol,
-            period: period,
+            period: "latest",
             netProfit: netProfit,
-            ebitda: val(["FAVÖK"]),
+            ebitda: ebitda,
             revenue: revenue,
-            grossProfit: val(["Brüt Kar"]),
-            operatingProfit: val(["Esas Faaliyet Karı"]),
-            totalAssets: val(["Toplam Varlıklar"]),
-            totalEquity: val(["Toplam Özkaynaklar"]),
-            totalDebt: val(["Toplam Yükümlülükler"]),
-            shortTermDebt: nil,
-            longTermDebt: nil,
-            currentAssets: nil,
-            cash: val(["Nakit ve Nakit Benzerleri"]),
-            operatingCashFlow: val(["İşletme Faaliyetlerinden"]),
+            grossProfit: grossProfit,
+            operatingProfit: operatingProfit,
+            totalAssets: totalAssets,
+            totalEquity: totalEquity,
+            totalDebt: totalDebt,
+            shortTermDebt: shortTermDebt,
+            longTermDebt: longTermDebt,
+            currentAssets: currentAssets,
+            cash: cash,
+            operatingCashFlow: operatingCashFlow,
             revenueGrowth: nil,
             netProfitGrowth: nil,
-            roe: nil,
-            roa: nil,
-            currentRatio: nil,
-            debtToEquity: nil,
-            netMargin: (netProfit != nil && revenue != nil && revenue! > 0) ? (netProfit! / revenue!) * 100 : nil,
-            pe: nil,
+            roe: (netProfit != nil && totalEquity != nil && totalEquity! > 0)
+                ? (netProfit! / totalEquity!) * 100 : nil,
+            roa: (netProfit != nil && totalAssets != nil && totalAssets! > 0)
+                ? (netProfit! / totalAssets!) * 100 : nil,
+            currentRatio: (currentAssets != nil && shortTermDebt != nil && shortTermDebt! > 0)
+                ? currentAssets! / shortTermDebt! : nil,
+            debtToEquity: (totalDebt != nil && totalEquity != nil && totalEquity! > 0)
+                ? totalDebt! / totalEquity! : nil,
+            netMargin: (netProfit != nil && revenue != nil && revenue! > 0)
+                ? (netProfit! / revenue!) * 100 : nil,
+            pe: pe,
             pb: nil,
-            marketCap: nil,
-            eps: nil,
+            marketCap: marketCap,
+            eps: (netProfit != nil && marketCap != nil && pe != nil && pe! > 0)
+                ? marketCap! / pe! : nil,
             timestamp: Date()
         )
     }

@@ -31,6 +31,7 @@ struct ArgusDrawerView: View {
         case feedback
         case alkindusGuide
         case financeWisdom
+        case academyHub
 
         var id: String {
             switch self {
@@ -43,14 +44,16 @@ struct ArgusDrawerView: View {
             case .feedback: return "feedback"
             case .alkindusGuide: return "alkindusGuide"
             case .financeWisdom: return "financeWisdom"
+            case .academyHub: return "academyHub"
             }
         }
     }
 
     private var sections: [DrawerSection] {
-        buildSections { sheet in
+        let baseSections = buildSections { sheet in
             activeSheet = sheet
         }
+        return withAcademyShortcut(baseSections)
     }
 
     private var allItems: [DrawerItem] {
@@ -67,7 +70,7 @@ struct ArgusDrawerView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.85)
+            InstitutionalTheme.Colors.background.opacity(0.78)
                 .ignoresSafeArea()
                 .onTapGesture { isPresented = false }
 
@@ -79,7 +82,7 @@ struct ArgusDrawerView: View {
 
                         if !searchText.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                sectionHeader("ARAMA SONUCLARI")
+                                sectionHeader("ARAMA SONUÇLARI")
                                 VStack(spacing: 8) {
                                     ForEach(filteredItems) { item in
                                         navigationItem(icon: item.icon, title: item.title, subtitle: item.subtitle, action: item.action)
@@ -103,11 +106,11 @@ struct ArgusDrawerView: View {
                     }
                     .padding(20)
                 }
-                .frame(width: 320)
-                .background(Theme.cardBackground)
+                .frame(width: 332)
+                .background(InstitutionalTheme.Colors.surface1)
                 .overlay(alignment: .leading) {
                     Rectangle()
-                        .fill(Theme.accent)
+                        .fill(InstitutionalTheme.Colors.primary)
                         .frame(width: 2)
                 }
 
@@ -129,22 +132,21 @@ struct ArgusDrawerView: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("ARGUS")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
+                    .font(InstitutionalTheme.Typography.headline)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     .tracking(3)
 
-                Text("Yatirim Danismanlik Sistemi")
-                    .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
+                Text("Eğitici Piyasa Analiz Programı")
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
             Spacer()
             Button { isPresented = false } label: {
                 Image(systemName: "xmark")
                     .font(.body)
-                    .foregroundColor(Theme.textSecondary)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     .padding(8)
-                    .background(Circle().fill(Color.white.opacity(0.05)))
+                    .background(Circle().fill(InstitutionalTheme.Colors.surface2))
             }
         }
     }
@@ -154,25 +156,25 @@ struct ArgusDrawerView: View {
     private var searchSection: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(Theme.textSecondary)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .font(.subheadline)
 
-            TextField("Islem veya ekran ara...", text: $searchText)
+            TextField("İşlem veya ekran ara...", text: $searchText)
                 .textFieldStyle(PlainTextFieldStyle())
-                .foregroundColor(.white)
-                .font(.subheadline)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .font(InstitutionalTheme.Typography.caption)
 
             if !searchText.isEmpty {
                 Button { searchText = "" } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(Theme.textSecondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .font(.subheadline)
                 }
             }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: Theme.Radius.small).fill(Color.white.opacity(0.04)))
-        .overlay(RoundedRectangle(cornerRadius: Theme.Radius.small).stroke(Theme.tint.opacity(0.1), lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm).fill(InstitutionalTheme.Colors.surface2))
+        .overlay(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm).stroke(InstitutionalTheme.Colors.borderStrong, lineWidth: 1))
     }
 
     // MARK: - Components
@@ -188,19 +190,18 @@ struct ArgusDrawerView: View {
             // SF Symbol
             Image(systemName: icon)
                 .font(.system(size: 18))
-                .foregroundColor(Theme.tint)
+                .foregroundColor(InstitutionalTheme.Colors.primary)
         }
     }
 
     private func sectionHeader(_ title: String) -> some View {
         HStack(spacing: 8) {
             Text(title)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(Theme.textSecondary)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .tracking(1)
             Rectangle()
-                .fill(Theme.tint.opacity(0.2))
+                .fill(InstitutionalTheme.Colors.primary.opacity(0.25))
                 .frame(height: 1)
         }
     }
@@ -212,22 +213,26 @@ struct ArgusDrawerView: View {
                     .frame(width: 28, height: 28)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.subheadline)
+                        .font(InstitutionalTheme.Typography.bodyStrong)
                         .fontWeight(.medium)
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     Text(subtitle)
-                        .font(.caption2)
-                        .foregroundColor(Theme.textSecondary)
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .lineLimit(1)
                 }
                 Spacer()
                 Image(systemName: "chevron.right")
                     .font(.caption2)
-                    .foregroundColor(Theme.textSecondary.opacity(0.5))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary.opacity(0.6))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: Theme.Radius.small).fill(Color.white.opacity(0.02)))
+            .background(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm).fill(InstitutionalTheme.Colors.surface2))
+            .overlay(
+                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+            )
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -253,7 +258,66 @@ struct ArgusDrawerView: View {
             AlkindusEducationSheet()
         case .financeWisdom:
             FinanceWisdomSheet()
+        case .academyHub:
+            ArgusAcademyHubSheet()
         }
+    }
+
+    private func withAcademyShortcut(_ baseSections: [DrawerSection]) -> [DrawerSection] {
+        let academyItem = DrawerItem(
+            title: "Argus Akademi",
+            subtitle: "Sistem ve motor eğitimi",
+            icon: "graduationcap"
+        ) {
+            activeSheet = .academyHub
+        }
+
+        var updated: [DrawerSection] = []
+        var hadLearningItems = false
+
+        for section in baseSections {
+            let filteredItems = section.items.filter { item in
+                let isLearning = isLearningItem(item.title)
+                if isLearning { hadLearningItems = true }
+                return !isLearning
+            }
+            if !filteredItems.isEmpty {
+                updated.append(DrawerSection(title: section.title, items: filteredItems))
+            }
+        }
+
+        let alreadyHasAcademy = updated
+            .flatMap(\.items)
+            .contains { normalized($0.title).contains("akademi") }
+
+        guard !alreadyHasAcademy else { return updated }
+
+        if let toolsIndex = updated.firstIndex(where: { normalized($0.title).contains("arac") }) {
+            let targetSection = updated[toolsIndex]
+            let sectionWithAcademy = DrawerSection(
+                title: targetSection.title,
+                items: [academyItem] + targetSection.items
+            )
+            updated[toolsIndex] = sectionWithAcademy
+            return updated
+        }
+
+        if hadLearningItems {
+            updated.insert(DrawerSection(title: "ÖĞRENME", items: [academyItem]), at: 0)
+            return updated
+        }
+
+        updated.append(DrawerSection(title: "ÖĞRENME", items: [academyItem]))
+        return updated
+    }
+
+    private func normalized(_ text: String) -> String {
+        text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "tr_TR"))
+    }
+
+    private func isLearningItem(_ title: String) -> Bool {
+        let normalizedTitle = normalized(title)
+        return normalizedTitle.contains("egitim") || normalizedTitle.contains("rehber") || normalizedTitle.contains("akademi")
     }
 }
 

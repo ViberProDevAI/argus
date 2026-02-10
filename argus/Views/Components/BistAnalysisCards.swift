@@ -461,10 +461,10 @@ struct HermesAnalystCard: View {
                 Button(action: { withAnimation(.spring()) { isExpanded.toggle() } }) {
                     HStack {
                         Image(systemName: "person.3.fill")
-                            .foregroundColor(.orange)
+                            .foregroundColor(SanctumTheme.hermesColor)
                         Text("Analist Konsensüsü")
                             .font(.headline)
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         
                         Spacer()
                         
@@ -485,14 +485,14 @@ struct HermesAnalystCard: View {
                                 .bold()
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.blue.opacity(0.2))
-                                .foregroundColor(.blue)
+                                .background(InstitutionalTheme.Colors.primary.opacity(0.16))
+                                .foregroundColor(InstitutionalTheme.Colors.primary)
                                 .cornerRadius(4)
                         }
                         
                         Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
                 .buttonStyle(PlainButtonStyle())
@@ -505,19 +505,19 @@ struct HermesAnalystCard: View {
                         // AL
                         if r.consensus.buyCount > 0 {
                             Rectangle()
-                                .fill(Color.green)
+                                .fill(InstitutionalTheme.Colors.positive)
                                 .frame(width: CGFloat(r.consensus.buyCount) / CGFloat(r.consensus.totalAnalysts) * 200)
                         }
                         // TUT
                         if r.consensus.holdCount > 0 {
                             Rectangle()
-                                .fill(Color.yellow)
+                                .fill(InstitutionalTheme.Colors.warning)
                                 .frame(width: CGFloat(r.consensus.holdCount) / CGFloat(r.consensus.totalAnalysts) * 200)
                         }
                         // SAT
                         if r.consensus.sellCount > 0 {
                             Rectangle()
-                                .fill(Color.red)
+                                .fill(InstitutionalTheme.Colors.negative)
                                 .frame(width: CGFloat(r.consensus.sellCount) / CGFloat(r.consensus.totalAnalysts) * 200)
                         }
                     }
@@ -528,15 +528,15 @@ struct HermesAnalystCard: View {
                     HStack {
                         Label("\(r.consensus.buyCount) AL", systemImage: "arrow.up")
                             .font(.caption)
-                            .foregroundColor(.green)
+                            .foregroundColor(InstitutionalTheme.Colors.positive)
                         Spacer()
                         Label("\(r.consensus.holdCount) TUT", systemImage: "minus")
                             .font(.caption)
-                            .foregroundColor(.yellow)
+                            .foregroundColor(InstitutionalTheme.Colors.warning)
                         Spacer()
                         Label("\(r.consensus.sellCount) SAT", systemImage: "arrow.down")
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundColor(InstitutionalTheme.Colors.negative)
                     }
                     
                     // Hedef Fiyat
@@ -544,17 +544,17 @@ struct HermesAnalystCard: View {
                         HStack {
                             Text("Hedef Fiyat:")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
                             Text("₺\(String(format: "%.2f", target))")
                                 .font(.subheadline)
                                 .bold()
-                                .foregroundColor(.white)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             
                             if let upside = r.upsidePotential {
                                 Text("(\(upside >= 0 ? "+" : "")\(String(format: "%.1f", upside))%)")
                                     .font(.caption)
-                                    .foregroundColor(upside >= 0 ? .green : .red)
+                                    .foregroundColor(upside >= 0 ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative)
                             }
                         }
                     }
@@ -562,31 +562,35 @@ struct HermesAnalystCard: View {
                     // Genişletilmiş Detay
                     if isExpanded {
                         VStack(alignment: .leading, spacing: 8) {
-                            Divider().background(Color.white.opacity(0.2))
+                            Divider().background(InstitutionalTheme.Colors.borderSubtle)
                             
                             ForEach(r.metrics) { metric in
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
                                         Text(metric.name)
                                             .font(.caption)
-                                            .foregroundColor(.white)
+                                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                         Spacer()
                                         Text(metric.value)
                                             .font(.caption)
-                                            .foregroundColor(.white)
+                                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                         Text("\(Int(metric.score))/\(Int(metric.maxScore))")
                                             .font(.caption2)
                                             .padding(.horizontal, 4)
-                                            .background(Color.orange.opacity(0.2))
-                                            .foregroundColor(.orange)
+                                            .background(InstitutionalTheme.Colors.warning.opacity(0.2))
+                                            .foregroundColor(InstitutionalTheme.Colors.warning)
                                             .cornerRadius(4)
                                     }
                                     Text(metric.explanation)
                                         .font(.caption2)
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                 }
                                 .padding(8)
-                                .background(Color.white.opacity(0.05))
+                                .background(InstitutionalTheme.Colors.surface2)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                                )
                                 .cornerRadius(8)
                             }
                         }
@@ -598,10 +602,10 @@ struct HermesAnalystCard: View {
                         VStack(alignment: .leading, spacing: 12) {
                             HStack {
                                 Image(systemName: "sparkles")
-                                    .foregroundColor(.yellow)
+                                    .foregroundColor(SanctumTheme.titanGold)
                                 Text("Analist verisi yetersiz, ancak piyasa dedikoduları var:")
                                     .font(.caption)
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             }
                             
                             // Sentiment Göstergesi
@@ -618,62 +622,65 @@ struct HermesAnalystCard: View {
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(news.sentiment.displayTitle)
                                         .font(.headline)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                     Text(news.isHighImpact ? "Yüksek Piyasa Etkisi" : "Normal Piyasa Algısı")
                                         .font(.caption2)
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                 }
                             }
                             
                             // Başlıklar
                             if !news.keyHeadlines.isEmpty {
-                                Divider().background(Color.white.opacity(0.1))
+                                Divider().background(InstitutionalTheme.Colors.borderSubtle)
                                 Text("Öne Çıkan Başlıklar")
                                     .font(.caption2)
                                     .bold()
-                                    .foregroundColor(.gray)
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                 
                                 ForEach(news.keyHeadlines.prefix(3), id: \.self) { headline in
                                     HStack(alignment: .top, spacing: 6) {
                                         Circle()
-                                            .fill(Color.blue)
+                                            .fill(InstitutionalTheme.Colors.primary)
                                             .frame(width: 4, height: 4)
                                             .padding(.top, 6)
                                         Text(headline)
                                             .font(.caption2)
-                                            .foregroundColor(.white.opacity(0.8))
+                                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                             .lineLimit(2)
                                     }
                                 }
                             }
                         }
                         .padding(12)
-                        .background(Color.blue.opacity(0.05))
+                        .background(InstitutionalTheme.Colors.surface2)
                         .cornerRadius(12)
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.blue.opacity(0.2), lineWidth: 1)
+                                .stroke(InstitutionalTheme.Colors.primary.opacity(0.25), lineWidth: 1)
                         )
                         
                     } else {
                         // --- VERİ YOK MODU ---
                         HStack {
                             Image(systemName: "eye.slash")
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Text("Bu hisse için analist veya haber verisi bulunamadı")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                         .padding()
                         .frame(maxWidth: .infinity)
-                        .background(Color.white.opacity(0.05))
+                        .background(InstitutionalTheme.Colors.surface1)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                        )
                         .cornerRadius(12)
                     }
                 }
             }
             .padding(16)
-            .background(Theme.cardBackground)
-            .cornerRadius(16)
+            .institutionalCard(scale: .insight, elevated: false)
             .onAppear { loadData() }
         }
     }
@@ -693,17 +700,17 @@ struct HermesAnalystCard: View {
     }
     
     private func verdictColor(_ verdict: String) -> Color {
-        if verdict.contains("AL") { return .green }
-        if verdict.contains("Nötr") || verdict.contains("TUT") { return .yellow }
-        return .orange
+        if verdict.contains("AL") { return InstitutionalTheme.Colors.positive }
+        if verdict.contains("Nötr") || verdict.contains("TUT") { return InstitutionalTheme.Colors.warning }
+        return InstitutionalTheme.Colors.negative
     }
     
     // Lite Mod Yardımcıları
     private func sentimentColor(_ sentiment: NewsSentiment) -> Color {
         switch sentiment {
-        case .strongPositive, .weakPositive: return .green
-        case .weakNegative, .strongNegative: return .red
-        default: return .gray
+        case .strongPositive, .weakPositive: return InstitutionalTheme.Colors.positive
+        case .weakNegative, .strongNegative: return InstitutionalTheme.Colors.negative
+        default: return InstitutionalTheme.Colors.textSecondary
         }
     }
     
@@ -727,7 +734,7 @@ struct MetricMiniCard: View {
         VStack(spacing: 4) {
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             Text(value)
                 .font(.subheadline)
                 .bold()
@@ -735,7 +742,11 @@ struct MetricMiniCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(8)
-        .background(color.opacity(0.1))
+        .background(InstitutionalTheme.Colors.surface2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+        )
         .cornerRadius(8)
     }
 }
@@ -758,7 +769,7 @@ struct BistModuleDetailCard: View {
                 // Skor Gauge
                 ZStack {
                     Circle()
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 8)
+                        .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 8)
                         .frame(width: 60, height: 60)
                     
                     if moduleResult.score > 0 {
@@ -774,17 +785,17 @@ struct BistModuleDetailCard: View {
                                 .foregroundColor(scoreColor)
                             Text("/100")
                                 .font(.system(size: 9))
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                     } else {
                         // Veri Yok Durumu
                         VStack(spacing: 0) {
                             Text("--")
                                 .font(.system(size: 18, weight: .bold, design: .rounded))
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Text("Veri Yok")
                                 .font(.system(size: 8))
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                     }
                 }
@@ -795,7 +806,7 @@ struct BistModuleDetailCard: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("KARAR")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     
                     Text(actionText)
                         .font(.headline.bold())
@@ -814,15 +825,19 @@ struct BistModuleDetailCard: View {
                         .foregroundColor(moduleColor)
                     Text("Analiz Özeti")
                         .font(.subheadline.bold())
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 }
                 
                 Text(moduleResult.commentary)
                     .font(.body)
-                    .foregroundColor(.white.opacity(0.9))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding()
-                    .background(Color.white.opacity(0.05))
+                    .background(InstitutionalTheme.Colors.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                    )
                     .cornerRadius(12)
             }
             
@@ -831,7 +846,7 @@ struct BistModuleDetailCard: View {
                 HStack {
                     Text("Destek Seviyesi")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Spacer()
                     Text(supportText)
                         .font(.caption.bold())
@@ -843,12 +858,12 @@ struct BistModuleDetailCard: View {
                     ZStack(alignment: .leading) {
                         // Background
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color.gray.opacity(0.3))
+                            .fill(InstitutionalTheme.Colors.borderSubtle)
                             .frame(height: 8)
                         
                         // Center marker
                         Rectangle()
-                            .fill(Color.white.opacity(0.5))
+                            .fill(InstitutionalTheme.Colors.borderStrong)
                             .frame(width: 2, height: 12)
                             .offset(x: geo.size.width / 2 - 1)
                         
@@ -865,30 +880,30 @@ struct BistModuleDetailCard: View {
                 HStack {
                     Text("İTİRAZ")
                         .font(.system(size: 9))
-                        .foregroundColor(.red.opacity(0.7))
+                        .foregroundColor(InstitutionalTheme.Colors.negative.opacity(0.8))
                     Spacer()
                     Text("NÖTR")
                         .font(.system(size: 9))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Spacer()
                     Text("DESTEK")
                         .font(.system(size: 9))
-                        .foregroundColor(.green.opacity(0.7))
+                        .foregroundColor(InstitutionalTheme.Colors.positive.opacity(0.8))
                 }
             }
             
             // 4️⃣ EK BİLGİLER (Varsa)
             if !extraInfo.isEmpty {
-                Divider().background(Color.white.opacity(0.2))
+                Divider().background(InstitutionalTheme.Colors.borderSubtle)
                 
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 4) {
                         Image(systemName: "chart.bar.fill")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Text("Detay Metrikleri")
                             .font(.caption.bold())
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     
                     ForEach(extraInfo) { info in
@@ -898,7 +913,7 @@ struct BistModuleDetailCard: View {
                                 .frame(width: 20)
                             Text(info.label)
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             Spacer()
                             Text(info.value)
                                 .font(.caption.bold())
@@ -910,16 +925,15 @@ struct BistModuleDetailCard: View {
             }
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
+        .institutionalCard(scale: .insight, elevated: false)
     }
     
     // MARK: - Computed Properties
     
     private var scoreColor: Color {
-        if moduleResult.score >= 70 { return .green }
-        if moduleResult.score >= 40 { return .yellow }
-        return .red
+        if moduleResult.score >= 70 { return InstitutionalTheme.Colors.positive }
+        if moduleResult.score >= 40 { return InstitutionalTheme.Colors.warning }
+        return InstitutionalTheme.Colors.negative
     }
     
     private var actionText: String {
@@ -932,9 +946,9 @@ struct BistModuleDetailCard: View {
     
     private var actionColor: Color {
         switch moduleResult.action {
-        case .buy: return .green
-        case .sell: return .red
-        case .hold: return .yellow
+        case .buy: return InstitutionalTheme.Colors.positive
+        case .sell: return InstitutionalTheme.Colors.negative
+        case .hold: return InstitutionalTheme.Colors.warning
         }
     }
     
@@ -947,9 +961,9 @@ struct BistModuleDetailCard: View {
     }
     
     private var supportColor: Color {
-        if moduleResult.supportLevel > 0.3 { return .green }
-        if moduleResult.supportLevel > -0.3 { return .yellow }
-        return .red
+        if moduleResult.supportLevel > 0.3 { return InstitutionalTheme.Colors.positive }
+        if moduleResult.supportLevel > -0.3 { return InstitutionalTheme.Colors.warning }
+        return InstitutionalTheme.Colors.negative
     }
 }
 
@@ -978,7 +992,7 @@ struct GlobalModuleDetailCard: View {
                 // Net Support Gauge
                 ZStack {
                     Circle()
-                        .stroke(Color.gray.opacity(0.3), lineWidth: 8)
+                        .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 8)
                         .frame(width: 60, height: 60)
                     
                     Circle()
@@ -993,7 +1007,7 @@ struct GlobalModuleDetailCard: View {
                             .foregroundColor(supportColor)
                         Text("%")
                             .font(.system(size: 9))
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
                 
@@ -1003,7 +1017,7 @@ struct GlobalModuleDetailCard: View {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text("SİNYAL")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     
                     Text(actionText)
                         .font(.headline.bold())
@@ -1027,15 +1041,19 @@ struct GlobalModuleDetailCard: View {
                             .foregroundColor(moduleColor)
                         Text("Kazanan Öneri")
                             .font(.subheadline.bold())
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     }
                     
                     Text(cleanReasoning(proposal.reasoning))
                         .font(.body)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding()
-                        .background(Color.white.opacity(0.05))
+                        .background(InstitutionalTheme.Colors.surface2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                        )
                         .cornerRadius(12)
                 }
             }
@@ -1045,11 +1063,11 @@ struct GlobalModuleDetailCard: View {
                 HStack {
                     Text("Oylama")
                         .font(.caption)
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Spacer()
                     Text("Onay: \(Int(decision.approveWeight * 100))% | Veto: \(Int(decision.vetoWeight * 100))%")
                         .font(.caption.bold())
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 
                 // Vote Bar
@@ -1057,17 +1075,17 @@ struct GlobalModuleDetailCard: View {
                     HStack(spacing: 2) {
                         // Approve
                         Rectangle()
-                            .fill(Color.green)
+                            .fill(InstitutionalTheme.Colors.positive)
                             .frame(width: geo.size.width * decision.approveWeight)
                         
                         // Veto
                         Rectangle()
-                            .fill(Color.red)
+                            .fill(InstitutionalTheme.Colors.negative)
                             .frame(width: geo.size.width * decision.vetoWeight)
                         
                         // Neutral
                         Rectangle()
-                            .fill(Color.gray.opacity(0.3))
+                            .fill(InstitutionalTheme.Colors.borderSubtle)
                     }
                     .cornerRadius(4)
                 }
@@ -1079,26 +1097,29 @@ struct GlobalModuleDetailCard: View {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .foregroundColor(.red)
+                            .foregroundColor(InstitutionalTheme.Colors.negative)
                         Text("Veto Gerekçeleri")
                             .font(.caption.bold())
-                            .foregroundColor(.red)
+                            .foregroundColor(InstitutionalTheme.Colors.negative)
                     }
                     
                     ForEach(decision.vetoReasons.prefix(3), id: \.self) { reason in
                         Text("• \(reason)")
                             .font(.caption)
-                            .foregroundColor(.red.opacity(0.8))
+                            .foregroundColor(InstitutionalTheme.Colors.negative.opacity(0.85))
                     }
                 }
                 .padding()
-                .background(Color.red.opacity(0.1))
+                .background(InstitutionalTheme.Colors.negative.opacity(0.12))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(InstitutionalTheme.Colors.negative.opacity(0.24), lineWidth: 1)
+                )
                 .cornerRadius(12)
             }
         }
         .padding(16)
-        .background(Theme.cardBackground)
-        .cornerRadius(16)
+        .institutionalCard(scale: .insight, elevated: false)
     }
     
     // Helper to clean raw strings
@@ -1114,9 +1135,9 @@ struct GlobalModuleDetailCard: View {
     // MARK: - Computed Properties
     
     private var supportColor: Color {
-        if decision.netSupport >= 0.5 { return .green }
-        if decision.netSupport >= 0.2 { return .yellow }
-        return .red
+        if decision.netSupport >= 0.5 { return InstitutionalTheme.Colors.positive }
+        if decision.netSupport >= 0.2 { return InstitutionalTheme.Colors.warning }
+        return InstitutionalTheme.Colors.negative
     }
     
     private var actionText: String {
@@ -1129,21 +1150,20 @@ struct GlobalModuleDetailCard: View {
     
     private var actionColor: Color {
         switch decision.action {
-        case .buy: return .green
-        case .sell: return .red
-        case .hold: return .yellow
+        case .buy: return InstitutionalTheme.Colors.positive
+        case .sell: return InstitutionalTheme.Colors.negative
+        case .hold: return InstitutionalTheme.Colors.warning
         }
     }
     
     private var signalStrengthColor: Color {
         switch decision.signalStrength {
-        case "GÜÇLÜ": return .green
-        case "ZAYIF": return .orange
-        default: return .gray
+        case "GÜÇLÜ": return InstitutionalTheme.Colors.positive
+        case "ZAYIF": return InstitutionalTheme.Colors.warning
+        default: return InstitutionalTheme.Colors.textSecondary
         }
     }
 }
 
 // Orion UI Bileşenleri OrionDetailView.swift'te tanımlı - duplikasyon kaldırıldı
 // LinearGauge, StructureLinearMap, Sparkline → OrionDetailView.swift
-

@@ -20,7 +20,7 @@ class ArgusSpeechService: ObservableObject {
     private let audioEngine = AVAudioEngine()
     
     private init() {
-        requestAuthorization()
+        // Authorization will be requested lazily when startRecording is called
     }
     
     func requestAuthorization() {
@@ -43,6 +43,9 @@ class ArgusSpeechService: ObservableObject {
     }
     
     func startRecording() throws {
+        // Request authorization first (lazy)
+        requestAuthorization()
+
         // Cancel previous task if any
         if let recognitionTask = recognitionTask {
             recognitionTask.cancel()

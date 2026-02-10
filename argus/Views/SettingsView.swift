@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - MAIN SETTINGS VIEW (ROUTER)
 struct SettingsView: View {
@@ -11,8 +12,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background: Pure Terminal Black
-                Color.black.edgesIgnoringSafeArea(.all)
+                InstitutionalTheme.Colors.background.edgesIgnoringSafeArea(.all)
                 
                 ScrollView {
                     VStack(spacing: 24) {
@@ -20,21 +20,21 @@ struct SettingsView: View {
                         // MARK: - SYSTEM STATUS HEADER
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
-                                Circle().fill(Color.green).frame(width: 8, height: 8)
+                                Circle().fill(InstitutionalTheme.Colors.positive).frame(width: 8, height: 8)
                                 Text("SİSTEM: ÇEVRİMİÇİ")
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.green)
+                                    .font(InstitutionalTheme.Typography.micro)
+                                    .foregroundColor(InstitutionalTheme.Colors.positive)
                                 Spacer()
                                 Button(action: { showDrawer = true }) {
                                     Image(systemName: "line.3.horizontal")
                                         .font(.system(size: 12))
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                 }
                                 Text("V.2024.1.0")
-                                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                    .foregroundColor(.gray)
+                                    .font(InstitutionalTheme.Typography.micro)
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             }
-                            Divider().background(Color.gray.opacity(0.3))
+                            Divider().background(InstitutionalTheme.Colors.borderSubtle)
                         }
                         .padding(.horizontal)
                         .padding(.top, 16)
@@ -83,15 +83,15 @@ struct SettingsView: View {
                         TerminalSection(title: "AYARLAR") {
                             HStack {
                                 Image(systemName: "moon.fill")
-                                    .foregroundColor(.purple)
+                                    .foregroundColor(InstitutionalTheme.Colors.primary)
                                     .font(.system(size: 12))
                                 Text("KARANLIK MOD")
-                                    .font(.system(size: 14, design: .monospaced))
-                                    .foregroundColor(.white)
+                                    .font(InstitutionalTheme.Typography.body)
+                                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                 Spacer()
                                 Toggle("", isOn: $isDarkMode)
                                     .labelsHidden()
-                                    .tint(.purple)
+                                    .tint(InstitutionalTheme.Colors.primary)
                             }
                             .padding(.vertical, 8)
                         }
@@ -128,6 +128,7 @@ extension SettingsView {
         case priceAlerts
         case dataHealth
         case serviceHealth
+        case apiKeys
         case guide
         case signals
         
@@ -136,6 +137,7 @@ extension SettingsView {
             case .priceAlerts: return "priceAlerts"
             case .dataHealth: return "dataHealth"
             case .serviceHealth: return "serviceHealth"
+            case .apiKeys: return "apiKeys"
             case .guide: return "guide"
             case .signals: return "signals"
             }
@@ -151,6 +153,8 @@ extension SettingsView {
             NavigationView { ArgusDataHealthView() }
         case .serviceHealth:
             NavigationView { ServiceHealthView() }
+        case .apiKeys:
+            NavigationView { APIKeyCenterView() }
         case .guide:
             NavigationView { ArgusGuideView() }
         case .signals:
@@ -195,6 +199,10 @@ extension SettingsView {
                     },
                     ArgusDrawerView.DrawerItem(title: "Veri Sagligi", subtitle: "Kaynak durumu", icon: "waveform.path.ecg") {
                         activeSettingsSheet = .dataHealth
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "API Key Merkezi", subtitle: "Tek ekran yonetim", icon: "key.fill") {
+                        activeSettingsSheet = .apiKeys
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Servis Durumu", subtitle: "API sagligi", icon: "shield") {
@@ -255,9 +263,9 @@ struct TerminalSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(.system(size: 10, weight: .black, design: .monospaced))
+                .font(InstitutionalTheme.Typography.micro)
                 .tracking(1.5)
-                .foregroundColor(Color.gray.opacity(0.8))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
             
@@ -265,11 +273,12 @@ struct TerminalSection<Content: View>: View {
                 content
             }
             .padding(16)
-            .background(Color(white: 0.08)) // Dark gray background for blocks
+            .background(InstitutionalTheme.Colors.surface1)
             .overlay(
-                Rectangle()
-                    .stroke(Color.gray.opacity(0.2), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
             )
+            .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous))
         }
     }
 }
@@ -296,20 +305,20 @@ struct ArgusTerminalRow: View {
                 .frame(width: 20)
             
             Text(label)
-                .font(.system(size: 14, weight: .medium, design: .monospaced))
-                .foregroundColor(.white)
+                .font(InstitutionalTheme.Typography.bodyStrong)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             
             Spacer()
             
             if let v = value {
                 Text(v)
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(InstitutionalTheme.Typography.dataSmall)
                     .foregroundColor(color.opacity(0.8))
             }
             
             Image(systemName: "chevron.right")
-                .font(.system(size: 10))
-                .foregroundColor(.gray.opacity(0.5))
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary.opacity(0.7))
         }
         .padding(.vertical, 12)
         .contentShape(Rectangle())
@@ -317,7 +326,7 @@ struct ArgusTerminalRow: View {
         .overlay(
             Rectangle()
                 .frame(height: 0.5)
-                .foregroundColor(Color.gray.opacity(0.1)),
+                .foregroundColor(InstitutionalTheme.Colors.borderSubtle),
             alignment: .bottom
         )
     }
@@ -326,186 +335,22 @@ struct ArgusTerminalRow: View {
 // MARK: - MODULE: CORTEX (INTELLIGENCE)
 struct SettingsCortexView: View {
     @ObservedObject var settingsViewModel: SettingsViewModel
-    @AppStorage("tcmb_evds_api_key") private var tcmbApiKey: String = ""
-    @AppStorage("collectapi_key") private var collectApiKey: String = ""
-    @State private var isTestingConnection = false
-    @State private var connectionStatus: String = ""
     
     var body: some View {
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             ScrollView {
                 VStack(spacing: 24) {
-                    // TCMB EVDS API
-                    TerminalSection(title: "TCMB EVDS API") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("API KEY")
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .foregroundColor(.gray)
-                                Spacer()
-                                if tcmbApiKey.isEmpty {
-                                    Text("TANIMLANMADI")
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundColor(.red)
-                                } else {
-                                    Text("TANIMLI")
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundColor(.green)
-                                }
-                            }
-                            
-                            SecureField("TCMB API Key", text: $tcmbApiKey)
-                                .font(.system(size: 14, design: .monospaced))
-                                .textFieldStyle(.roundedBorder)
-                                .autocapitalization(.none)
-                            
-                            HStack {
-                                Button(action: testConnection) {
-                                    HStack {
-                                        if isTestingConnection {
-                                            ProgressView()
-                                                .scaleEffect(0.7)
-                                        } else {
-                                            Image(systemName: "network")
-                                        }
-                                        Text("BAĞLANTI TEST")
-                                            .font(.system(size: 10, design: .monospaced))
-                                    }
-                                    .foregroundColor(.cyan)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(Color.cyan.opacity(0.2))
-                                    .cornerRadius(6)
-                                }
-                                .disabled(tcmbApiKey.isEmpty || isTestingConnection)
-                                
-                                if !connectionStatus.isEmpty {
-                                    Text(connectionStatus)
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundColor(connectionStatus.contains("BAŞARILI") ? .green : .red)
-                                }
-                            }
-                            
-                            Text("evds2.tcmb.gov.tr adresinden ücretsiz alınır")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(.gray.opacity(0.6))
+                    TerminalSection(title: "API ANAHTAR MERKEZI") {
+                        NavigationLink(destination: APIKeyCenterView()) {
+                            ArgusTerminalRow(label: "MERKEZI API YONETIMI", value: "GELISMIS", icon: "key.fill", color: .cyan)
                         }
-                        .padding(.vertical, 8)
-                    }
-                    
-                    // COLLECTAPI (BIST Verileri)
-                    TerminalSection(title: "COLLECTAPI // BIST") {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text("API KEY")
-                                    .font(.system(size: 12, design: .monospaced))
-                                    .foregroundColor(.gray)
-                                Spacer()
-                                if collectApiKey.isEmpty {
-                                    Text("TANIMLANMADI")
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundColor(.red)
-                                } else {
-                                    Text("TANIMLI")
-                                        .font(.system(size: 10, design: .monospaced))
-                                        .foregroundColor(.green)
-                                }
-                            }
-                            
-                            SecureField("CollectAPI Key", text: $collectApiKey)
-                                .font(.system(size: 14, design: .monospaced))
-                                .textFieldStyle(.roundedBorder)
-                                .autocapitalization(.none)
-                            
-                            Text("collectapi.com adresinden alinir (BIST hisse verileri)")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(.gray.opacity(0.6))
-                        }
-                        .padding(.vertical, 8)
-                    }
-                    
-                    // LLM API KEYS (NEW)
-                    TerminalSection(title: "YAPAY ZEKA MOTORLARI (LLM)") {
-                        VStack(alignment: .leading, spacing: 16) {
-                            
-                            // GROQ
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("GROQ API (LLAMA 3.3)")
-                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    if !APIKeyStore.shared.groqApiKey.isEmpty {
-                                        Text("AKTİF")
-                                            .font(.system(size: 10, design: .monospaced))
-                                            .foregroundColor(.green)
-                                    }
-                                }
-                                SecureField("Groq API Key (gsk_...)", text: Binding(
-                                    get: { APIKeyStore.shared.getKey(for: .groq) ?? "" },
-                                    set: { APIKeyStore.shared.setKey(provider: .groq, key: $0) }
-                                ))
-                                .font(.system(size: 12, design: .monospaced))
-                                .textFieldStyle(.roundedBorder)
-                                .autocapitalization(.none)
-                            }
-                            
-                            Divider().background(Color.gray.opacity(0.2))
-                            
-                            // GEMINI
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("GOOGLE GEMINI PRO")
-                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    if !APIKeyStore.shared.geminiApiKey.isEmpty {
-                                        Text("AKTİF")
-                                            .font(.system(size: 10, design: .monospaced))
-                                            .foregroundColor(.green)
-                                    }
-                                }
-                                SecureField("Gemini API Key (AIza...)", text: Binding(
-                                    get: { APIKeyStore.shared.getKey(for: .gemini) ?? "" },
-                                    set: { APIKeyStore.shared.setKey(provider: .gemini, key: $0) }
-                                ))
-                                .font(.system(size: 12, design: .monospaced))
-                                .textFieldStyle(.roundedBorder)
-                                .autocapitalization(.none)
-                            }
-                            
-                            Divider().background(Color.gray.opacity(0.2))
-                            
-                            // DEEPSEEK
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("DEEPSEEK V3")
-                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                        .foregroundColor(.white)
-                                    Spacer()
-                                    if !APIKeyStore.shared.deepSeekApiKey.isEmpty {
-                                        Text("AKTİF")
-                                            .font(.system(size: 10, design: .monospaced))
-                                            .foregroundColor(.green)
-                                    }
-                                }
-                                SecureField("DeepSeek API Key (sk_...)", text: Binding(
-                                    get: { APIKeyStore.shared.getKey(for: .deepSeek) ?? "" },
-                                    set: { APIKeyStore.shared.setKey(provider: .deepSeek, key: $0) }
-                                ))
-                                .font(.system(size: 12, design: .monospaced))
-                                .textFieldStyle(.roundedBorder)
-                                .autocapitalization(.none)
-                            }
-                            
-                            Text("Bu anahtarlar cihazınızda yerel olarak saklanır. Çalışan bir API key girerek limit sorunlarını çözebilirsiniz.")
-                                .font(.system(size: 9, design: .monospaced))
-                                .foregroundColor(.gray.opacity(0.6))
-                                .padding(.top, 4)
-                            
-                        }
-                        .padding(.vertical, 8)
+
+                        Text("Tum API anahtarlari tek ekrandan yonetilir. Cift kayit ve daginik ayarlar kaldirildi.")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.gray.opacity(0.7))
+                            .padding(.horizontal, 8)
+                            .padding(.top, 6)
                     }
                     
                     TerminalSection(title: "VERI AKISLARI") {
@@ -528,19 +373,6 @@ struct SettingsCortexView: View {
         }
         .navigationTitle("CORTEX")
         .navigationBarTitleDisplayMode(.inline)
-    }
-    
-    private func testConnection() {
-        isTestingConnection = true
-        connectionStatus = ""
-        
-        Task {
-            let success = await TCMBDataService.shared.testConnection()
-            await MainActor.run {
-                isTestingConnection = false
-                connectionStatus = success ? "BASARILI" : "HATA"
-            }
-        }
     }
 }
 
@@ -678,7 +510,16 @@ struct SettingsCodexView: View {
     @ObservedObject var settingsViewModel: SettingsViewModel
     @State private var showingExportSheet = false
     @State private var exportURL: URL? = nil
-    
+    @State private var showingFileImporter = false
+    @State private var isImporting = false
+    @State private var importResult: String? = nil
+    @State private var isMigrationExporting = false
+
+    private var migrationStatsText: String {
+        let stats = LearningDataMigrationService.shared.getLearningDataStats()
+        return "\(stats.totalFiles) DOSYA"
+    }
+
     var body: some View {
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
@@ -723,29 +564,87 @@ struct SettingsCodexView: View {
                         }
                     }
                     
+                    // MARK: - VERİ TAŞIMA (Migration)
+                    TerminalSection(title: "ESKİ UYGULAMADAN VERİ AKTAR") {
+                        // Import butonu
+                        Button(action: { showingFileImporter = true }) {
+                            ArgusTerminalRow(
+                                label: "ÖĞRENMELERİ İÇE AKTAR",
+                                value: isImporting ? "AKTARILIYOR..." : "DOSYA SEÇ",
+                                icon: "arrow.down.doc.fill",
+                                color: Color(red: 1.0, green: 0.8, blue: 0.2)
+                            )
+                        }
+                        .disabled(isImporting)
+
+                        // Import sonucu
+                        if let result = importResult {
+                            HStack(spacing: 8) {
+                                Image(systemName: result.contains("✅") ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                    .foregroundColor(result.contains("✅") ? .green : .red)
+                                Text(result)
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundColor(result.contains("✅") ? .green : .red)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 4)
+                        }
+
+                        // Mevcut veri durumu
+                        VStack(alignment: .leading, spacing: 4) {
+                            let stats = LearningDataMigrationService.shared.getLearningDataStats()
+                            Text("Mevcut Chiron: \(stats.chironWeightSymbols) sembol, \(stats.chironTradeFiles) işlem dosyası")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.gray)
+                            Text("Mevcut Alkindus: \(stats.alkindusFilesFound) kalibrasyon dosyası")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.gray)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+
+                        // Export butonu (mevcut veriyi dışa aktar)
+                        Button(action: { exportAllLearningData() }) {
+                            ArgusTerminalRow(
+                                label: "TÜM ÖĞRENMELERİ DIŞA AKTAR",
+                                value: isMigrationExporting ? "HAZIRLANIYOR..." : migrationStatsText,
+                                icon: "arrow.up.doc.on.clipboard",
+                                color: .blue
+                            )
+                        }
+                        .disabled(isMigrationExporting)
+                    }
+                    .fileImporter(
+                        isPresented: $showingFileImporter,
+                        allowedContentTypes: [.json],
+                        allowsMultipleSelection: false
+                    ) { result in
+                        handleFileImport(result)
+                    }
+
                     // MARK: - VERİ İNDİRME
                     TerminalSection(title: "VERİ İNDİRME") {
                         // Trade History Export
                         Button(action: { exportTradeHistory() }) {
                             ArgusTerminalRow(label: "İŞLEM GEÇMİŞİ", value: "JSON", icon: "arrow.up.doc", color: .green)
                         }
-                        
+
                         // Forward Test Export
                         Button(action: { exportForwardTests() }) {
                             ArgusTerminalRow(label: "FORWARD TEST SONUÇLARI", value: "JSON", icon: "lab.flask", color: .purple)
                         }
-                        
+
                         // Decision Events Export
                         Button(action: { exportDecisionEvents() }) {
                             ArgusTerminalRow(label: "KARAR GEÇMİŞİ", value: "JSON", icon: "brain", color: .cyan)
                         }
-                        
+
                         // Alkindus Calibration Export
                         Button(action: { exportAlkindusCalibration() }) {
                             ArgusTerminalRow(label: "ALKINDUS ÖĞRENMELERİ", value: "JSON", icon: "brain.head.profile", color: .yellow)
                         }
                     }
-                    
+
                     // Footer
                     VStack(spacing: 4) {
                         Image(systemName: "eye.fill")
@@ -849,6 +748,64 @@ struct SettingsCodexView: View {
         }
     }
     
+    // MARK: - Migration Import
+    private func handleFileImport(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let selectedURL = urls.first else { return }
+            isImporting = true
+            importResult = nil
+
+            // Dosyaya erişim izni al
+            guard selectedURL.startAccessingSecurityScopedResource() else {
+                importResult = "❌ Dosya erişim hatası"
+                isImporting = false
+                return
+            }
+
+            Task {
+                do {
+                    let stats = try await LearningDataMigrationService.shared.importLearningData(from: selectedURL)
+                    selectedURL.stopAccessingSecurityScopedResource()
+                    await MainActor.run {
+                        isImporting = false
+                        importResult = "✅ \(stats.totalFiles) dosya içe aktarıldı! Chiron: \(stats.chironWeightSymbols) sembol, Alkindus: \(stats.alkindusFilesFound) dosya"
+                    }
+                } catch {
+                    selectedURL.stopAccessingSecurityScopedResource()
+                    await MainActor.run {
+                        isImporting = false
+                        importResult = "❌ Hata: \(error.localizedDescription)"
+                    }
+                }
+            }
+
+        case .failure(let error):
+            importResult = "❌ Dosya seçim hatası: \(error.localizedDescription)"
+        }
+    }
+
+    // MARK: - Migration Export
+    private func exportAllLearningData() {
+        isMigrationExporting = true
+        Task {
+            do {
+                let url = try await LearningDataMigrationService.shared.exportAllLearningData()
+                await MainActor.run {
+                    isMigrationExporting = false
+                    self.exportURL = url
+                    self.showingExportSheet = true
+                }
+            } catch {
+                await MainActor.run {
+                    isMigrationExporting = false
+                    alertMessage = "Migration export hatası: \(error.localizedDescription)"
+                    showingAlert = true
+                }
+            }
+        }
+    }
+
     private func saveAndShare(data: Data, fileName: String) {
         let tempDir = FileManager.default.temporaryDirectory
         let fileURL = tempDir.appendingPathComponent(fileName)

@@ -18,11 +18,12 @@ final class HeimdallOrchestrator {
     func requestQuote(symbol: String, context: UsageContext = .interactive) async throws -> Quote {
         let provider = "yahoo"
         let endpoint = "/quote"
+        let circuitProvider = circuitKey(provider: provider, endpoint: "quote")
         
         // Circuit Breaker Check
-        guard await HeimdallCircuitBreaker.shared.canRequest(provider: provider) else {
+        guard await HeimdallCircuitBreaker.shared.canRequest(provider: circuitProvider) else {
             await HeimdallLogger.shared.warn("circuit_blocked", provider: provider, errorClass: "circuit_open")
-            throw HeimdallCoreError(category: .rateLimited, code: 503, message: "Circuit open for \(provider)", bodyPrefix: "")
+            throw HeimdallCoreError(category: .rateLimited, code: 503, message: "Circuit open for \(provider)/quote", bodyPrefix: "")
         }
         
         await RateLimiter.shared.waitIfNeeded()
@@ -32,13 +33,13 @@ final class HeimdallOrchestrator {
             let quote = try await yahoo.fetchQuote(symbol: symbol)
             let latency = Int(Date().timeIntervalSince(start) * 1000)
             
-            await HeimdallCircuitBreaker.shared.reportSuccess(provider: provider)
+            await HeimdallCircuitBreaker.shared.reportSuccess(provider: circuitProvider)
             await HeimdallLogger.shared.info("fetch_success", provider: provider, endpoint: endpoint, symbol: symbol, latencyMs: latency)
             await HealthStore.shared.reportSuccess(provider: provider, latency: Double(latency))
             
             return quote
         } catch {
-            await HeimdallCircuitBreaker.shared.reportFailure(provider: provider, error: error)
+            await HeimdallCircuitBreaker.shared.reportFailure(provider: circuitProvider, error: error)
             await HeimdallLogger.shared.error("fetch_failed", provider: provider, errorClass: classifyError(error), errorMessage: error.localizedDescription, endpoint: endpoint)
             await HealthStore.shared.reportError(provider: provider, error: error)
             throw error
@@ -50,9 +51,20 @@ final class HeimdallOrchestrator {
     func requestFundamentals(symbol: String, context: UsageContext = .interactive) async throws -> FinancialsData {
         let provider = "yahoo"
         let endpoint = "/fundamentals"
+        let circuitProvider = circuitKey(provider: provider, endpoint: "fundamentals")
         
-        guard await HeimdallCircuitBreaker.shared.canRequest(provider: provider) else {
-            throw HeimdallCoreError(category: .rateLimited, code: 503, message: "Circuit open", bodyPrefix: "")
+        guard await HeimdallCircuitBreaker.shared.canRequest(provider: circuitProvider) else {
+            if let cached = await getCachedFundamentals(symbol: symbol) {
+                await HeimdallLogger.shared.warn(
+                    "cache_fallback_used",
+                    provider: provider,
+                    errorClass: "circuit_open",
+                    errorMessage: "Fundamentals served from cache",
+                    endpoint: endpoint
+                )
+                return cached
+            }
+            throw HeimdallCoreError(category: .rateLimited, code: 503, message: "Circuit open for \(provider)/fundamentals", bodyPrefix: "")
         }
 
         await RateLimiter.shared.waitIfNeeded()
@@ -61,12 +73,24 @@ final class HeimdallOrchestrator {
         do {
             let data = try await yahoo.fetchFundamentals(symbol: symbol)
             let latency = Int(Date().timeIntervalSince(start) * 1000)
-            await HeimdallCircuitBreaker.shared.reportSuccess(provider: provider)
+            await HeimdallCircuitBreaker.shared.reportSuccess(provider: circuitProvider)
             await HeimdallLogger.shared.info("fetch_success", provider: provider, endpoint: endpoint, symbol: symbol, latencyMs: latency)
+            DataCacheService.shared.save(value: data, kind: .fundamentals, symbol: symbol, source: "Yahoo")
             return data
         } catch {
-            await HeimdallCircuitBreaker.shared.reportFailure(provider: provider, error: error)
+            await HeimdallCircuitBreaker.shared.reportFailure(provider: circuitProvider, error: error)
             await HeimdallLogger.shared.error("fetch_failed", provider: provider, errorClass: classifyError(error), errorMessage: error.localizedDescription, endpoint: endpoint)
+            if shouldFallbackToCachedFundamentals(error),
+               let cached = await getCachedFundamentals(symbol: symbol) {
+                await HeimdallLogger.shared.warn(
+                    "cache_fallback_used",
+                    provider: provider,
+                    errorClass: "rate_limit_or_transient",
+                    errorMessage: "Fundamentals served from cache after provider failure",
+                    endpoint: endpoint
+                )
+                return cached
+            }
             throw error
         }
     }
@@ -84,9 +108,10 @@ final class HeimdallOrchestrator {
     ) async throws -> [Candle] {
         let provider = "yahoo"
         let endpoint = "/candles"
+        let circuitProvider = circuitKey(provider: provider, endpoint: "candles")
         
-        guard await HeimdallCircuitBreaker.shared.canRequest(provider: provider) else {
-            throw HeimdallCoreError(category: .rateLimited, code: 503, message: "Circuit open", bodyPrefix: "")
+        guard await HeimdallCircuitBreaker.shared.canRequest(provider: circuitProvider) else {
+            throw HeimdallCoreError(category: .rateLimited, code: 503, message: "Circuit open for \(provider)/candles", bodyPrefix: "")
         }
         
         await RateLimiter.shared.waitIfNeeded()
@@ -95,11 +120,11 @@ final class HeimdallOrchestrator {
         do {
             let candles = try await yahoo.fetchCandles(symbol: symbol, timeframe: timeframe, limit: limit)
             let latency = Int(Date().timeIntervalSince(start) * 1000)
-            await HeimdallCircuitBreaker.shared.reportSuccess(provider: provider)
+            await HeimdallCircuitBreaker.shared.reportSuccess(provider: circuitProvider)
             await HeimdallLogger.shared.info("fetch_success", provider: provider, endpoint: endpoint, symbol: symbol, latencyMs: latency)
             return candles
         } catch {
-            await HeimdallCircuitBreaker.shared.reportFailure(provider: provider, error: error)
+            await HeimdallCircuitBreaker.shared.reportFailure(provider: circuitProvider, error: error)
             await HeimdallLogger.shared.error("fetch_failed", provider: provider, errorClass: classifyError(error), errorMessage: error.localizedDescription, endpoint: endpoint)
             throw error
         }
@@ -268,6 +293,36 @@ final class HeimdallOrchestrator {
         
         return "unknown"
     }
+    
+    private func circuitKey(provider: String, endpoint: String) -> String {
+        "\(provider):\(endpoint)"
+    }
+    
+    private func shouldFallbackToCachedFundamentals(_ error: Error) -> Bool {
+        if let heimdallError = error as? HeimdallCoreError {
+            switch heimdallError.category {
+            case .rateLimited, .serverError, .networkError, .circuitOpen:
+                return true
+            default:
+                return heimdallError.code == 1013
+            }
+        }
+        
+        let nsError = error as NSError
+        if nsError.code == 1013 || nsError.code == 429 {
+            return true
+        }
+        
+        let message = nsError.localizedDescription.lowercased()
+        return message.contains("1013") || message.contains("rate limit") || message.contains("try again later")
+    }
+    
+    private func getCachedFundamentals(symbol: String) async -> FinancialsData? {
+        guard let entry = await DataCacheService.shared.getEntry(kind: .fundamentals, symbol: symbol) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(FinancialsData.self, from: entry.data)
+    }
 }
 
 // MARK: - Usage Context (required for API compatibility)
@@ -276,4 +331,3 @@ enum UsageContext {
     case background
     case realtime
 }
-

@@ -69,6 +69,7 @@ struct argusApp: App {
     }
 
     @AppStorage("hasAcceptedDisclaimer") private var hasAcceptedDisclaimer: Bool = false
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding: Bool = false
 
     var body: some Scene {
         WindowGroup {
@@ -82,7 +83,14 @@ struct argusApp: App {
                     .transition(.opacity)
                     .zIndex(100)
                 } else {
-                    if hasAcceptedDisclaimer {
+                    if !hasSeenOnboarding {
+                        ArgusOnboardingView {
+                            withAnimation {
+                                hasSeenOnboarding = true
+                            }
+                        }
+                        .transition(.opacity)
+                    } else if hasAcceptedDisclaimer {
                         ContentView()
                             .environmentObject(tradingViewModel)
                             .environmentObject(coordinator)

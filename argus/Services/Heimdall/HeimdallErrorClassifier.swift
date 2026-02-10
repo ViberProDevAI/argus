@@ -41,6 +41,10 @@ struct HeimdallErrorClassifier {
             return Classification(category: .rateLimited, code: 429, reason: "Quota Exceeded", isTransient: true, requiresCooldown: true, isCapabilityLock: false)
         }
         
+        if code == 1013 {
+            return Classification(category: .rateLimited, code: 1013, reason: "Provider Rate Limited (1013)", isTransient: true, requiresCooldown: true, isCapabilityLock: false)
+        }
+        
         if code == 401 {
              return Classification(category: .authInvalid, code: 401, reason: "Invalid Key", isTransient: false, requiresCooldown: false, isCapabilityLock: true)
         }

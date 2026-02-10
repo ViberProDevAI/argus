@@ -21,6 +21,7 @@ struct AtlasV2DetailView: View {
                 } else if let result = result {
                     // Başlık ve Genel Skor
                     headerCard(result)
+                    educationalRationaleCard(result)
                     
                     // Öne Çıkanlar & Uyarılar
                     if !result.highlights.isEmpty || !result.warnings.isEmpty {
@@ -28,7 +29,7 @@ struct AtlasV2DetailView: View {
                     }
                     
                     // VALUE ALERT SYSTEM (BIST-ÖZEL)
-                    if symbol.hasSuffix(".IS") {
+                    if symbol.hasSuffix(".IS"), hasValueAlerts(result) {
                         valueAlertCard(result)
                     }
                     
@@ -36,7 +37,7 @@ struct AtlasV2DetailView: View {
                     sectionCard(
                         title: "Değerleme",
                         icon: "dollarsign.circle.fill",
-                        iconColor: .green,
+                        iconColor: InstitutionalTheme.Colors.warning,
                         score: result.valuationScore,
                         metrics: result.valuation.allMetrics,
                         sectionId: "valuation"
@@ -45,7 +46,7 @@ struct AtlasV2DetailView: View {
                     sectionCard(
                         title: "Karlılık",
                         icon: "chart.line.uptrend.xyaxis",
-                        iconColor: .blue,
+                        iconColor: InstitutionalTheme.Colors.positive,
                         score: result.profitabilityScore,
                         metrics: result.profitability.allMetrics,
                         sectionId: "profitability"
@@ -54,7 +55,7 @@ struct AtlasV2DetailView: View {
                     sectionCard(
                         title: "Büyüme",
                         icon: "arrow.up.right.circle.fill",
-                        iconColor: .purple,
+                        iconColor: InstitutionalTheme.Colors.primary,
                         score: result.growthScore,
                         metrics: result.growth.allMetrics,
                         sectionId: "growth"
@@ -63,7 +64,7 @@ struct AtlasV2DetailView: View {
                     sectionCard(
                         title: "Finansal Sağlık",
                         icon: "shield.checkered",
-                        iconColor: .cyan,
+                        iconColor: InstitutionalTheme.Colors.primary,
                         score: result.healthScore,
                         metrics: result.health.allMetrics,
                         sectionId: "health"
@@ -72,16 +73,16 @@ struct AtlasV2DetailView: View {
                     sectionCard(
                         title: "Nakit Kalitesi",
                         icon: "banknote.fill",
-                        iconColor: .green,
+                        iconColor: InstitutionalTheme.Colors.positive,
                         score: result.cashScore,
                         metrics: result.cash.allMetrics,
                         sectionId: "cash"
                     )
                     
                     sectionCard(
-                        title: "Temetü",
+                        title: "Temettü",
                         icon: "gift.fill",
-                        iconColor: .pink,
+                        iconColor: InstitutionalTheme.Colors.warning,
                         score: result.dividendScore,
                         metrics: result.dividend.allMetrics,
                         sectionId: "dividend"
@@ -91,7 +92,7 @@ struct AtlasV2DetailView: View {
                     sectionCard(
                         title: "Risk Analizi",
                         icon: "exclamationmark.triangle.fill",
-                        iconColor: .orange,
+                        iconColor: InstitutionalTheme.Colors.negative,
                         score: 100 - (result.risk.beta.value ?? 1.0) * 20,
                         metrics: result.risk.allMetrics,
                         sectionId: "risk"
@@ -103,6 +104,7 @@ struct AtlasV2DetailView: View {
             }
             .padding()
         }
+        .background(InstitutionalTheme.Colors.background)
         .navigationTitle("Atlas Analizi")
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -114,16 +116,31 @@ struct AtlasV2DetailView: View {
     
     private func headerCard(_ result: AtlasV2Result) -> some View {
         VStack(spacing: 16) {
+            HStack(spacing: 8) {
+                Text("ATLAS ÇEKİRDEĞİ")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    .tracking(1.1)
+                Spacer()
+                Text(result.qualityBand.rawValue)
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(scoreColor(result.totalScore).opacity(0.16))
+                    .foregroundColor(scoreColor(result.totalScore))
+                    .clipShape(Capsule())
+            }
+
             // Şirket İsmi ve Sembol
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(result.profile.name)
                         .font(.title2.bold())
-                        .foregroundColor(.primary)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     HStack(spacing: 8) {
                         Text(result.symbol)
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         
                         // Sektör Badge
                         if let sector = result.profile.sector {
@@ -131,8 +148,8 @@ struct AtlasV2DetailView: View {
                                 .font(.caption2)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.blue.opacity(0.2))
-                                .foregroundColor(.blue)
+                                .background(InstitutionalTheme.Colors.primary.opacity(0.16))
+                                .foregroundColor(InstitutionalTheme.Colors.primary)
                                 .cornerRadius(4)
                         }
                     }
@@ -145,7 +162,7 @@ struct AtlasV2DetailView: View {
                         .font(.headline)
                     Text(result.profile.marketCapTier)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
             }
             
@@ -154,10 +171,10 @@ struct AtlasV2DetailView: View {
                 HStack {
                     Image(systemName: "building.2.fill")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Text(industry)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Spacer()
                 }
             }
@@ -169,7 +186,7 @@ struct AtlasV2DetailView: View {
                 // Circular Progress
                 ZStack {
                     Circle()
-                        .stroke(Color.gray.opacity(0.2), lineWidth: 8)
+                        .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 8)
                         .frame(width: 80, height: 80)
                     
                     Circle()
@@ -190,7 +207,7 @@ struct AtlasV2DetailView: View {
                             .font(.title.bold())
                         Text("/100")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
                 
@@ -198,7 +215,7 @@ struct AtlasV2DetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Kalite Bandı")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     
                     HStack {
                         Text(result.qualityBand.rawValue)
@@ -206,12 +223,12 @@ struct AtlasV2DetailView: View {
                             .foregroundColor(scoreColor(result.totalScore))
                         Text("(\(result.qualityBand.description))")
                             .font(.subheadline)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     
                     Text(result.summary)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .lineLimit(2)
                 }
                 
@@ -219,11 +236,7 @@ struct AtlasV2DetailView: View {
             }
         }
         .padding()
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-                .shadow(color: scoreColor(result.totalScore).opacity(0.2), radius: 10, x: 0, y: 5)
-        )
+        .background(cardBackground)
         .overlay(
             RoundedRectangle(cornerRadius: 16)
                 .stroke(scoreColor(result.totalScore).opacity(0.3), lineWidth: 1)
@@ -233,25 +246,65 @@ struct AtlasV2DetailView: View {
     // MARK: - Highlights Card
     
     private func highlightsCard(_ result: AtlasV2Result) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Öne Çıkanlar
-            ForEach(result.highlights, id: \.self) { highlight in
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "star.fill")
-                        .foregroundColor(.yellow)
-                    Text(highlight)
-                        .font(.subheadline)
+        VStack(alignment: .leading, spacing: 14) {
+            if !result.highlights.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .foregroundColor(InstitutionalTheme.Colors.positive)
+                        Text("Pozitif Sinyaller")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        Spacer()
+                        Text("\(result.highlights.count)")
+                            .font(.caption2.weight(.bold))
+                            .foregroundColor(InstitutionalTheme.Colors.positive)
+                    }
+                    ForEach(result.highlights, id: \.self) { highlight in
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle()
+                                .fill(InstitutionalTheme.Colors.positive.opacity(0.9))
+                                .frame(width: 6, height: 6)
+                                .padding(.top, 5)
+                            Text(highlight)
+                                .font(.subheadline)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        }
+                    }
                 }
+                .padding(10)
+                .background(InstitutionalTheme.Colors.positive.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             
-            // Uyarılar
-            ForEach(result.warnings, id: \.self) { warning in
-                HStack(alignment: .top, spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    Text(warning)
-                        .font(.subheadline)
+            if !result.warnings.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundColor(InstitutionalTheme.Colors.warning)
+                        Text("Kritik Notlar")
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        Spacer()
+                        Text("\(result.warnings.count)")
+                            .font(.caption2.weight(.bold))
+                            .foregroundColor(InstitutionalTheme.Colors.warning)
+                    }
+                    ForEach(result.warnings, id: \.self) { warning in
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle()
+                                .fill(InstitutionalTheme.Colors.warning.opacity(0.95))
+                                .frame(width: 6, height: 6)
+                                .padding(.top, 5)
+                            Text(warning)
+                                .font(.subheadline)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        }
+                    }
                 }
+                .padding(10)
+                .background(InstitutionalTheme.Colors.warning.opacity(0.10))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
         }
         .padding()
@@ -261,7 +314,7 @@ struct AtlasV2DetailView: View {
     
     // MARK: - Section Card
     
-    private func sectionCard(title: String, icon: String = "", iconColor: Color = .white, score: Double, metrics: [AtlasMetric], sectionId: String) -> some View {
+    private func sectionCard(title: String, icon: String = "", iconColor: Color = InstitutionalTheme.Colors.textPrimary, score: Double, metrics: [AtlasMetric], sectionId: String) -> some View {
         VStack(spacing: 0) {
             // Header
             Button {
@@ -275,10 +328,21 @@ struct AtlasV2DetailView: View {
                 HStack {
                     if !icon.isEmpty {
                         Image(systemName: icon)
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 24, height: 24)
+                            .background(iconColor.opacity(0.16))
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                             .foregroundColor(iconColor)
                     }
-                    Text(title)
-                        .font(.headline)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(title)
+                            .font(.headline)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        Text(sectionSubtitle(sectionId))
+                            .font(.caption2)
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    }
                     
                     Spacer()
                     
@@ -289,14 +353,40 @@ struct AtlasV2DetailView: View {
                     Text("\(Int(score))")
                         .font(.headline)
                         .foregroundColor(scoreColor(score))
+                        .monospacedDigit()
                     
                     // Chevron
                     Image(systemName: expandedSections.contains(sectionId) ? "chevron.up" : "chevron.down")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 .padding()
             }
             .buttonStyle(.plain)
+
+            if let strongest = metrics.max(by: { $0.score < $1.score }),
+               let weakest = metrics.min(by: { $0.score < $1.score }) {
+                HStack(spacing: 8) {
+                    SectionMetricChip(
+                        label: "Güçlü",
+                        metric: strongest,
+                        color: InstitutionalTheme.Colors.positive
+                    )
+                    SectionMetricChip(
+                        label: "İzle",
+                        metric: weakest,
+                        color: explanationColor(weakest.status)
+                    )
+                }
+                .padding(.horizontal)
+                .padding(.bottom, expandedSections.contains(sectionId) ? 8 : 12)
+            }
+
+            let sectionDrivers = topDrivers(from: metrics, limit: 3)
+            if !sectionDrivers.isEmpty {
+                sectionDriverStrip(sectionDrivers)
+                    .padding(.horizontal)
+                    .padding(.bottom, expandedSections.contains(sectionId) ? 8 : 12)
+            }
             
             // Expanded Content
             if expandedSections.contains(sectionId) {
@@ -307,6 +397,7 @@ struct AtlasV2DetailView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom)
+                .padding(.top, 4)
                 // transition kaldırıldı - performans optimizasyonu
             }
         }
@@ -316,29 +407,54 @@ struct AtlasV2DetailView: View {
     // MARK: - Metric Row
     
     private func metricRow(_ metric: AtlasMetric) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             // Üst satır: İsim, Değer, Durum
             HStack {
-                Text(metric.name)
-                    .font(.subheadline.weight(.medium))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(metric.name)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    Text("Skor \(Int(metric.score)) / 100")
+                        .font(.caption2)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                }
                 
                 Spacer()
                 
                 Text(metric.formattedValue)
                     .font(.subheadline.bold())
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    .monospacedDigit()
                 
-                Text(metric.status.emoji)
+                Text(metric.status.label.uppercased())
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(explanationColor(metric.status).opacity(0.16))
+                    .foregroundColor(explanationColor(metric.status))
+                    .clipShape(Capsule())
             }
+
+            metricScoreBar(metric.score, color: explanationColor(metric.status))
             
             // Sektör karşılaştırması
             if let sectorAvg = metric.sectorAverage {
-                HStack {
+                HStack(spacing: 8) {
                     Text("Sektör Ort:")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Text(AtlasMetric.format(sectorAvg))
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    if let deltaText = metricDeltaText(metric) {
+                        Text(deltaText)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(explanationColor(metric.status))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(explanationColor(metric.status).opacity(0.12))
+                            .clipShape(Capsule())
+                    }
                 }
             }
             
@@ -346,23 +462,44 @@ struct AtlasV2DetailView: View {
             Text(metric.explanation)
                 .font(.caption)
                 .foregroundColor(explanationColor(metric.status))
+                .lineSpacing(1)
             
             // Eğitici not (varsa)
             if !metric.educationalNote.isEmpty {
                 HStack(alignment: .top, spacing: 4) {
                     Image(systemName: "book.fill")
                         .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(InstitutionalTheme.Colors.primary)
                     Text(metric.educationalNote)
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .italic()
                 }
                 .padding(.top, 4)
             }
+
+            if let formula = metric.formula, !formula.isEmpty {
+                HStack(spacing: 6) {
+                    Image(systemName: "function")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(InstitutionalTheme.Colors.primary)
+                    Text(formula)
+                        .font(.caption2)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+                .padding(.top, 2)
+            }
             
-            Divider()
+            Divider().background(InstitutionalTheme.Colors.borderSubtle)
         }
+        .padding(10)
+        .background(InstitutionalTheme.Colors.surface2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
     
     // MARK: - Summary Card
@@ -371,13 +508,15 @@ struct AtlasV2DetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 4) {
                 Image(systemName: "graduationcap.fill")
-                    .foregroundColor(.orange)
+                    .foregroundColor(InstitutionalTheme.Colors.warning)
                 Text("Yatırımcı İçin Özet")
                     .font(.headline)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             }
             
             Text(result.summary)
                 .font(.subheadline)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             
             // Alt bölüm skorları grid
             LazyVGrid(columns: [
@@ -396,7 +535,7 @@ struct AtlasV2DetailView: View {
             // BIST SECTOR COMPARISON (NEW)
             if symbol.hasSuffix(".IS") {
                 BistSectorComparisonCard(symbol: symbol, result: result)
-                    .padding()
+                    .padding(.top, 4)
             }
         }
         .padding()
@@ -406,50 +545,36 @@ struct AtlasV2DetailView: View {
     // MARK: - Value Alert System (BIST-ÖZEL)
     
     private func valueAlertCard(_ result: AtlasV2Result) -> some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Value Alert Sistemi")
+                .font(.caption.weight(.bold))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+
             // Deep Value Detection
             if isDeepValue(result) {
-                HStack(spacing: 8) {
-                    Image(systemName: "star.fill")
-                        .font(.caption)
-                        .foregroundColor(.yellow)
-                    Text("⭐ DERİN DEĞER FIRSATI")
-                        .font(.caption).bold().foregroundColor(.yellow)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(Color.yellow.opacity(0.2))
-                .cornerRadius(6)
+                alertLine(
+                    title: "DERİN DEĞER FIRSATI",
+                    icon: "star.fill",
+                    color: InstitutionalTheme.Colors.warning
+                )
             }
             
             // Value Trap Detection
             if isValueTrap(result) {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.caption)
-                        .foregroundColor(.red)
-                    Text("⚠️ VALUE TRAP UYARISI")
-                        .font(.caption).bold().foregroundColor(.red)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(Color.red.opacity(0.2))
-                .cornerRadius(6)
+                alertLine(
+                    title: "VALUE TRAP UYARISI",
+                    icon: "exclamationmark.triangle.fill",
+                    color: InstitutionalTheme.Colors.negative
+                )
             }
             
             // High Dividend Warning
             if isHighDividendRisky(result) {
-                HStack(spacing: 8) {
-                    Image(systemName: "exclamationmark.octagon.fill")
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                    Text("⚠️ SÜRDÜRÜLEMEZ TEMETTÜ")
-                        .font(.caption).bold().foregroundColor(.orange)
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                .background(Color.orange.opacity(0.2))
-                .cornerRadius(6)
+                alertLine(
+                    title: "SÜRDÜRÜLEMEZ TEMETTÜ",
+                    icon: "exclamationmark.octagon.fill",
+                    color: InstitutionalTheme.Colors.warning
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -458,7 +583,7 @@ struct AtlasV2DetailView: View {
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
         )
     }
     
@@ -479,24 +604,230 @@ struct AtlasV2DetailView: View {
               let divVal = div.value else { return false }
         return divVal > 10.0 && result.cashScore < 40
     }
+
+    private func hasValueAlerts(_ result: AtlasV2Result) -> Bool {
+        isDeepValue(result) || isValueTrap(result) || isHighDividendRisky(result)
+    }
+
+    private func alertLine(title: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(color)
+            Text(title)
+                .font(.caption.weight(.bold))
+                .foregroundColor(color)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(color.opacity(0.16))
+        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .stroke(color.opacity(0.28), lineWidth: 1)
+        )
+    }
 }
 
 // MARK: - Helpers Extension
 extension AtlasV2DetailView {
     
     private func miniScoreCard(_ title: String, _ score: Double) -> some View {
-        VStack(spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-            Text("\(Int(score))")
-                .font(.headline)
-                .foregroundColor(scoreColor(score))
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("\(Int(score))")
+                    .font(.headline)
+                    .foregroundColor(scoreColor(score))
+                    .monospacedDigit()
+                Text(sectionGrade(score))
+                    .font(.caption2.weight(.bold))
+                    .foregroundColor(scoreColor(score))
+            }
+            metricScoreBar(score, color: scoreColor(score))
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(Color.gray.opacity(0.1))
-        .cornerRadius(8)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 8)
+        .background(InstitutionalTheme.Colors.surface2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func metricScoreBar(_ score: Double, color: Color) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(InstitutionalTheme.Colors.borderSubtle)
+                    .frame(height: 5)
+                Capsule()
+                    .fill(color)
+                    .frame(width: geo.size.width * min(max(score / 100.0, 0), 1), height: 5)
+            }
+        }
+        .frame(height: 5)
+    }
+
+    private func sectionGrade(_ score: Double) -> String {
+        switch score {
+            case 85...: return "A+"
+            case 70..<85: return "A"
+            case 55..<70: return "B"
+            case 40..<55: return "C"
+            case 25..<40: return "D"
+            default: return "F"
+        }
+    }
+
+    private func metricDeltaText(_ metric: AtlasMetric) -> String? {
+        guard let value = metric.value, let sector = metric.sectorAverage, sector != 0 else { return nil }
+        let delta = ((value - sector) / abs(sector)) * 100
+        let sign = delta > 0 ? "+" : ""
+        return "\(sign)\(Int(delta.rounded()))%"
+    }
+
+    @ViewBuilder
+    private func educationalRationaleCard(_ result: AtlasV2Result) -> some View {
+        let drivers = topDrivers(from: combinedMetrics(from: result), limit: 5)
+        if !drivers.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("NEDEN BÖYLE?")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    Spacer()
+                    Text("İlk \(min(3, drivers.count)) etken")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(drivers.prefix(3))) { driver in
+                            AtlasDriverChip(
+                                title: driver.name,
+                                subtitle: driver.explanation,
+                                impactText: String(format: "%+.0f", driver.score - 50),
+                                tint: driverColor(for: driver.impact)
+                            )
+                        }
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    let slices = donutSlices(from: Array(drivers.prefix(4)))
+                    ZStack {
+                        Circle()
+                            .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 9)
+                            .frame(width: 72, height: 72)
+                        ForEach(slices) { slice in
+                            Circle()
+                                .trim(from: slice.start, to: slice.end)
+                                .stroke(slice.color, style: StrokeStyle(lineWidth: 9, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        Text("Katkı")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("KATKI DAĞILIMI")
+                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                        ForEach(Array(drivers.prefix(3))) { driver in
+                            HStack(spacing: 6) {
+                                Circle()
+                                    .fill(driverColor(for: driver.impact))
+                                    .frame(width: 6, height: 6)
+                                Text(driver.name)
+                                    .font(.caption2)
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                                    .lineLimit(1)
+                                Spacer(minLength: 0)
+                                Text(String(format: "%+.0f", driver.score - 50))
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundColor(driverColor(for: driver.impact))
+                                    .monospacedDigit()
+                            }
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(cardBackground)
+        }
+    }
+
+    private func sectionDriverStrip(_ drivers: [AtlasDriverInsight]) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(drivers) { driver in
+                    AtlasDriverChip(
+                        title: driver.name,
+                        subtitle: driver.explanation,
+                        impactText: String(format: "%+.0f", driver.score - 50),
+                        tint: driverColor(for: driver.impact)
+                    )
+                }
+            }
+            .padding(.vertical, 2)
+        }
+    }
+
+    private func topDrivers(from metrics: [AtlasMetric], limit: Int) -> [AtlasDriverInsight] {
+        metrics
+            .map { metric in
+                AtlasDriverInsight(
+                    id: metric.id,
+                    name: metric.name,
+                    impact: max(-1, min(1, (metric.score - 50.0) / 50.0)),
+                    score: metric.score,
+                    explanation: metric.explanation
+                )
+            }
+            .sorted { abs($0.impact) > abs($1.impact) }
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    private func donutSlices(from drivers: [AtlasDriverInsight]) -> [AtlasDonutSlice] {
+        let magnitudes = drivers.map { max(abs($0.impact), 0.05) }
+        let total = max(magnitudes.reduce(0, +), 0.001)
+        var cursor = 0.0
+
+        return zip(drivers, magnitudes).map { driver, magnitude in
+            let start = cursor / total
+            cursor += magnitude
+            let end = cursor / total
+            return AtlasDonutSlice(
+                id: driver.id,
+                start: start,
+                end: end,
+                color: driverColor(for: driver.impact)
+            )
+        }
+    }
+
+    private func combinedMetrics(from result: AtlasV2Result) -> [AtlasMetric] {
+        result.valuation.allMetrics
+            + result.profitability.allMetrics
+            + result.growth.allMetrics
+            + result.health.allMetrics
+            + result.cash.allMetrics
+            + result.dividend.allMetrics
+            + result.risk.allMetrics
+    }
+
+    private func driverColor(for impact: Double) -> Color {
+        if impact > 0.08 { return InstitutionalTheme.Colors.positive }
+        if impact < -0.08 { return InstitutionalTheme.Colors.negative }
+        return InstitutionalTheme.Colors.warning
     }
     
     // MARK: - Helper Views
@@ -505,23 +836,27 @@ extension AtlasV2DetailView {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.5)
+                .tint(InstitutionalTheme.Colors.primary)
             Text("Atlas analiz ediliyor...")
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
         .frame(maxWidth: .infinity, minHeight: 300)
+        .padding()
+        .background(cardBackground)
     }
     
     private func errorView(_ message: String) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
             .font(.largeTitle)
-            .foregroundColor(.red)
+            .foregroundColor(InstitutionalTheme.Colors.negative)
             Text("Analiz Hatası")
             .font(.headline)
+            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             Text(message)
                 .font(.subheadline)
-                .foregroundColor(.secondary)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .multilineTextAlignment(.center)
             
             // Debug Info Button
@@ -530,7 +865,7 @@ extension AtlasV2DetailView {
                     VStack(alignment: .leading, spacing: 8) {
                         Text(detailedError)
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             .textSelection(.enabled)
                     }
                     .padding(.top, 8)
@@ -540,13 +875,14 @@ extension AtlasV2DetailView {
         }
         .frame(maxWidth: .infinity, minHeight: 300)
         .padding()
+        .background(cardBackground)
     }
     
     private func miniProgressBar(score: Double) -> some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                .fill(Color.gray.opacity(0.2))
+                .fill(InstitutionalTheme.Colors.borderSubtle)
                 .frame(height: 6)
                 
                 Capsule()
@@ -556,29 +892,46 @@ extension AtlasV2DetailView {
         }
         .frame(width: 60, height: 6)
     }
+
+    private func sectionSubtitle(_ sectionId: String) -> String {
+        switch sectionId {
+            case "valuation": return "F/K, PD/DD ve iskonto profili"
+            case "profitability": return "Marjlar, verimlilik ve getiri kalitesi"
+            case "growth": return "Gelir ve kâr büyüme ivmesi"
+            case "health": return "Borçluluk, kaldıraç ve bilanço dengesi"
+            case "cash": return "Nakit üretimi ve sürdürülebilirlik"
+            case "dividend": return "Temettü verimi ve devamlılık riski"
+            case "risk": return "Beta, oynaklık ve kırılganlık haritası"
+            default: return "Çekirdek metrikler"
+        }
+    }
     
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 16)
-        .fill(.ultraThinMaterial)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 4)
+            .fill(InstitutionalTheme.Colors.surface1)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+            )
+            .shadow(color: InstitutionalTheme.Colors.background.opacity(0.35), radius: 8, x: 0, y: 4)
     }
     
     private func scoreColor(_ score: Double) -> Color {
         switch score {
-            case 70...: return .green
-            case 50..<70: return .yellow
-            case 30..<50: return .orange
-            default: return .red
+            case 70...: return InstitutionalTheme.Colors.positive
+            case 50..<70: return InstitutionalTheme.Colors.warning
+            case 30..<50: return InstitutionalTheme.Colors.warning.opacity(0.85)
+            default: return InstitutionalTheme.Colors.negative
         }
     }
     
     private func explanationColor(_ status: AtlasMetricStatus) -> Color {
         switch status {
-            case .excellent, .good: return .green
-            case .neutral: return .primary
-            case .warning: return .orange
-            case .bad, .critical: return .red
-            case .noData: return .secondary
+            case .excellent, .good: return InstitutionalTheme.Colors.positive
+            case .neutral: return InstitutionalTheme.Colors.textPrimary
+            case .warning: return InstitutionalTheme.Colors.warning
+            case .bad, .critical: return InstitutionalTheme.Colors.negative
+            case .noData: return InstitutionalTheme.Colors.textSecondary
         }
     }
     
@@ -652,7 +1005,100 @@ extension AtlasV2DetailView {
     }
 }
 
+private struct AtlasDriverInsight: Identifiable {
+    let id: String
+    let name: String
+    let impact: Double
+    let score: Double
+    let explanation: String
+}
+
+private struct AtlasDonutSlice: Identifiable {
+    let id: String
+    let start: CGFloat
+    let end: CGFloat
+    let color: Color
+
+    init(id: String, start: Double, end: Double, color: Color) {
+        self.id = id
+        self.start = CGFloat(start)
+        self.end = CGFloat(end)
+        self.color = color
+    }
+}
+
+private struct AtlasDriverChip: View {
+    let title: String
+    let subtitle: String
+    let impactText: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title.uppercased())
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundColor(tint)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .lineLimit(1)
+            }
+            Text(impactText)
+                .font(.caption2.weight(.bold))
+                .foregroundColor(tint)
+                .monospacedDigit()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(InstitutionalTheme.Colors.surface2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(tint.opacity(0.22), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
 // MARK: - BIST SECTOR COMPARISON CARD (NEW)
+struct SectionMetricChip: View {
+    let label: String
+    let metric: AtlasMetric
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(label.uppercased())
+                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                .foregroundColor(color)
+            Divider()
+                .frame(height: 12)
+                .overlay(InstitutionalTheme.Colors.borderSubtle)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(metric.name)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .lineLimit(1)
+                Text(metric.formattedValue)
+                    .font(.caption2.weight(.bold))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    .monospacedDigit()
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(InstitutionalTheme.Colors.surface2)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(color.opacity(0.26), lineWidth: 1)
+        )
+    }
+}
+
 struct BistSectorComparisonCard: View {
     let symbol: String
     let result: AtlasV2Result
@@ -663,9 +1109,9 @@ struct BistSectorComparisonCard: View {
         VStack(spacing: 12) {
             HStack {
                 Image(systemName: "chart.bar.fill")
-                    .foregroundColor(.blue)
+                    .foregroundColor(InstitutionalTheme.Colors.primary)
                 Text("SEKTÖR KIYASLAMASI")
-                    .font(.caption).bold().foregroundColor(.gray)
+                    .font(.caption).bold().foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 Spacer()
                 
                 if isLoading {
@@ -716,37 +1162,25 @@ struct BistSectorComparisonCard: View {
                     )
                 }
             } else {
-                Text("Sektör verisi yükleniyor...")
-                    .font(.caption).foregroundColor(.gray)
+                Text("Sektör kıyas verisi şu an mevcut değil.")
+                    .font(.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
         }
         .padding(12)
-        .background(Color.blue.opacity(0.1))
+        .background(InstitutionalTheme.Colors.surface2)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.blue.opacity(0.3), lineWidth: 1)
+                .stroke(InstitutionalTheme.Colors.primary.opacity(0.25), lineWidth: 1)
         )
         .onAppear { loadSectorData() }
     }
     
     private func loadSectorData() {
-        Task {
-            // Simüle edilmiş sector average ( gerçek API'den gelecek)
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 saniye
-            
-            await MainActor.run {
-                self.sectorAverage = BistSectorAverage(
-                    profitabilityAvg: 65.0,
-                    valuationAvg: 58.0,
-                    growthAvg: 52.0,
-                    healthAvg: 60.0,
-                    cashAvg: 48.0,
-                    dividendAvg: 45.0
-                )
-                self.isLoading = false
-            }
-        }
+        // Mock veri yerine boş geçilir; gerçek veri kaynağı bağlandığında burada yüklenecek.
+        isLoading = false
+        sectorAverage = nil
     }
 }
 
@@ -758,37 +1192,37 @@ struct SectorMetricComparison: View {
     var body: some View {
         VStack(spacing: 4) {
             Text(label)
-                .font(.caption2).foregroundColor(.gray)
+                .font(.caption2).foregroundColor(InstitutionalTheme.Colors.textSecondary)
             
             HStack(spacing: 4) {
                 Text(String(format: "%.0f", current))
-                    .font(.caption).bold().foregroundColor(.white)
+                    .font(.caption).bold().foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 
                 if current > average {
                     Image(systemName: "arrow.up.right.fill")
-                        .font(.caption2).foregroundColor(.green)
+                        .font(.caption2).foregroundColor(InstitutionalTheme.Colors.positive)
                 } else if current < average {
                     Image(systemName: "arrow.down.right.fill")
-                        .font(.caption2).foregroundColor(.red)
+                        .font(.caption2).foregroundColor(InstitutionalTheme.Colors.negative)
                 } else {
                     Image(systemName: "equal")
-                        .font(.caption2).foregroundColor(.gray)
+                        .font(.caption2).foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
             }
             
             // Comparison bar
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(Color.gray.opacity(0.3))
+                    .fill(InstitutionalTheme.Colors.borderSubtle)
                     .frame(height: 4)
                 
                 HStack(spacing: 0) {
                     Capsule()
-                        .fill(Color.blue.opacity(0.7))
+                        .fill(InstitutionalTheme.Colors.primary.opacity(0.7))
                         .frame(width: CGFloat(current / 100) * 40, height: 4)
                     
                     Capsule()
-                        .fill(Color.orange.opacity(0.5))
+                        .fill(InstitutionalTheme.Colors.warning.opacity(0.6))
                         .frame(width: CGFloat(average / 100) * 40, height: 4)
                 }
             }

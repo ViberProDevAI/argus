@@ -51,6 +51,7 @@ enum ArgusSystemEntity: String, CaseIterable, Identifiable {
         case .aether: return "AetherIcon"
         case .atlas: return "AtlasIcon"
         case .hermes: return "HermesIcon"
+        case .demeter: return "DemeterIcon"
         default: return nil
         }
     }

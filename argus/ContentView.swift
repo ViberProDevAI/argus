@@ -12,53 +12,42 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             // Global Living Background (Design System Base)
-            DesignTokens.Colors.background
+            InstitutionalTheme.Colors.background
                 .ignoresSafeArea()
 
             // Background Animation Layer
             ArgusGlobalBackground()
-                .opacity(0.3)
+                .opacity(0.16)
                 .zIndex(0)
 
 
-                ZStack(alignment: .topLeading) {
-                    // Main Content Area with Navigation Stack
-                    NavigationStack(path: $router.navigationStack) {
-                        Group {
-                            switch deepLinkManager.selectedTab {
-                            case .home:
-                                MarketView()
-                                    .environmentObject(viewModel)
-                            case .alkindus:
-                                AlkindusDashboardView()
-                            case .markets: // Using Cockpit as Markets/Terminal view
-                                ArgusCockpitView()
-                            case .portfolio:
-                                PortfolioView(viewModel: viewModel)
-                            case .settings:
-                                SettingsView(settingsViewModel: settingsViewModel)
-                            }
+            VStack(spacing: 0) {
+                // Main Content Area with Navigation Stack
+                NavigationStack(path: $router.navigationStack) {
+                    Group {
+                        switch deepLinkManager.selectedTab {
+                        case .home:
+                            MarketView()
+                                .environmentObject(viewModel)
+                        case .kokpit:
+                            ArgusCockpitView()
+                        case .portfolio:
+                            PortfolioView(viewModel: viewModel)
+                        case .settings:
+                            SettingsView(settingsViewModel: settingsViewModel)
                         }
-                        .navigationDestination(for: NavigationRoute.self) { route in
-                            router.destinationView(for: route, viewModel: viewModel)
-                        }
-                        .environmentObject(viewModel)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    // Hamburger Button REMOVED (Moved to individual views)
-
-                    Spacer()
-
-                    // Custom Tab Bar (Bottom)
-                    VStack {
-                        Spacer()
-
-                        AppTabBar()
-                            .environmentObject(router)
-                            .zIndex(1)
+                    .navigationDestination(for: NavigationRoute.self) { route in
+                        router.destinationView(for: route, viewModel: viewModel)
                     }
+                    .environmentObject(viewModel)
                 }
+                .id(deepLinkManager.selectedTab)
+
+                // Custom Tab Bar (Bottom)
+                AppTabBar()
+                    .environmentObject(router)
+            }
 
         }
         .sheet(item: $viewModel.generatedSmartPlan) { plan in
@@ -74,7 +63,11 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showVoiceSheet) {
-            VoiceAssistantView()
+            ArgusVoiceView()
+                .environmentObject(viewModel)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenArgusVoice"))) { _ in
+            showVoiceSheet = true
         }
         .sheet(item: $router.presentedSheet) { route in
             router.destinationView(for: route, viewModel: viewModel)
@@ -89,9 +82,34 @@ struct ContentView: View {
             if let id = notification.userInfo?["notificationId"] as? String {
                 print("🔔 Argus Deep Link: ID found \(id)")
             }
-            deepLinkManager.navigate(to: .alkindus)
+            deepLinkManager.navigate(to: .home)
+        }
+        .onAppear {
+            applyLaunchTabOverrideIfNeeded()
         }
         .environmentObject(router)
+    }
+
+    private func applyLaunchTabOverrideIfNeeded() {
+        guard
+            let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix("--argus-tab=") })
+        else {
+            return
+        }
+
+        let tabValue = argument.replacingOccurrences(of: "--argus-tab=", with: "")
+        switch tabValue {
+        case "home":
+            deepLinkManager.navigate(to: .home)
+        case "kokpit":
+            deepLinkManager.navigate(to: .kokpit)
+        case "portfolio":
+            deepLinkManager.navigate(to: .portfolio)
+        case "settings":
+            deepLinkManager.navigate(to: .settings)
+        default:
+            break
+        }
     }
 }
 

@@ -237,7 +237,8 @@ actor BISTSentimentEngine {
             bearishPercent: bearishPercent,
             neutralPercent: neutralPercent,
             newsVolume: articles.count,
-            relevantNewsCount: positiveCount + negativeCount + neutralCount,
+            // "İlgili" haber: yön sinyali taşıyan (pozitif/negatif) içerikler.
+            relevantNewsCount: totalRelevant,
             keyHeadlines: Array(keyHeadlines.prefix(5)),
             mentionTrend: trend,
             lastUpdated: Date(),

@@ -39,10 +39,7 @@ final class HermesStateViewModel: ObservableObject {
             let events = try await HermesLLMService.shared.analyzeEvents(articles: articles, scope: scope, isGeneral: false)
             
             let insights = events.map { event in
-                let sentiment: NewsSentiment
-                if event.finalScore >= 70 { sentiment = .strongPositive }
-                else if event.finalScore <= 35 { sentiment = .strongNegative }
-                else { sentiment = .neutral }
+                let sentiment = event.sentimentLabel ?? .neutral
                 
                 let delayPenalty = HermesEventScoring.delayFactor(
                     ageMinutes: max(0.0, Date().timeIntervalSince(event.publishedAt) / 60.0)

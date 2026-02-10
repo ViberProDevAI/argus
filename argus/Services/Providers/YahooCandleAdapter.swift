@@ -139,8 +139,8 @@ actor YahooCandleAdapter {
                 ))
             }
         }
-        // Tarihe göre sırala (eski → yeni) ve limit uygula
-        // NOT: .reversed() KALDIRILDI - Yahoo zaten kronolojik döndürüyor!
-        return Array(candles.suffix(limit))
+        // Sağlamlık: veri sırası kaynaktan bağımsız olarak normalize edilir (eski -> yeni).
+        let ordered = candles.sorted { $0.date < $1.date }
+        return Array(ordered.suffix(limit))
     }
 }

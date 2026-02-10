@@ -571,7 +571,7 @@ final class PortfolioStore: ObservableObject {
     // MARK: - Helpers
     
     private func isBistSymbol(_ symbol: String) -> Bool {
-        symbol.uppercased().hasSuffix(".IS")
+        SymbolResolver.shared.isBistSymbol(symbol)
     }
     
     // MARK: - Persistence

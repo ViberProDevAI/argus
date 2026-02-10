@@ -285,6 +285,6 @@ Review: Ensure app initialization works correctly
 ---
 
 **Created by:** Claude Code Agent
-**Worktree:** `/Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel`
+**Worktree:** `${PROJECT_ROOT}/.worktrees/split-trading-viewmodel`
 **Branch:** `split-trading-viewmodel`
 **Last Updated:** 2026-02-03 11:56 UTC

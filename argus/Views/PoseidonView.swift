@@ -2,7 +2,7 @@ import SwiftUI
 
 struct PoseidonView: View {
     let score: WhaleScore
-    
+
     var body: some View {
         VStack(spacing: 20) {
             // Header

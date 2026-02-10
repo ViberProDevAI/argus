@@ -100,16 +100,18 @@ actor OracleEngine {
         var signals: [OracleSignal] = []
         
         // 1. KONUT SEKTÖRÜ (Housing Boom)
-        let housingChange = input.housingSalesChangeYoY
-        if abs(housingChange) > 5.0 {
+        if let housingChange = input.housingSalesChangeYoY,
+           let housingTotal = input.housingSalesTotal,
+           let housingMoM = input.housingSalesChangeMoM,
+           abs(housingChange) > 5.0 {
             let sentiment: SignalSentiment = housingChange > 0 ? .bullish : .bearish
             let score = housingChange * 1.5 // %10 artış -> +15 Puan
             
             let signal = OracleSignal(
                 type: .housingBoom,
-                rawValue: input.housingSalesTotal,
+                rawValue: housingTotal,
                 changeYoY: housingChange,
-                changeMoM: input.housingSalesChangeMoM,
+                changeMoM: housingMoM,
                 sentiment: sentiment,
                 message: housingChange > 0 
                     ? "Konut satışlarında yıllık %\(String(format: "%.1f", housingChange)) artış: GYO sektörü için pozitif talep şoku."
@@ -128,87 +130,90 @@ actor OracleEngine {
         }
         
         // 2. PERAKENDE (Retail Pulse - Kredi Kartı)
-        let spendingChange = input.creditCardSpendingChangeYoY
-        // Enflasyondan Arındırılmış (Reel) Büyüme Kontrolü
-        let realGrowth = spendingChange - input.inflationYoY
-        
-        if abs(realGrowth) > 2.0 {
-            let sentiment: SignalSentiment = realGrowth > 0 ? .bullish : .bearish
-            let score = realGrowth * 2.0 // Reel büyüme katsayısı yüksek
-            
-            let signal = OracleSignal(
-                type: .retailPulse,
-                rawValue: input.creditCardSpendingTotal, // Milyar TL
-                changeYoY: spendingChange,
-                changeMoM: 0, // Haftalık olduğu için MoM complex
-                sentiment: sentiment,
-                message: realGrowth > 0
-                    ? "Tüketim çılgınlığı: Kredi kartı harcamaları reel olarak %\(String(format: "%.1f", realGrowth)) arttı."
-                    : "Tüketici frene bastı: Reel harcamalarda düşüş var.",
-                effects: [
-                    OracleSectorEffect(
-                        sectorCode: "XTCRT", // Ticaret
-                        impactedStocks: ["BIMAS", "MGROS", "SOKM", "MAVI"],
-                        scoreImpact: score,
-                        reason: "Perakende harcamalarındaki reel değişim mağaza cirolarını direkt etkiler."
-                    )
-                ],
-                freshness: .realTime // Haftalık veri
-            )
-            signals.append(signal)
+        if let spendingChange = input.creditCardSpendingChangeYoY,
+           let inflation = input.inflationYoY,
+           let spendingTotal = input.creditCardSpendingTotal {
+            // Enflasyondan Arındırılmış (Reel) Büyüme Kontrolü
+            let realGrowth = spendingChange - inflation
+            if abs(realGrowth) > 2.0 {
+                let sentiment: SignalSentiment = realGrowth > 0 ? .bullish : .bearish
+                let score = realGrowth * 2.0 // Reel büyüme katsayısı yüksek
+                
+                let signal = OracleSignal(
+                    type: .retailPulse,
+                    rawValue: spendingTotal, // Milyar TL
+                    changeYoY: spendingChange,
+                    changeMoM: 0, // Haftalık olduğu için MoM complex
+                    sentiment: sentiment,
+                    message: realGrowth > 0
+                        ? "Tüketim çılgınlığı: Kredi kartı harcamaları reel olarak %\(String(format: "%.1f", realGrowth)) arttı."
+                        : "Tüketici frene bastı: Reel harcamalarda düşüş var.",
+                    effects: [
+                        OracleSectorEffect(
+                            sectorCode: "XTCRT", // Ticaret
+                            impactedStocks: ["BIMAS", "MGROS", "SOKM", "MAVI"],
+                            scoreImpact: score,
+                            reason: "Perakende harcamalarındaki reel değişim mağaza cirolarını direkt etkiler."
+                        )
+                    ],
+                    freshness: .realTime // Haftalık veri
+                )
+                signals.append(signal)
+            }
         }
         
         // 3. SANAYİ (Industry Gear - KKO)
-        let kko = input.capacityUsageRatio
-        let kkoPrev = input.prevCapacityUsageRatio
-        let kkoDelta = kko - kkoPrev
-        
-        if abs(kkoDelta) > 0.5 || kko > 78.0 || kko < 72.0 {
-            var sentiment: SignalSentiment = .neutral
-            var msg = ""
-            var score = 0.0
-            
-            if kko > 78.0 {
-                sentiment = .bullish
-                msg = "Sanayi tam gaz: KKO %\(String(format: "%.1f", kko)) ile zirveye yakın."
-                score = 20.0
-            } else if kko < 72.0 {
-                sentiment = .bearish
-                msg = "Sanayi çarkları yavaşlıyor: KKO %\(String(format: "%.1f", kko)) seviyesine geriledi."
-                score = -15.0
-            } else if kkoDelta > 1.0 {
-                sentiment = .bullish
-                msg = "Üretimde toparlanma sinyali: KKO artış eğiliminde."
-                score = 10.0
+        if let kko = input.capacityUsageRatio,
+           let kkoPrev = input.prevCapacityUsageRatio {
+            let kkoDelta = kko - kkoPrev
+            if abs(kkoDelta) > 0.5 || kko > 78.0 || kko < 72.0 {
+                var sentiment: SignalSentiment = .neutral
+                var msg = ""
+                var score = 0.0
+                
+                if kko > 78.0 {
+                    sentiment = .bullish
+                    msg = "Sanayi tam gaz: KKO %\(String(format: "%.1f", kko)) ile zirveye yakın."
+                    score = 20.0
+                } else if kko < 72.0 {
+                    sentiment = .bearish
+                    msg = "Sanayi çarkları yavaşlıyor: KKO %\(String(format: "%.1f", kko)) seviyesine geriledi."
+                    score = -15.0
+                } else if kkoDelta > 1.0 {
+                    sentiment = .bullish
+                    msg = "Üretimde toparlanma sinyali: KKO artış eğiliminde."
+                    score = 10.0
+                }
+                
+                let signal = OracleSignal(
+                    type: .industryGear,
+                    rawValue: kko,
+                    changeYoY: 0,
+                    changeMoM: kkoDelta,
+                    sentiment: sentiment,
+                    message: msg,
+                    effects: [
+                        OracleSectorEffect(
+                            sectorCode: "XUSIN",
+                            impactedStocks: ["EREGL", "KRDMD", "ARCLK", "FROTO", "TOASO"],
+                            scoreImpact: score,
+                            reason: "Kapasite kullanımındaki değişim sanayi üretim hacmini işaret eder."
+                        )
+                    ],
+                    freshness: .delayed1M
+                )
+                signals.append(signal)
             }
-            
-            let signal = OracleSignal(
-                type: .industryGear,
-                rawValue: kko,
-                changeYoY: 0,
-                changeMoM: kkoDelta,
-                sentiment: sentiment,
-                message: msg,
-                effects: [
-                    OracleSectorEffect(
-                        sectorCode: "XUSIN",
-                        impactedStocks: ["EREGL", "KRDMD", "ARCLK", "FROTO", "TOASO"],
-                        scoreImpact: score,
-                        reason: "Kapasite kullanımındaki değişim sanayi üretim hacmini işaret eder."
-                    )
-                ],
-                freshness: .delayed1M
-            )
-            signals.append(signal)
         }
         
         // 4. TURİZM (Tourism Rush) - Mevsimsellik!
         // Basit simülasyon mantığı: Yaz aylarında default pozitif, diğer aylar veriye bağlı.
-        let tourismChange = input.touristArrivalsChangeYoY
-        if tourismChange > 10.0 {
+        if let tourismChange = input.touristArrivalsChangeYoY,
+           let tourismTotal = input.touristArrivalsTotal,
+           tourismChange > 10.0 {
              let signal = OracleSignal(
                 type: .tourismRush,
-                rawValue: input.touristArrivalsTotal, // Milyon Kişi
+                rawValue: tourismTotal, // Milyon Kişi
                 changeYoY: tourismChange,
                 changeMoM: 0,
                 sentiment: .bullish,
@@ -227,11 +232,12 @@ actor OracleEngine {
         }
         
         // 5. OTO (Auto Velocity)
-        let autoChange = input.autoSalesChangeYoY
-        if abs(autoChange) > 5.0 {
+        if let autoChange = input.autoSalesChangeYoY,
+           let autoTotal = input.autoSalesTotal,
+           abs(autoChange) > 5.0 {
             let signal = OracleSignal(
                 type: .autoVelocity,
-                rawValue: input.autoSalesTotal,
+                rawValue: autoTotal,
                 changeYoY: autoChange,
                 changeMoM: 0,
                 sentiment: autoChange > 0 ? .bullish : .bearish,
@@ -266,24 +272,24 @@ actor OracleEngine {
 /// Oracle Veri Giriş Modeli (Snapshot + Ekstra EVDS Verileri)
 struct OracleDataInput: Sendable {
     // Macro Context
-    let inflationYoY: Double
+    let inflationYoY: Double?
     
-    // EVDS Specifics (Simulated or Fetched)
-    let housingSalesTotal: Double
-    let housingSalesChangeYoY: Double
-    let housingSalesChangeMoM: Double
+    // EVDS / acik kaynak spesifikleri (veri yoksa nil)
+    let housingSalesTotal: Double?
+    let housingSalesChangeYoY: Double?
+    let housingSalesChangeMoM: Double?
     
-    let creditCardSpendingTotal: Double
-    let creditCardSpendingChangeYoY: Double
+    let creditCardSpendingTotal: Double?
+    let creditCardSpendingChangeYoY: Double?
     
-    let capacityUsageRatio: Double
-    let prevCapacityUsageRatio: Double
+    let capacityUsageRatio: Double?
+    let prevCapacityUsageRatio: Double?
     
-    let touristArrivalsTotal: Double
-    let touristArrivalsChangeYoY: Double
+    let touristArrivalsTotal: Double?
+    let touristArrivalsChangeYoY: Double?
     
-    let autoSalesTotal: Double
-    let autoSalesChangeYoY: Double
+    let autoSalesTotal: Double?
+    let autoSalesChangeYoY: Double?
     
     // Varsayılan / Mock Veri Üretici (Ocak 2026 Context)
     static func mockJan2026(inflation: Double) -> OracleDataInput {

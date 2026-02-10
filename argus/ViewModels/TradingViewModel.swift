@@ -182,6 +182,7 @@ class TradingViewModel: ObservableObject {
     // UI State
     @Published var isLoading = false
     @Published var errorMessage: String?
+    var macroRefreshTask: Task<Void, Never>?
     
     // Argus ETF State
     // Argus ETF State (RiskVM)
@@ -374,9 +375,17 @@ class TradingViewModel: ObservableObject {
     // Argus Scout (Pre-Cognition)
     // Internal timer removed - handled by AutoPilotStore
     
-    // Hermes / News State
-    @Published var hermesSummaries: [String: [HermesSummary]] = [:] // Symbol -> Summaries
-    @Published var hermesMode: HermesMode = .full 
+    // Hermes / News State (Delegated to HermesNewsViewModel)
+    private var hermesVM: HermesNewsViewModel { HermesNewsViewModel.shared }
+
+    var hermesSummaries: [String: [HermesSummary]] {
+        get { hermesVM.hermesSummaries }
+        set { hermesVM.hermesSummaries = newValue }
+    }
+    var hermesMode: HermesMode {
+        get { hermesVM.hermesMode }
+        set { hermesVM.hermesMode = newValue }
+    } 
     
     // Generic Backtest State
 
@@ -449,6 +458,7 @@ class TradingViewModel: ObservableObject {
         set { DiagnosticsViewModel.shared.dataHealthBySymbol = newValue }
     }
     var cancellables = Set<AnyCancellable>() // Combine Subscriptions
+    private var hasCleanedUp = false
 
     // Performance Metrics (Freeze Detective)
     var bootstrapDuration: Double { DiagnosticsViewModel.shared.bootstrapDuration }
@@ -468,6 +478,9 @@ class TradingViewModel: ObservableObject {
         
         // Orion 2.0 Multi-Timeframe Bindings
         setupOrionBindings()
+
+        // Keep cockpit rows in sync with live quotes/decisions/quality
+        setupTerminalObservation()
         
         // Ekonomik takvim beklenti hatırlatması kontrolü
         Task { @MainActor in
@@ -510,6 +523,7 @@ class TradingViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] items in
                 self?.watchlist = items
+                self?.refreshTerminal()
             }
             .store(in: &cancellables)
 
@@ -531,6 +545,29 @@ class TradingViewModel: ObservableObject {
         // - 10x better performance for quote/candle updates
     }
 
+    private func setupTerminalObservation() {
+        market.$quotes
+            .throttle(for: .seconds(0.7), scheduler: RunLoop.main, latest: true)
+            .sink { [weak self] _ in
+                self?.refreshTerminal()
+            }
+            .store(in: &cancellables)
+
+        SignalStateViewModel.shared.$grandDecisions
+            .throttle(for: .seconds(0.7), scheduler: RunLoop.main, latest: true)
+            .sink { [weak self] _ in
+                self?.refreshTerminal()
+            }
+            .store(in: &cancellables)
+
+        DiagnosticsViewModel.shared.$dataHealthBySymbol
+            .throttle(for: .seconds(1.0), scheduler: RunLoop.main, latest: true)
+            .sink { [weak self] _ in
+                self?.refreshTerminal()
+            }
+            .store(in: &cancellables)
+    }
+
 
     
     /// PortfolioStore ile senkronizasyon - Tek Kaynak köprüsü
@@ -548,9 +585,7 @@ class TradingViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newBalance in
                 // didSet tetiklenmemesi için direkt atama
-                if self?.balance != newBalance {
-                    self?.balance = newBalance
-                }
+                self?.balance = newBalance
             }
             .store(in: &cancellables)
         
@@ -558,9 +593,7 @@ class TradingViewModel: ObservableObject {
         PortfolioStore.shared.$bistBalance
             .receive(on: DispatchQueue.main)
             .sink { [weak self] newBalance in
-                if self?.bistBalance != newBalance {
-                    self?.bistBalance = newBalance
-                }
+                self?.bistBalance = newBalance
             }
             .store(in: &cancellables)
         
@@ -606,14 +639,14 @@ class TradingViewModel: ObservableObject {
     // fetchRawNews moved to HermesStateViewModel
 
     deinit {
-        // Timer cleanup - memory leak prevention
+        guard !hasCleanedUp else { return }
+        hasCleanedUp = true
+        // Stop AutoPilot loop (idempotent)
         stopAutoPilotTimer()
-
-        
-        // Combine subscriptions cleanup
+        // Cancel Combine subscriptions
+        cancellables.forEach { $0.cancel() }
         cancellables.removeAll()
-        
-        print("🧹 TradingViewModel deinit - all resources cleaned up")
+        print("🧹 TradingViewModel deinit - resources cleaned up")
     }
     
 
@@ -1067,79 +1100,109 @@ class TradingViewModel: ObservableObject {
         // Sync Portfolio & Balances (SSoT from PortfolioStore)
         PortfolioStore.shared.$trades
             .receive(on: RunLoop.main)
-            .assign(to: \.portfolio, on: self)
+            .sink { [weak self] trades in
+                self?.portfolio = trades
+            }
             .store(in: &cancellables)
             
         PortfolioStore.shared.$globalBalance
             .receive(on: RunLoop.main)
-            .assign(to: \.balance, on: self)
+            .sink { [weak self] newBalance in
+                self?.balance = newBalance
+            }
             .store(in: &cancellables)
             
         PortfolioStore.shared.$bistBalance
             .receive(on: RunLoop.main)
-            .assign(to: \.bistBalance, on: self)
+            .sink { [weak self] newBalance in
+                self?.bistBalance = newBalance
+            }
             .store(in: &cancellables)
             
         PortfolioStore.shared.$transactions
             .receive(on: RunLoop.main)
-            .assign(to: \.transactionHistory, on: self)
+            .sink { [weak self] transactions in
+                self?.transactionHistory = transactions
+            }
             .store(in: &cancellables)
             
         // Sync Execution State
         ExecutionStateViewModel.shared.$planAlerts
             .receive(on: RunLoop.main)
-            .assign(to: \.planAlerts, on: self)
+            .sink { [weak self] alerts in
+                self?.planAlerts = alerts
+            }
             .store(in: &cancellables)
             
         ExecutionStateViewModel.shared.$agoraSnapshots
             .receive(on: RunLoop.main)
-            .assign(to: \.agoraSnapshots, on: self)
+            .sink { [weak self] snaps in
+                self?.agoraSnapshots = snaps
+            }
             .store(in: &cancellables)
             
         ExecutionStateViewModel.shared.$lastTradeTimes
             .receive(on: RunLoop.main)
-            .assign(to: \.lastTradeTimes, on: self)
+            .sink { [weak self] times in
+                self?.lastTradeTimes = times
+            }
             .store(in: &cancellables)
             
         // Sync Hermes State (News)
         HermesStateViewModel.shared.$newsBySymbol
             .receive(on: RunLoop.main)
-            .assign(to: \.newsBySymbol, on: self)
+            .sink { [weak self] v in
+                self?.newsBySymbol = v
+            }
             .store(in: &cancellables)
             
         HermesStateViewModel.shared.$newsInsightsBySymbol
             .receive(on: RunLoop.main)
-            .assign(to: \.newsInsightsBySymbol, on: self)
+            .sink { [weak self] v in
+                self?.newsInsightsBySymbol = v
+            }
             .store(in: &cancellables)
             
         HermesStateViewModel.shared.$hermesEventsBySymbol
             .receive(on: RunLoop.main)
-            .assign(to: \.hermesEventsBySymbol, on: self)
+            .sink { [weak self] v in
+                self?.hermesEventsBySymbol = v
+            }
             .store(in: &cancellables)
             
         HermesStateViewModel.shared.$kulisEventsBySymbol
             .receive(on: RunLoop.main)
-            .assign(to: \.kulisEventsBySymbol, on: self)
+            .sink { [weak self] v in
+                self?.kulisEventsBySymbol = v
+            }
             .store(in: &cancellables)
             
         HermesStateViewModel.shared.$watchlistNewsInsights
             .receive(on: RunLoop.main)
-            .assign(to: \.watchlistNewsInsights, on: self)
+            .sink { [weak self] v in
+                self?.watchlistNewsInsights = v
+            }
             .store(in: &cancellables)
             
         HermesStateViewModel.shared.$generalNewsInsights
             .receive(on: RunLoop.main)
-            .assign(to: \.generalNewsInsights, on: self)
+            .sink { [weak self] v in
+                self?.generalNewsInsights = v
+            }
             .store(in: &cancellables)
             
         HermesStateViewModel.shared.$isLoadingNews
             .receive(on: RunLoop.main)
-            .assign(to: \.isLoadingNews, on: self)
+            .sink { [weak self] v in
+                self?.isLoadingNews = v
+            }
             .store(in: &cancellables)
             
         HermesStateViewModel.shared.$newsErrorMessage
             .receive(on: RunLoop.main)
-            .assign(to: \.newsErrorMessage, on: self)
+            .sink { [weak self] v in
+                self?.newsErrorMessage = v
+            }
             .store(in: &cancellables)
     }
 
@@ -1152,22 +1215,45 @@ class TradingViewModel: ObservableObject {
     
     // Discovery methods moved to TradingViewModel+MarketData.swift
 
-    // MARK: - News & Insights (Gemini)
-    
-    @Published var newsBySymbol: [String: [NewsArticle]] = [:]
-    @Published var newsInsightsBySymbol: [String: [NewsInsight]] = [:]
-    @Published var hermesEventsBySymbol: [String: [HermesEvent]] = [:]
-    @Published var kulisEventsBySymbol: [String: [HermesEvent]] = [:]
-    
+    // MARK: - News & Insights (Delegated to HermesNewsViewModel)
+
+    var newsBySymbol: [String: [NewsArticle]] {
+        get { hermesVM.newsBySymbol }
+        set { hermesVM.newsBySymbol = newValue }
+    }
+    var newsInsightsBySymbol: [String: [NewsInsight]] {
+        get { hermesVM.newsInsightsBySymbol }
+        set { hermesVM.newsInsightsBySymbol = newValue }
+    }
+    var hermesEventsBySymbol: [String: [HermesEvent]] {
+        get { hermesVM.hermesEventsBySymbol }
+        set { hermesVM.hermesEventsBySymbol = newValue }
+    }
+    var kulisEventsBySymbol: [String: [HermesEvent]] {
+        get { hermesVM.kulisEventsBySymbol }
+        set { hermesVM.kulisEventsBySymbol = newValue }
+    }
+
     // Hermes Feeds
-    @Published var watchlistNewsInsights: [NewsInsight] = [] // Tab 1: "Takip Listem"
-    @Published var generalNewsInsights: [NewsInsight] = []   // Tab 2: "Genel Piyasa"
-    
-    @Published var isLoadingNews: Bool = false
-    @Published var newsErrorMessage: String? = nil
-    
-    @MainActor
-    // Hermes methods moved to TradingViewModel+Hermes.swift
+    var watchlistNewsInsights: [NewsInsight] {
+        get { hermesVM.watchlistNewsInsights }
+        set { hermesVM.watchlistNewsInsights = newValue }
+    }
+    var generalNewsInsights: [NewsInsight] {
+        get { hermesVM.generalNewsInsights }
+        set { hermesVM.generalNewsInsights = newValue }
+    }
+
+    var isLoadingNews: Bool {
+        get { hermesVM.isLoadingNews }
+        set { hermesVM.isLoadingNews = newValue }
+    }
+    var newsErrorMessage: String? {
+        get { hermesVM.newsErrorMessage }
+        set { hermesVM.newsErrorMessage = newValue }
+    }
+
+    // Hermes methods delegated to HermesNewsViewModel - see TradingViewModel+Hermes.swift
     
     // MARK: - Passive AutoPilot Scanner (NVDA Fix)
     // Scan high-scoring assets in Watchlist/Portfolio that might NOT have news but are Technical/Fundamental screaming buys.
@@ -1420,12 +1506,15 @@ struct PortfolioAllocationItem: Identifiable {
 extension TradingViewModel {
     func executeBuy(symbol: String, quantity: Double, price: Double) {
         Task { @MainActor in
-            self.buy(
+            if let trade = ExecutionStateViewModel.shared.buy(
                 symbol: symbol,
                 quantity: quantity,
                 source: .user,
-                rationale: "Sanctum Alış Emri @ \(price)"
-            )
+                rationale: "Sanctum Alış Emri @ \(price)",
+                referencePrice: price
+            ) {
+                self.triggerSmartPlan(for: trade)
+            }
             
             // FAZE 1.2: Alım sonrası otomatik plan oluştur
             Task {
@@ -1439,11 +1528,12 @@ extension TradingViewModel {
     
     func executeSell(symbol: String, quantity: Double, price: Double) {
         Task { @MainActor in
-            self.sell(
+            ExecutionStateViewModel.shared.sell(
                 symbol: symbol,
                 quantity: quantity,
                 source: .user,
-                reason: "Sanctum Satış Emri @ \(price)"
+                reason: "Sanctum Satış Emri @ \(price)",
+                referencePrice: price
             )
 
             // FAZE 1.2: Satış sonrası planları güncelle
@@ -1483,5 +1573,9 @@ extension TradingViewModel {
 
     func exportPortfolioSnapshot() -> [String: Any] {
         PortfolioViewModel.shared.exportPortfolioSnapshot()
+    }
+
+    func resetAllData() {
+        PortfolioViewModel.shared.resetAllData()
     }
 }

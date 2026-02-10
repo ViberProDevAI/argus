@@ -17,12 +17,12 @@ public struct MimirConfig: Codable, Sendable {
     public var circuitBreakerOpenSeconds: Int
     public var defaultTTLSeconds: Int
     
-    // Defaults
+    // Defaults - Updated 2026-02: Using latest Gemini models
     public nonisolated static var standard: MimirConfig {
         return MimirConfig(
             enabled: true,
-            modelPrimary: "gemini-1.5-flash",
-            modelFallback: "gemini-1.5-nano",
+            modelPrimary: "gemini-2.0-flash",
+            modelFallback: "gemini-1.5-flash",
             maxRequestsPerMinute: 15,
             maxTokensPerMinute: 32_000,
             maxTokensPerDay: 1_000_000,

@@ -4,205 +4,163 @@ struct RegimeGuideSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    introSection
-                    regimesSection
-                    detectionSection
-                    strategySection
+                    headerSection
+                    regimeDefinitionsSection
+                    fastDecisionFlowSection
+                    actionMatrixSection
+                    errorPreventionSection
                 }
                 .padding(20)
             }
-            .background(Theme.background)
-            .navigationTitle("Piyasa Rejimleri")
+            .background(InstitutionalTheme.Colors.background)
+            .navigationTitle("Ders 3 · Rejim")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Kapat") { dismiss() }
-                        .foregroundColor(Theme.tint)
+                        .foregroundColor(InstitutionalTheme.Colors.primary)
                 }
             }
         }
     }
 
-    // MARK: - Intro
-
-    private var introSection: some View {
+    private var headerSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("REJIM NEDIR?")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(Theme.textSecondary)
+            Text("Rejimi Okumadan İşlem Açma")
+                .font(InstitutionalTheme.Typography.title)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
-            Text("Piyasa rejimi, piyasanin genel karakterini tanimlar. Farkli rejimlerde farkli stratejiler calisir. Yanlis rejimde dogru strateji bile para kaybettirir.")
-                .font(.subheadline)
-                .foregroundColor(.white)
+            Text("Aynı strateji her piyasada aynı sonucu vermez. Rejim, işlemin yönünü değil risk dozunu belirler.")
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
     }
 
-    // MARK: - Regimes
-
-    private var regimesSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            sectionHeader("REJIM TIPLERI")
-
-            VStack(spacing: 12) {
-                regimeCard(
-                    name: "TREND",
-                    color: Theme.positive,
-                    description: "Piyasa net bir yone sahip. Yukselis veya dusus trendi mevcut.",
-                    indicators: "ADX > 25, net fiyat yonu",
-                    strategy: "Trendi takip et, Orion motoru oncelikli"
-                )
-
-                regimeCard(
-                    name: "CAPRAZ (Yatay)",
-                    color: Theme.warning,
-                    description: "Piyasa belirli bir aralikta yukari-asagi hareket ediyor.",
-                    indicators: "ADX < 20, destek/direnc arasinda sikisma",
-                    strategy: "Trend motorlarindan kacin, destek/direncte islem yap"
-                )
-
-                regimeCard(
-                    name: "RISK-OFF",
-                    color: Theme.negative,
-                    description: "Yuksek belirsizlik ve korku. Yatirimcilar riskli varliklardan kaciyor.",
-                    indicators: "VIX > 30, sert dususler, yuksek volatilite",
-                    strategy: "Nakit agirligini artir, defansif sektorlere don"
-                )
-            }
-        }
-    }
-
-    private func regimeCard(
-        name: String,
-        color: Color,
-        description: String,
-        indicators: String,
-        strategy: String
-    ) -> some View {
+    private var regimeDefinitionsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
+            sectionTitle("3 TEMEL REJİM")
+            regimeRow(
+                name: "Trend",
+                color: InstitutionalTheme.Colors.positive,
+                summary: "Yön belirgin, devam olasılığı daha yüksek.",
+                clue: "ADX güçlü, kırılım teyitli."
+            )
+            regimeRow(
+                name: "Çapraz",
+                color: InstitutionalTheme.Colors.warning,
+                summary: "Yön zayıf, bant içi hareket baskın.",
+                clue: "ADX düşük, sık fake breakout."
+            )
+            regimeRow(
+                name: "Risk-off",
+                color: InstitutionalTheme.Colors.negative,
+                summary: "Belirsizlik yüksek, korunma öncelikli.",
+                clue: "VIX yükseliş eğiliminde, volatilite sert."
+            )
+        }
+    }
+
+    private var fastDecisionFlowSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("60 SANİYELİK HIZLI AKIŞ")
+            stepRow(index: "1", title: "Volatiliteye bak", detail: "VIX yukarıysa risk boyutunu otomatik düşür.")
+            stepRow(index: "2", title: "Trend gücünü ölç", detail: "ADX güçlü ise trend; değilse çapraz kabul et.")
+            stepRow(index: "3", title: "Motor önceliğini değiştir", detail: "Risk-off’ta Aether/Atlas önceliği artır, agresif teknik ağırlığı azalt.")
+            stepRow(index: "4", title: "Nihai kararı yeniden oku", detail: "Konsey kararı ile rejim çelişiyorsa işlem boyutunu küçült.")
+        }
+    }
+
+    private var actionMatrixSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("REJİME GÖRE EYLEM MATRİSİ")
+            matrixRow(regime: "Trend", action: "Teyitli yönde kal, gereksiz karşı işlem açma.")
+            matrixRow(regime: "Çapraz", action: "İşlem sayısını azalt, seçiciliği artır.")
+            matrixRow(regime: "Risk-off", action: "Pozisyon küçült, stop disiplinini sıkılaştır.")
+        }
+    }
+
+    private var errorPreventionSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("SIK YAPILAN HATALAR")
+            bullet("Rejim çaprazken trenddeymiş gibi agresif kaldıraç kullanmak.")
+            bullet("Makro stres artarken pozisyon büyütmek.")
+            bullet("Rejimi sadece bir metrikle okuyup diğer bağlamı yok saymak.")
+        }
+    }
+
+    private func regimeRow(name: String, color: Color, summary: String, clue: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 8) {
                 Circle()
                     .fill(color)
-                    .frame(width: 10, height: 10)
-
+                    .frame(width: 8, height: 8)
                 Text(name)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.white)
-
-                Spacer()
+                    .font(InstitutionalTheme.Typography.bodyStrong)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             }
+            Text(summary)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            Text("İpucu: \(clue)")
+                .font(.system(size: 11))
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            Rectangle()
+                .fill(InstitutionalTheme.Colors.borderSubtle)
+                .frame(height: 1)
+        }
+    }
 
-            Text(description)
-                .font(.caption)
-                .foregroundColor(Theme.textSecondary)
-
-            Divider().background(color.opacity(0.3))
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .top, spacing: 8) {
-                    Text("Gostergeler:")
-                        .font(.caption2)
-                        .foregroundColor(Theme.textSecondary)
-                    Text(indicators)
-                        .font(.caption2)
-                        .foregroundColor(.white)
-                }
-
-                HStack(alignment: .top, spacing: 8) {
-                    Text("Strateji:")
-                        .font(.caption2)
-                        .foregroundColor(Theme.textSecondary)
-                    Text(strategy)
-                        .font(.caption2)
-                        .foregroundColor(color)
-                }
+    private func stepRow(index: String, title: String, detail: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text(index)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(InstitutionalTheme.Colors.primary)
+                    .frame(width: 14, alignment: .leading)
+                Text(title)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             }
-        }
-        .padding(14)
-        .background(Color.white.opacity(0.03))
-        .cornerRadius(Theme.Radius.medium)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.medium)
-                .stroke(color.opacity(0.3), lineWidth: 1)
-        )
-    }
-
-    // MARK: - Detection
-
-    private var detectionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("REJIM NASIL BELIRLENIR?")
-
-            VStack(alignment: .leading, spacing: 8) {
-                detectionRow("ADX Seviyesi", "Trend gucu olcer")
-                detectionRow("VIX", "Korku/belirsizlik seviyesi")
-                detectionRow("Yabanci Akisi", "Risk istahi gostergesi")
-                detectionRow("Faiz Trendi", "Parasal kosullar")
-            }
-
-            Text("Chiron motoru bu gostergeleri birlestirerek dominant rejimi tespit eder ve diger motorlarin agirliklarini ayarlar.")
-                .font(.caption)
-                .foregroundColor(Theme.textSecondary)
-                .padding(.top, 4)
+            Text(detail)
+                .font(.system(size: 11))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .padding(.leading, 22)
+            Rectangle()
+                .fill(InstitutionalTheme.Colors.borderSubtle)
+                .frame(height: 1)
         }
     }
 
-    private func detectionRow(_ indicator: String, _ description: String) -> some View {
-        HStack {
-            Text(indicator)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(Theme.tint)
-                .frame(width: 100, alignment: .leading)
-
-            Text(description)
-                .font(.caption)
-                .foregroundColor(Theme.textSecondary)
-
-            Spacer()
-        }
-        .padding(10)
-        .background(Color.white.opacity(0.02))
-        .cornerRadius(Theme.Radius.small)
-    }
-
-    // MARK: - Strategy
-
-    private var strategySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("REJIME GORE STRATEJI")
-
-            tipBox("TREND rejiminde Orion'a guvenilebilir. CAPRAZ rejimde Orion cok sayida yanlis sinyal uretir - bu rejimde islem sayisini azaltin veya destek/direnc stratejisi kullanin.")
-
-            tipBox("RISK-OFF rejiminde en iyi strateji genellikle 'bir sey yapmamak'tir. Nakit tutun, firtina dinene kadar bekleyin.")
-        }
-    }
-
-    private func tipBox(_ text: String) -> some View {
+    private func matrixRow(regime: String, action: String) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "lightbulb")
-                .font(.subheadline)
-                .foregroundColor(Theme.tint)
-
-            Text(text)
-                .font(.caption)
-                .foregroundColor(.white)
+            Text(regime)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.primary)
+                .frame(width: 64, alignment: .leading)
+            Text(action)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
-        .padding(12)
-        .background(Theme.tint.opacity(0.1))
-        .cornerRadius(Theme.Radius.small)
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.caption)
-            .fontWeight(.semibold)
-            .foregroundColor(Theme.textSecondary)
-            .tracking(0.5)
+    private func bullet(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("•")
+                .foregroundColor(InstitutionalTheme.Colors.warning)
+            Text(text)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(InstitutionalTheme.Typography.micro)
+            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            .tracking(0.8)
     }
 }
 

@@ -506,14 +506,20 @@ class OracleChamberViewModel: ObservableObject {
         let simInput = OracleDataInput(
             inflationYoY: simInflation,
             housingSalesTotal: baseInput.housingSalesTotal,
-            housingSalesChangeYoY: simInterestRate > 40 ? baseInput.housingSalesChangeYoY * 0.5 : baseInput.housingSalesChangeYoY,
+            housingSalesChangeYoY: baseInput.housingSalesChangeYoY.map { value in
+                simInterestRate > 40 ? value * 0.5 : value
+            },
             housingSalesChangeMoM: baseInput.housingSalesChangeMoM,
             creditCardSpendingTotal: baseInput.creditCardSpendingTotal,
             creditCardSpendingChangeYoY: simInflation + 15, // Enflasyon + nominal artış
-            capacityUsageRatio: simDollarTry > 40 ? baseInput.capacityUsageRatio - 4 : baseInput.capacityUsageRatio,
+            capacityUsageRatio: baseInput.capacityUsageRatio.map { value in
+                simDollarTry > 40 ? value - 4 : value
+            },
             prevCapacityUsageRatio: baseInput.prevCapacityUsageRatio,
             touristArrivalsTotal: baseInput.touristArrivalsTotal,
-            touristArrivalsChangeYoY: simDollarTry > 40 ? baseInput.touristArrivalsChangeYoY * 1.5 : baseInput.touristArrivalsChangeYoY,
+            touristArrivalsChangeYoY: baseInput.touristArrivalsChangeYoY.map { value in
+                simDollarTry > 40 ? value * 1.5 : value
+            },
             autoSalesTotal: baseInput.autoSalesTotal,
             autoSalesChangeYoY: simInterestRate > 45 ? -15 : baseInput.autoSalesChangeYoY
         )

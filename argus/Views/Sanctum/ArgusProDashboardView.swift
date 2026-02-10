@@ -64,7 +64,7 @@ struct ArgusProDashboardView: View {
                         // ROW 2: PROMETHEUS (Target) & ATHENA (Signals)
                         HStack(spacing: 12) {
                             // BLOCK C: PROMETHEUS (Was Phoenix)
-                            BentoCard(title: "PROMETHEUS", icon: "scope", accentColor: .purple, height: 160) {
+                            BentoCard(title: "PROMETHEUS", icon: "scope", accentColor: SanctumTheme.titanGold, height: 160) {
                                 prometheusContent
                             }
                             .onTapGesture { activeModule = .prometheus }
@@ -94,7 +94,7 @@ struct ArgusProDashboardView: View {
                         // Footer / Copyright
                         Text("ARGUS TERMINAL v2.2 • SANCTUM CORE")
                             .font(.system(size: 8, design: .monospaced))
-                            .foregroundColor(.gray.opacity(0.3))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                             .padding(.top, 20)
                     }
                     .padding(12)
@@ -126,7 +126,7 @@ struct ArgusProDashboardView: View {
                     
                     Text("TREND YÖNÜ")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 
                 Spacer()
@@ -136,10 +136,10 @@ struct ArgusProDashboardView: View {
                     VStack(alignment: .leading) {
                         Text("\(Int(score.components.rsi ?? 0))")
                             .font(.system(size: 20, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         Text("RSI")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     
                     Spacer()
@@ -150,7 +150,7 @@ struct ArgusProDashboardView: View {
                             .foregroundColor(displayColor(for: score.score))
                         Text("GÜÇ")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
             } else {
@@ -176,7 +176,7 @@ struct ArgusProDashboardView: View {
                     
                     Text("DEĞERLEME")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 
                 Spacer()
@@ -186,22 +186,27 @@ struct ArgusProDashboardView: View {
                     VStack(alignment: .leading) {
                         Text(String(format: "%.1f", atlas.totalScore / 10.0)) // Assuming 0-100 scale -> 0-10
                         .font(.system(size: 20, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         Text("KALİTE") // Atlas Total Score = Quality
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     
                     Spacer()
                     
-                    // Mock FK if n/a
                     VStack(alignment: .trailing) {
-                        Text("8.4") // TODO: Pull real FK
-                        .font(.system(size: 16, weight: .medium, design: .monospaced))
-                        .foregroundColor(.gray)
+                        if let pe = atlas.financials?.peRatio {
+                            Text(String(format: "%.1f", pe))
+                                .font(.system(size: 16, weight: .medium, design: .monospaced))
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        } else {
+                            Text("N/A")
+                                .font(.system(size: 16, weight: .medium, design: .monospaced))
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        }
                         Text("F/K")
-                        .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.gray)
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
                 
@@ -226,7 +231,7 @@ struct ArgusProDashboardView: View {
                     
                     Text("HEDEF FİYAT")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 
                 Spacer()
@@ -236,10 +241,10 @@ struct ArgusProDashboardView: View {
                     VStack(alignment: .leading) {
                         Text("\(Int(phoenix.confidence))%")
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .foregroundColor(phoenix.confidence > 70 ? Sanctum2Theme.neonGreen : .orange)
+                            .foregroundColor(phoenix.confidence > 70 ? Sanctum2Theme.neonGreen : Sanctum2Theme.amberWarning)
                         Text("GÜVEN")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     
                     Spacer()
@@ -250,7 +255,7 @@ struct ArgusProDashboardView: View {
                             .foregroundColor(Sanctum2Theme.crimsonRed)
                         Text("STOP")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
                 
@@ -274,7 +279,7 @@ struct ArgusProDashboardView: View {
                     
                     Text("SİNYAL")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 
                 Spacer()
@@ -283,17 +288,17 @@ struct ArgusProDashboardView: View {
                     VStack(alignment: .leading) {
                         Text("AKTİF")
                             .font(.system(size: 16, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         Text("DURUM")
                             .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("SİNYAL YOK")
                         .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 Spacer()
             }
@@ -312,7 +317,7 @@ struct ArgusProDashboardView: View {
                     
                     Text("SENTIMENT")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 
                 Spacer()
@@ -320,7 +325,7 @@ struct ArgusProDashboardView: View {
                 VStack(alignment: .leading) {
                     Text(topNews.headline)
                         .font(.system(size: 9))
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
                         .lineLimit(2)
                 }
             } else {
@@ -328,10 +333,10 @@ struct ArgusProDashboardView: View {
                     Spacer()
                     Image(systemName: "antenna.radiowaves.left.and.right")
                         .font(.system(size: 20))
-                        .foregroundColor(.gray.opacity(0.3))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     Text("Veri Yok")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Spacer()
                 }
             }
@@ -345,12 +350,12 @@ struct ArgusProDashboardView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("TREND TAKİP")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Text("STRATEJİ")
                     .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(.gray)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
             
             Spacer()
@@ -363,7 +368,7 @@ struct ArgusProDashboardView: View {
                         .foregroundColor(Sanctum2Theme.neonGreen)
                     Text("FREKANS")
                         .font(.system(size: 8, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
             }
         }
@@ -374,7 +379,7 @@ struct ArgusProDashboardView: View {
     private var loadingPlaceholder: some View {
         VStack {
             Spacer()
-            ProgressView().tint(.gray)
+            ProgressView().tint(InstitutionalTheme.Colors.textSecondary)
             Spacer()
         }
     }
@@ -387,9 +392,9 @@ struct ArgusProDashboardView: View {
     
     private func sentColor(_ s: NewsSentiment) -> Color {
         switch s {
-        case .strongPositive, .weakPositive: return .green
-        case .strongNegative, .weakNegative: return .red
-        default: return .gray
+        case .strongPositive, .weakPositive: return SanctumTheme.auroraGreen
+        case .strongNegative, .weakNegative: return SanctumTheme.crimsonRed
+        default: return InstitutionalTheme.Colors.textSecondary
         }
     }
     

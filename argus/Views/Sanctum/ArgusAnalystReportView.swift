@@ -10,31 +10,37 @@ struct ArgusAnalystReportView: View {
     
     var body: some View {
         ZStack {
-            Color.black.edgesIgnoringSafeArea(.all)
+            InstitutionalTheme.Colors.background.edgesIgnoringSafeArea(.all)
             
             VStack(alignment: .leading, spacing: 0) {
                 // Header
                 HStack {
                     Image(systemName: "sparkles")
-                        .foregroundColor(SanctumTheme.hologramBlue)
+                        .foregroundColor(InstitutionalTheme.Colors.primary)
                     Text("ARGUS ANALYST")
                         .font(.system(size: 16, weight: .bold, design: .monospaced))
-                        .foregroundColor(SanctumTheme.hologramBlue)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     Spacer()
                     Button(action: { presentationMode.wrappedValue.dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
                 .padding()
-                .background(Color(white: 0.1))
+                .background(InstitutionalTheme.Colors.surface2)
+                .overlay(
+                    Rectangle()
+                        .frame(height: 1)
+                        .foregroundColor(InstitutionalTheme.Colors.borderSubtle),
+                    alignment: .bottom
+                )
                 
                 // Report Content
                 ScrollView {
                     Text(displayedText)
                         .font(.system(size: 14, weight: .regular, design: .monospaced))
-                        .foregroundColor(.green)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         .padding()
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -44,7 +50,7 @@ struct ArgusAnalystReportView: View {
                     Spacer()
                     Text("Powered by ARGUS AI ENGINE")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .padding()
                 }
             }

@@ -34,36 +34,30 @@ class MarketStatusService {
     // MARK: - US Market Status
     func getMarketStatus() -> MarketStatus {
         let now = Date()
-        
-        // 1. Check Weekend
+
+        // 1. Check Weekend — haftasonu kapalı
         if isWeekend(now, timeZone: usTimeZone) {
             return .closed(reason: "Haftasonu")
         }
-        
-        // 2. Check Time in NYC
+
+        // 2. Hafta içi — ABD piyasası her zaman açık (premarket + afterhours dahil)
+        // Eğitici uygulama: kullanıcılar istedikleri zaman işlem yapabilmeli
         let components = calendar.dateComponents(in: usTimeZone, from: now)
         guard let hour = components.hour, let minute = components.minute else {
             return .closed(reason: "Zaman Hatası")
         }
-        
+
         let currentMinutes = hour * 60 + minute
         let openMinutes = marketOpenHour * 60 + marketOpenMinute
         let closeMinutes = marketCloseHour * 60 + marketCloseMinute
-        
-        if currentMinutes < openMinutes {
-            // Early Morning
-            if currentMinutes >= (4 * 60) { // Premarket starts 4:00 AM usually
-                return .preMarket
-            }
-            return .closed(reason: "Piyasa Açılmadı")
-        } else if currentMinutes >= closeMinutes {
-            if currentMinutes < (20 * 60) { // Afterhours until 8:00 PM
-                return .afterHours
-            }
-            return .closed(reason: "Piyasa Kapandı")
+
+        if currentMinutes >= openMinutes && currentMinutes < closeMinutes {
+            return .open
+        } else if currentMinutes >= (4 * 60) && currentMinutes < openMinutes {
+            return .preMarket
+        } else {
+            return .afterHours // Hafta içi gece dahil açık
         }
-        
-        return .open
     }
     
     // MARK: - BIST Market Status
@@ -98,7 +92,7 @@ class MarketStatusService {
     func canTrade() -> Bool {
         // Legacy: US Market only
         switch getMarketStatus() {
-        case .open: return true
+        case .open, .preMarket, .afterHours: return true
         default: return false
         }
     }
@@ -107,7 +101,7 @@ class MarketStatusService {
         switch market {
         case .global:
             switch getMarketStatus() {
-            case .open: return true
+            case .open, .preMarket, .afterHours: return true
             default: return false
             }
         case .bist:
@@ -146,4 +140,3 @@ class MarketStatusService {
         return formatter.string(from: Date())
     }
 }
-

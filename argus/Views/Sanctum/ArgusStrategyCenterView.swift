@@ -47,11 +47,11 @@ struct ArgusStrategyCenterView: View {
                                 .background(selectedSegment == segment ? SanctumTheme.hologramBlue.opacity(0.2) : Color.clear)
                                 .overlay(
                                     RoundedRectangle(cornerRadius: 12)
-                                        .stroke(selectedSegment == segment ? SanctumTheme.hologramBlue : Color.gray.opacity(0.3), lineWidth: 1)
+                                        .stroke(selectedSegment == segment ? SanctumTheme.hologramBlue : InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
                                 )
                                 .cornerRadius(12)
                             }
-                            .foregroundColor(selectedSegment == segment ? SanctumTheme.hologramBlue : .gray)
+                            .foregroundColor(selectedSegment == segment ? SanctumTheme.hologramBlue : InstitutionalTheme.Colors.textSecondary)
                         }
                     }
                     .padding()
@@ -97,17 +97,17 @@ struct AetherDecisionView: View {
                         .foregroundColor(SanctumTheme.neonGreen)
                     Text("AETHER MAKRO GÖRÜŞÜ")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     Spacer()
                 }
                 
-                Divider().background(Color.white.opacity(0.2))
+                Divider().background(InstitutionalTheme.Colors.borderStrong)
                 
                 HStack {
                     VStack(alignment: .leading) {
                         Text("PİYASA REJİMİ")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Text(viewModel.market.marketRegime.rawValue.uppercased())
                             .font(.title3)
                             .fontWeight(.bold)
@@ -117,25 +117,25 @@ struct AetherDecisionView: View {
                     VStack(alignment: .trailing) {
                         Text("RİSK İŞTAHI")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Text("NÖTR") // Todo: dynamic
                             .font(.title3)
                             .fontWeight(.bold)
-                            .foregroundColor(.yellow)
+                            .foregroundColor(SanctumTheme.titanGold)
                     }
                 }
             }
             .padding()
             .background(SanctumTheme.surface)
             .cornerRadius(12)
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1))
             
             // Insight Feed (Mock for now)
             VStack(alignment: .leading, spacing: 12) {
                 Text("MAKRO ANALİZ NOTLARI")
                     .font(.caption)
                     .fontWeight(.bold)
-                    .foregroundColor(.gray)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 
                 ForEach(0..<3) { _ in
                     HStack(spacing: 12) {
@@ -145,14 +145,14 @@ struct AetherDecisionView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Enflasyon verisi beklentilere paralel geldi.")
                                 .font(.system(size: 14))
-                                .foregroundColor(.white)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             Text("2 saat önce • TCMB")
                                 .font(.caption2)
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                     }
                     .padding()
-                    .background(Color.black.opacity(0.3))
+                    .background(SanctumTheme.terminalBg.opacity(0.7))
                     .cornerRadius(8)
                 }
             }
@@ -170,18 +170,18 @@ struct BacktestResultsView: View {
             Text("SİMÜLASYON MODU")
                 .font(.title2)
                 .fontWeight(.bold)
-                .foregroundColor(.white)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             
             Text("Geçmiş veriler üzerinde strateji testleri ve Monte Carlo simülasyonları burada görüntülenecek.")
                 .font(.body)
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
             
             Button(action: {}) {
                 Text("YENİ TEST BAŞLAT")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     .padding()
                     .frame(maxWidth: .infinity)
                     .background(SanctumTheme.crimsonRed)
@@ -205,22 +205,22 @@ struct AlkindusDashboard: View {
             Text("ZAMANSAL ANALİZ (TEMPORAL)")
                 .font(.caption)
                 .bold()
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             
             // 1. Time Warp Status
             HStack {
                 VStack(alignment: .leading) {
                     Text("Piyasa Frekansı")
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .font(.caption)
                     Text("Yüksek Volatilite")
-                        .foregroundColor(.orange)
+                        .foregroundColor(SanctumTheme.titanGold)
                         .bold()
                 }
                 Spacer()
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.largeTitle)
-                    .foregroundColor(.purple)
+                    .foregroundColor(SanctumTheme.hologramBlue)
             }
             .padding()
             .background(SanctumTheme.surface)
@@ -230,25 +230,25 @@ struct AlkindusDashboard: View {
             VStack(alignment: .leading) {
                 Text("Mevsimsellik (Ocak)")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 
                 HStack {
                     Text("Geçmiş 5 Yıl Ortalaması:")
                     Spacer()
                     Text("%+2.4")
-                        .foregroundColor(.green)
+                        .foregroundColor(SanctumTheme.auroraGreen)
                         .bold()
                 }
                 .font(.subheadline)
                 .padding(.top, 4)
                 
                 ProgressView(value: 0.7)
-                    .tint(.purple)
+                    .tint(SanctumTheme.hologramBlue)
                     .padding(.vertical, 8)
                 
                 Text("Şu an piyasa döngüsünün 'Birikim' evresindeyiz.")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
             .padding()
             .background(SanctumTheme.surface)
@@ -266,34 +266,34 @@ struct ChironLearningDashboard: View {
             Text("SİSTEM ÖĞRENME GÜNLÜĞÜ")
                 .font(.caption)
                 .bold()
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             
             // Stats
             HStack(spacing: 12) {
-                StrategyStatBox(title: "Öğrenilen Model", value: "142", color: .cyan)
-                StrategyStatBox(title: "Doğruluk", value: "%78", color: .green)
-                StrategyStatBox(title: "Hata Payı", value: "%22", color: .red)
+                StrategyStatBox(title: "Öğrenilen Model", value: "142", color: SanctumTheme.hologramBlue)
+                StrategyStatBox(title: "Doğruluk", value: "%78", color: SanctumTheme.auroraGreen)
+                StrategyStatBox(title: "Hata Payı", value: "%22", color: SanctumTheme.crimsonRed)
             }
             
             // Recent Logs
             ForEach(0..<5) { i in
                 HStack {
                     Circle()
-                        .fill(i % 2 == 0 ? Color.green : Color.orange)
+                        .fill(i % 2 == 0 ? SanctumTheme.auroraGreen : SanctumTheme.titanGold)
                         .frame(width: 8, height: 8)
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text(i % 2 == 0 ? "Başarılı Tahmin (THYAO)" : "Stop-Loss Tetiklendi (GARAN)")
                             .font(.system(size: 12, weight: .bold))
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         Text("Model #\(1042 - i) - Parametre optimize edildi.")
                             .font(.caption2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     Spacer()
                     Text("1\(i)dk önce")
                         .font(.caption2)
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 .padding()
                 .background(SanctumTheme.surface)
@@ -316,7 +316,7 @@ struct StrategyStatBox: View {
                 .foregroundColor(color)
             Text(title)
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
         .frame(maxWidth: .infinity)
         .padding()

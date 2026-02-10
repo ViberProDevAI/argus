@@ -58,6 +58,7 @@ enum HeimdallNetwork {
                     
                     // Capture Body Prefix for Analysis
                     let bodyPrefix = String(data: data.prefix(300), encoding: .utf8)?.replacingOccurrences(of: "\n", with: " ") ?? "Bin/Empty"
+                    let bodyLower = bodyPrefix.lowercased()
                     
                     // Status Code Analysis
                     switch httpResp.statusCode {
@@ -68,6 +69,9 @@ enum HeimdallNetwork {
                         }
                         if bodyPrefix.contains("Error Message") || bodyPrefix.contains("\"code\": 429") || bodyPrefix.contains("exceeded your daily API") {
                              throw HeimdallCoreError(category: .rateLimited, code: 429, message: "API Error in 200 OK", bodyPrefix: bodyPrefix)
+                        }
+                        if bodyLower.contains("1013") && (bodyLower.contains("rate") || bodyLower.contains("try again later")) {
+                            throw HeimdallCoreError(category: .rateLimited, code: 1013, message: "Provider Rate Limited (1013)", bodyPrefix: bodyPrefix)
                         }
                         return data
                         
@@ -84,10 +88,9 @@ enum HeimdallNetwork {
                     case 429:
                         throw HeimdallCoreError(category: .rateLimited, code: 429, message: "Rate Limit Exceeded", bodyPrefix: bodyPrefix)
                     case 500...599:
-                         // Server Errors are technically retryable, but we might want to respect provider
-                         // For now, let's throw HeimdallCoreError which *might* trigger Circuit Breaker if Registry desires, 
-                         // OR we could retry locally here if we wanted. 
-                         // User asked for retry on "NSURLErrorDomain", not necessarily 500.
+                        if bodyLower.contains("1013") && (bodyLower.contains("rate") || bodyLower.contains("try again later")) {
+                            throw HeimdallCoreError(category: .rateLimited, code: 1013, message: "Provider Rate Limited (1013)", bodyPrefix: bodyPrefix)
+                        }
                         throw HeimdallCoreError(category: .serverError, code: httpResp.statusCode, message: "Server Error", bodyPrefix: bodyPrefix)
                     default:
                         throw HeimdallCoreError(category: .unknown, code: httpResp.statusCode, message: "HTTP \(httpResp.statusCode)", bodyPrefix: bodyPrefix)
@@ -108,6 +111,13 @@ enum HeimdallNetwork {
                         default:
                             isTransient = false
                         }
+                    } else if let heimdallError = error as? HeimdallCoreError {
+                        switch heimdallError.category {
+                        case .rateLimited, .serverError, .networkError:
+                            isTransient = true
+                        default:
+                            isTransient = false
+                        }
                     } else {
                         // HeimdallCoreError is NOT transient usually (4xx, 5xx)
                         // Unless we decide 5xx is transient?
@@ -115,7 +125,12 @@ enum HeimdallNetwork {
                     }
                     
                     if isTransient && attempt < maxAttempts {
-                        let delay = Double(attempt) * 0.5 // 0.5s, 1.0s, 1.5s
+                        let delay: Double
+                        if let heimdallError = error as? HeimdallCoreError, heimdallError.category == .rateLimited {
+                            delay = Double(attempt) * 1.0 // 1s, 2s, 3s
+                        } else {
+                            delay = Double(attempt) * 0.5 // 0.5s, 1.0s, 1.5s
+                        }
                         print("⏳ Network Retry (\(attempt)/\(maxAttempts)) for \(url.lastPathComponent): \(error.localizedDescription)")
                         try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
                         continue

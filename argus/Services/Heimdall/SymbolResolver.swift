@@ -85,6 +85,8 @@ struct SymbolResolver {
     ]
     
     func isBistSymbol(_ symbol: String) -> Bool {
-        return bistSymbols.contains(symbol.uppercased())
+        let upper = symbol.uppercased()
+        let normalized = upper.hasSuffix(".IS") ? String(upper.dropLast(3)) : upper
+        return bistSymbols.contains(normalized)
     }
 }

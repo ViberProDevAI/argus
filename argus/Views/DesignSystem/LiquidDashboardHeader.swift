@@ -15,8 +15,7 @@ struct LiquidDashboardHeader: View {
     private var isBist: Bool { selectedMarket == .bist }
     
     // Dynamic Colors
-    private var themeColor: Color { isBist ? .red : Theme.accent }
-    private var themeSecondary: Color { isBist ? .orange : Theme.primary }
+    private var themeColor: Color { isBist ? InstitutionalTheme.Colors.warning : InstitutionalTheme.Colors.primary }
     private var currencySymbol: String { isBist ? "₺" : "$" }
     
     // Data Calculation
@@ -57,9 +56,9 @@ struct LiquidDashboardHeader: View {
                         marketToggle(title: "BIST", mode: .bist)
                     }
                     .padding(3)
-                    .background(Material.ultraThinMaterial)
+                    .background(InstitutionalTheme.Colors.surface2.opacity(0.95))
                     .clipShape(Capsule())
-                    .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .overlay(Capsule().stroke(InstitutionalTheme.Colors.borderStrong, lineWidth: 1))
                     
                     Spacer()
                     
@@ -74,27 +73,27 @@ struct LiquidDashboardHeader: View {
                 // 2. Main Balance (Center)
                 VStack(spacing: 4) {
                     Text(isBist ? "BIST DEĞERİ" : "TOPLAM VARLIK")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .font(InstitutionalTheme.Typography.micro)
                         .tracking(1.5)
-                        .foregroundColor(Color.white.opacity(0.7))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     
                     // Ana Bakiye - Küçültüldü (48 -> 36)
                     Text("\(currencySymbol)\(String(format: "%.0f", equity))")
-                        .font(.system(size: 36, weight: .black, design: .rounded))
-                        .foregroundColor(.white)
+                        .font(.system(size: 34, weight: .black, design: .rounded))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         .shadow(color: themeColor.opacity(0.3), radius: 10)
                 }
                 
                 // 3. Stats Grid (3 Columns)
                 HStack(spacing: 12) {
                     // Nakit
-                    statPill(title: "NAKİT", value: balance, color: .white.opacity(0.9))
+                    statPill(title: "NAKİT", value: balance, color: InstitutionalTheme.Colors.textPrimary)
                     
                     // Net K/Z (Toplam)
-                    statPill(title: "NET K/Z", value: realized + unrealized, color: (realized + unrealized) >= 0 ? Theme.positive : Theme.negative)
+                    statPill(title: "NET K/Z", value: realized + unrealized, color: (realized + unrealized) >= 0 ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative)
                     
                     // Anlık K/Z (Unrealized) - YENİ
-                    statPill(title: "ANLIK", value: unrealized, color: unrealized >= 0 ? Theme.positive : Theme.negative)
+                    statPill(title: "ANLIK", value: unrealized, color: unrealized >= 0 ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative)
                 }
                 .padding(.bottom, 8)
             }
@@ -110,16 +109,16 @@ struct LiquidDashboardHeader: View {
             withAnimation(.spring()) { selectedMarket = mode }
         }) {
             Text(title)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(selectedMarket == mode ? themeColor : .white.opacity(0.6))
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(selectedMarket == mode ? themeColor : InstitutionalTheme.Colors.textSecondary)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(
-                    selectedMarket == mode ? Color.white.opacity(1.0) : Color.clear
+                    selectedMarket == mode ? InstitutionalTheme.Colors.textPrimary : Color.clear
                 )
                 .clipShape(Capsule())
                 // Invert text color if selected (White bg -> Theme color text)
-                .foregroundColor(selectedMarket == mode ? themeColor : .white)
+                .foregroundColor(selectedMarket == mode ? themeColor : InstitutionalTheme.Colors.textPrimary)
         }
     }
     
@@ -127,13 +126,13 @@ struct LiquidDashboardHeader: View {
         Button(action: action) {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .frame(width: 40, height: 40)
-                .background(Material.ultraThinMaterial)
+                .background(InstitutionalTheme.Colors.surface2.opacity(0.95))
                 .clipShape(Circle())
                 .overlay(
                     Circle()
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                        .stroke(InstitutionalTheme.Colors.borderStrong, lineWidth: 1)
                 )
         }
     }
@@ -146,17 +145,17 @@ struct LiquidDashboardHeader: View {
             
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(.white.opacity(0.5))
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 
                 Text("\(currencySymbol)\(String(format: "%.0f", value))")
-                    .font(.system(size: 15, weight: .bold, design: .monospaced))
-                    .foregroundColor(.white)
+                    .font(InstitutionalTheme.Typography.data)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
-        .background(Material.ultraThinMaterial)
+        .background(InstitutionalTheme.Colors.surface2.opacity(0.92))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)

@@ -352,7 +352,7 @@ final class MarketViewModel: ObservableObject {
 
     func loadMacroEnvironment() {
         Task {
-            let rating = await MacroRegimeService.shared.computeMacroEnvironment(forceRefresh: true)
+            let rating = await MacroRegimeService.shared.computeMacroEnvironment(forceRefresh: false)
             await MainActor.run {
                 let context = ChironContext(
                     atlasScore: nil,

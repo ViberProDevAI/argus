@@ -19,10 +19,10 @@ struct MetricInsightRow: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(metric.label)
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         Text(metric.context)
                             .font(.caption2)
-                            .foregroundColor(metric.scoreImpact > 0 ? .green : (metric.scoreImpact < 0 ? .red : .gray))
+                            .foregroundColor(impactColor)
                     }
                     
                     Spacer()
@@ -30,13 +30,13 @@ struct MetricInsightRow: View {
                     // Value
                     Text(metric.value)
                         .font(.system(size: 13, weight: .bold, design: .monospaced))
-                        .foregroundColor(metric.scoreImpact > 0 ? .green : (metric.scoreImpact < 0 ? .red : .white))
+                        .foregroundColor(metric.scoreImpact > 0 ? InstitutionalTheme.Colors.positive : (metric.scoreImpact < 0 ? InstitutionalTheme.Colors.negative : InstitutionalTheme.Colors.textPrimary))
                     
                     // Expand Icon
                     Image(systemName: "chevron.right")
                         .font(.caption2)
                         .rotationEffect(.degrees(isExpanded ? 90 : 0))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 }
                 .padding(.vertical, 8)
                 .contentShape(Rectangle()) // Make full row tappable
@@ -47,23 +47,29 @@ struct MetricInsightRow: View {
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "info.circle.fill")
                         .font(.caption)
-                        .foregroundColor(.blue.opacity(0.8))
+                        .foregroundColor(InstitutionalTheme.Colors.primary.opacity(0.85))
                         .offset(y: 2)
                     
                     Text(metric.education)
                         .font(.system(size: 11))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .lineLimit(nil)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(10)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(8)
+                .background(InstitutionalTheme.Colors.primary.opacity(0.12))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider().background(InstitutionalTheme.Colors.borderSubtle)
         }
+    }
+
+    private var impactColor: Color {
+        if metric.scoreImpact > 0 { return InstitutionalTheme.Colors.positive }
+        if metric.scoreImpact < 0 { return InstitutionalTheme.Colors.negative }
+        return InstitutionalTheme.Colors.textSecondary
     }
 }
 
@@ -77,6 +83,7 @@ struct BistFaktorCard: View {
     @State private var result: BistFaktorResult?
     @State private var isLoading = true
     @State private var showDetails = false
+    @State private var errorMessage: String?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -85,11 +92,11 @@ struct BistFaktorCard: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TEMEL ANALİZ & FAKTÖRLER")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     Text(symbol)
                         .font(.title3)
                         .bold()
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 }
                 
                 Spacer()
@@ -99,18 +106,24 @@ struct BistFaktorCard: View {
                         Text("\(Int(r.totalScore))")
                             .font(.system(size: 24, weight: .black, design: .monospaced))
                             .foregroundColor(scoreColor(r.totalScore))
+                            .monospacedDigit()
                         Text("/100")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             .offset(y: 6)
                     }
-                } else {
+                } else if isLoading {
                     ProgressView()
+                        .tint(InstitutionalTheme.Colors.primary)
+                } else {
+                    Text("VERİ YOK")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(InstitutionalTheme.Colors.warning)
                 }
             }
             .padding(16)
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider().background(InstitutionalTheme.Colors.borderSubtle)
             
             // Factor Summary Grid (Interactive)
             if let r = result {
@@ -125,7 +138,7 @@ struct BistFaktorCard: View {
                 VStack(alignment: .leading, spacing: 12) {
                     Text("DETAYLI ANALİZ RAPORU")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         .padding(.top, 8)
                     
                     ForEach(r.factors) { factor in
@@ -146,27 +159,54 @@ struct BistFaktorCard: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 16)
+            } else if !isLoading {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Faktör analizi şu an yüklenemedi.")
+                        .font(.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    if let errorMessage, !errorMessage.isEmpty {
+                        Text(errorMessage)
+                            .font(.caption2)
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                            .lineLimit(2)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
             }
         }
-        .background(Color(hex: "08080A")) // Darker simpler background
-        .cornerRadius(12)
+        .background(InstitutionalTheme.Colors.surface1)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
         )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .shadow(color: InstitutionalTheme.Colors.background.opacity(0.35), radius: 8, x: 0, y: 4)
         .onAppear { loadData() }
     }
     
     private func loadData() {
         Task {
-            // 1. Oracle Verilerini Hazırla (Neural Link)
-            let oracleInput = await TCMBDataService.shared.getOracleInput()
-            let oracleSignals = await OracleEngine.shared.analyze(input: oracleInput)
-            
-            // 2. Faktör Analizi (Oracle Sinyalleri ile)
-            if let data = try? await BistFaktorEngine.shared.analyze(symbol: symbol, oracleSignals: oracleSignals) {
+            await MainActor.run {
+                isLoading = true
+                errorMessage = nil
+            }
+
+            do {
+                // 1. Oracle Verilerini Hazırla (Neural Link)
+                let oracleInput = await TCMBDataService.shared.getOracleInput()
+                let oracleSignals = await OracleEngine.shared.analyze(input: oracleInput)
+
+                // 2. Faktör Analizi (Oracle Sinyalleri ile)
+                let data = try await BistFaktorEngine.shared.analyze(symbol: symbol, oracleSignals: oracleSignals)
                 await MainActor.run {
                     self.result = data
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.result = nil
+                    self.errorMessage = error.localizedDescription
                     self.isLoading = false
                 }
             }
@@ -174,21 +214,21 @@ struct BistFaktorCard: View {
     }
     
     private func scoreColor(_ score: Double) -> Color {
-        if score >= 70 { return .green }
-        if score >= 50 { return .yellow }
-        return .red
+        if score >= 70 { return InstitutionalTheme.Colors.positive }
+        if score >= 50 { return InstitutionalTheme.Colors.warning }
+        return InstitutionalTheme.Colors.negative
     }
     
     private func factorColor(_ name: String) -> Color {
         switch name {
-        case "blue": return .blue
-        case "green": return .green
-        case "purple": return .purple
-        case "yellow": return .yellow
-        case "orange": return .orange
-        case "red": return .red
-        case "mint": return .mint
-        default: return .gray
+        case "blue": return InstitutionalTheme.Colors.primary
+        case "green": return InstitutionalTheme.Colors.positive
+        case "purple": return InstitutionalTheme.Colors.primary
+        case "yellow": return InstitutionalTheme.Colors.warning
+        case "orange": return InstitutionalTheme.Colors.warning
+        case "red": return InstitutionalTheme.Colors.negative
+        case "mint": return InstitutionalTheme.Colors.positive
+        default: return InstitutionalTheme.Colors.textSecondary
         }
     }
 }
@@ -204,28 +244,33 @@ struct FactorSummaryCell: View {
             
             Text(factor.name.components(separatedBy: " ").first ?? "")
                 .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             
             Text("\(Int(factor.score))")
                 .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(.white)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .monospacedDigit()
         }
         .padding(8)
         .frame(maxWidth: .infinity)
-        .background(Color.white.opacity(0.03))
-        .cornerRadius(8)
+        .background(InstitutionalTheme.Colors.surface2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
     
     func factorColor(_ name: String) -> Color {
         switch name {
-        case "blue": return .blue
-        case "green": return .green
-        case "purple": return .purple
-        case "yellow": return .yellow
-        case "orange": return .orange
-        case "red": return .red
-        case "mint": return .mint
-        default: return .gray
+        case "blue": return InstitutionalTheme.Colors.primary
+        case "green": return InstitutionalTheme.Colors.positive
+        case "purple": return InstitutionalTheme.Colors.primary
+        case "yellow": return InstitutionalTheme.Colors.warning
+        case "orange": return InstitutionalTheme.Colors.warning
+        case "red": return InstitutionalTheme.Colors.negative
+        case "mint": return InstitutionalTheme.Colors.positive
+        default: return InstitutionalTheme.Colors.textSecondary
         }
     }
 }
@@ -432,16 +477,7 @@ struct BistMoneyFlowCard: View {
     }
 }
 
-// Placeholder for Regime
-struct BistRejimCard: View {
-    var body: some View {
-        Text("Rejim Kartı (Hazırlanıyor)")
-            .foregroundColor(.gray)
-            .padding()
-            .background(Color(hex: "08080A"))
-            .cornerRadius(12)
-    }
-}
+// BistRejimCard: Kaldırıldı — REJİM modülü artık BistMacroSummaryCard + SirkiyeDashboard + Oracle + Sektör kullanıyor
 
 // Helper
 extension Double {

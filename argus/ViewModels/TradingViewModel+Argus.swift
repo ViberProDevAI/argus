@@ -50,7 +50,7 @@ extension TradingViewModel {
         if !candidates.isEmpty {
             // print("🔭 Scout Handover: \(candidates.count) candidates passed to Corse Engine.")
             for (symbol, score) in candidates {
-                await self.processHighConvictionCandidate(symbol: symbol, score: score)
+                await AutoPilotStore.shared.processHighConvictionCandidate(symbol: symbol, score: score)
             }
         }
     }

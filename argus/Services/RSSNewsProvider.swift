@@ -16,10 +16,12 @@ class RSSParser: NSObject, XMLParserDelegate {
     // Limits
     private let limit: Int
     private let sourceName: String
+    private let symbol: String
     
-    init(limit: Int, sourceName: String) {
+    init(limit: Int, sourceName: String, symbol: String = "MARKET") {
         self.limit = limit
         self.sourceName = sourceName
+        self.symbol = symbol
     }
     
     func parse(data: Data) -> [NewsArticle] {
@@ -61,7 +63,7 @@ class RSSParser: NSObject, XMLParserDelegate {
                 
                 let article = NewsArticle(
                     id: UUID().uuidString,
-                    symbol: "MARKET", // General
+                    symbol: symbol,
                     source: sourceName,
                     headline: currentTitle.trimmingCharacters(in: .whitespacesAndNewlines),
                     summary: currentDescription.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -149,7 +151,7 @@ final class RSSNewsProvider: NewsProvider {
         return await withTaskGroup(of: [NewsArticle].self) { group in
             for (name, urlStr) in sources {
                 group.addTask {
-                    return await self.fetchSingleFeed(name: name, urlStr: urlStr, limit: limit)
+                    return await self.fetchSingleFeed(name: name, urlStr: urlStr, symbol: symbol, limit: limit)
                 }
             }
             
@@ -171,7 +173,7 @@ final class RSSNewsProvider: NewsProvider {
         }
     }
     
-    private func fetchSingleFeed(name: String, urlStr: String, limit: Int) async -> [NewsArticle] {
+    private func fetchSingleFeed(name: String, urlStr: String, symbol: String, limit: Int) async -> [NewsArticle] {
         guard let url = URL(string: urlStr) else { return [] }
         
         do {
@@ -185,7 +187,7 @@ final class RSSNewsProvider: NewsProvider {
                 return []
             }
             
-            let parser = RSSParser(limit: limit, sourceName: name)
+            let parser = RSSParser(limit: limit, sourceName: name, symbol: symbol)
             return parser.parse(data: data)
         } catch {
             print("RSS Fail (\(name)): \(error.localizedDescription)")

@@ -12,6 +12,9 @@ final class ExecutionStateViewModel: ObservableObject {
     
     // MARK: - Published Properties
     
+    /// Last trade error (for UI display)
+    @Published var lastTradeError: String? = nil
+
     /// AutoPilot enabled state
     @Published var isAutoPilotEnabled: Bool = false {
         didSet {
@@ -160,16 +163,28 @@ final class ExecutionStateViewModel: ObservableObject {
               let price = userInfo["price"] as? Double else { return }
         
         Task { @MainActor in
-            self.buy(
+            guard let trade = self.buy(
                 symbol: symbol,
                 quantity: quantity,
                 source: .autoPilot,
                 engine: .pulse,
                 stopLoss: nil,
                 takeProfit: nil,
-                rationale: "Trade Brain Execution"
-            )
-            print("✅ TRADE BRAIN ALIM: \(symbol) - \(Int(quantity)) adet @ \(String(format: "%.2f", price))")
+                rationale: "Trade Brain Execution",
+                referencePrice: price
+            ) else {
+                print("❌ TRADE BRAIN ALIM RED: \(symbol)")
+                return
+            }
+
+            if let decision = SignalStateViewModel.shared.grandDecisions[symbol] {
+                _ = PositionPlanStore.shared.createPlan(for: trade, decision: decision)
+                print("🧠 Trade Brain Plan oluşturuldu: \(symbol)")
+            } else {
+                print("⚠️ Trade Brain Plan atlandı (karar yok): \(symbol)")
+            }
+            
+            print("✅ TRADE BRAIN ALIM: \(symbol) - \(String(format: "%.4f", quantity)) adet @ \(String(format: "%.2f", price))")
         }
     }
     
@@ -199,16 +214,25 @@ final class ExecutionStateViewModel: ObservableObject {
     
     @MainActor
     @discardableResult
-    func buy(symbol: String, quantity: Double, source: TradeSource = .user, engine: AutoPilotEngine? = nil, stopLoss: Double? = nil, takeProfit: Double? = nil, rationale: String? = nil, decisionTrace: DecisionTraceSnapshot? = nil, marketSnapshot: MarketSnapshot? = nil) -> Trade? {
+    func buy(symbol: String, quantity: Double, source: TradeSource = .user, engine: AutoPilotEngine? = nil, stopLoss: Double? = nil, takeProfit: Double? = nil, rationale: String? = nil, decisionTrace: DecisionTraceSnapshot? = nil, marketSnapshot: MarketSnapshot? = nil, referencePrice: Double? = nil) -> Trade? {
         
-        let isBist = symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol)
+        let isBist = SymbolResolver.shared.isBistSymbol(symbol)
         
         // Use MarketDataStore for price
-        guard let quote = MarketDataStore.shared.getQuote(for: symbol) else {
-            ArgusLogger.error(.portfoy, "Fiyat verisi bulunamadı: \(symbol)")
+        lastTradeError = nil
+        let price: Double
+        if let quote = MarketDataStore.shared.getQuote(for: symbol), quote.currentPrice > 0 {
+            price = quote.currentPrice
+        } else if let ref = referencePrice, ref > 0 {
+            price = ref
+            ArgusLogger.warning(.portfoy, "Canli quote yok, referencePrice kullanildi: \(symbol)")
+        } else {
+            let err = "Fiyat verisi bulunamadi: \(symbol)"
+            lastTradeError = err
+            ArgusLogger.error(.portfoy, err)
+            print("❌ TRADE BLOCKED: \(err)")
             return nil
         }
-        let price = quote.currentPrice
         
         // Validate
         let availableBalance = (isBist ? PortfolioStore.shared.bistBalance : PortfolioStore.shared.globalBalance)
@@ -218,13 +242,15 @@ final class ExecutionStateViewModel: ObservableObject {
             quantity: quantity,
             price: price,
             availableBalance: availableBalance,
-            isBistMarketOpen: isBist, 
-            isGlobalMarketOpen: MarketStatusService.shared.canTrade()
+            isBistMarketOpen: MarketStatusService.shared.canTrade(for: .bist),
+            isGlobalMarketOpen: MarketStatusService.shared.canTrade(for: .global)
         )
         
         guard validation.isValid else {
             let error = validation.error?.localizedDescription ?? "Bilinmeyen hata"
+            lastTradeError = error
             ArgusLogger.error(.portfoy, "İŞLEM REDDEDİLDİ: \(error)")
+            print("❌ TRADE BLOCKED (Validation): \(error) | Balance: \(availableBalance) | Price: \(price) | Qty: \(quantity)")
             return nil
         }
         
@@ -239,7 +265,10 @@ final class ExecutionStateViewModel: ObservableObject {
             )
             
             if snapshot.locks.isLocked {
+                let err = "AGORA engelledi: \(snapshot.reasonOneLiner)"
+                lastTradeError = err
                 ArgusLogger.warning(.autopilot, "AGORA BLOCKED BUY: \(snapshot.reasonOneLiner)")
+                print("❌ TRADE BLOCKED (AGORA): \(err)")
                 addAgoraSnapshot(snapshot)
                 return nil
             }
@@ -274,31 +303,42 @@ final class ExecutionStateViewModel: ObservableObject {
     }
     
     @MainActor
-    func sell(symbol: String, quantity: Double, source: TradeSource = .user, engine: AutoPilotEngine? = nil, reason: String? = nil) {
-        
-        // Use MarketDataStore for price
-        guard let quote = MarketDataStore.shared.getQuote(for: symbol) else { 
-            ArgusLogger.error(.portfoy, "Fiyat verisi bulunamadı: \(symbol)")
-            return 
+    func sell(symbol: String, quantity: Double, source: TradeSource = .user, engine: AutoPilotEngine? = nil, reason: String? = nil, referencePrice: Double? = nil) {
+        lastTradeError = nil
+
+        // Use MarketDataStore for price, fallback to referencePrice
+        let price: Double
+        if let quote = MarketDataStore.shared.getQuote(for: symbol), quote.currentPrice > 0 {
+            price = quote.currentPrice
+        } else if let ref = referencePrice, ref > 0 {
+            price = ref
+        } else {
+            let err = "Fiyat verisi bulunamadi: \(symbol)"
+            lastTradeError = err
+            ArgusLogger.error(.portfoy, err)
+            print("❌ SELL BLOCKED: \(err)")
+            return
         }
-        let price = quote.currentPrice
         
         let openTrades = PortfolioStore.shared.trades.filter { $0.symbol == symbol && $0.isOpen }
         let totalOwned = openTrades.reduce(0.0) { $0 + $1.quantity }
         
         // Simplified check
-        let isBist = symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol)
+        let isBist = SymbolResolver.shared.isBistSymbol(symbol)
         
         let validation = TradeValidator.validateSell(
             symbol: symbol,
             quantity: quantity,
             ownedQuantity: totalOwned,
-            isBistMarketOpen: isBist, 
-            isGlobalMarketOpen: MarketStatusService.shared.canTrade()
+            isBistMarketOpen: MarketStatusService.shared.canTrade(for: .bist),
+            isGlobalMarketOpen: MarketStatusService.shared.canTrade(for: .global)
         )
         
         guard validation.isValid else {
-            ArgusLogger.error(.portfoy, "SATIŞ REDDEDİLDİ: \(validation.error?.localizedDescription ?? "")")
+            let error = validation.error?.localizedDescription ?? "Bilinmeyen hata"
+            lastTradeError = error
+            ArgusLogger.error(.portfoy, "SATIŞ REDDEDİLDİ: \(error)")
+            print("❌ SELL BLOCKED (Validation): \(error)")
             return
         }
         
@@ -313,7 +353,10 @@ final class ExecutionStateViewModel: ObservableObject {
             )
             
             if snapshot.locks.isLocked {
+                 let err = "AGORA engelledi: \(snapshot.reasonOneLiner)"
+                 lastTradeError = err
                  ArgusLogger.warning(.autopilot, "AGORA BLOCKED SELL: \(snapshot.reasonOneLiner)")
+                 print("❌ SELL BLOCKED (AGORA): \(err)")
                  addAgoraSnapshot(snapshot)
                  return
             }

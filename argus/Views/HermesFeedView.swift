@@ -30,7 +30,7 @@ struct HermesFeedView: View {
                     ErrorStateView(message: error) {
                         Task { await feedState.loadFeed(scope: selectedScope, watchlist: viewModel.watchlist) }
                     }
-                } else if feedState.insights.isEmpty && feedState.events.isEmpty {
+                } else if feedState.insights.isEmpty && feedState.events.isEmpty && feedState.rawArticles.isEmpty {
                     EmptyFeedView(scope: selectedScope) {
                         Task { await feedState.loadFeed(scope: selectedScope, watchlist: viewModel.watchlist) }
                     }
@@ -87,6 +87,14 @@ struct HermesFeedView: View {
                     }
                     .padding(.horizontal)
                 }
+
+                // Raw News fallback (to verify fetch even if analysis layer fails)
+                if feedState.events.isEmpty && feedState.insights.isEmpty && !feedState.rawArticles.isEmpty {
+                    ForEach(feedState.rawArticles.prefix(40)) { article in
+                        RawNewsCard(article: article)
+                            .padding(.horizontal)
+                    }
+                }
             }
             .padding(.bottom, 100)
         }
@@ -103,6 +111,7 @@ class HermesFeedState: ObservableObject {
     @Published var errorMessage: String?
     @Published var events: [HermesEvent] = []
     @Published var insights: [NewsInsight] = []
+    @Published var rawArticles: [NewsArticle] = []
 
     func loadFeed(scope: Int, watchlist: [String]) async {
         isLoading = true
@@ -128,12 +137,17 @@ class HermesFeedState: ObservableObject {
 
         var allEvents: [HermesEvent] = []
         var allInsights: [NewsInsight] = []
+        var allRawArticles: [NewsArticle] = []
 
         // Load from HermesStateViewModel cache first
         let hermesVM = HermesStateViewModel.shared
 
         for symbol in watchlist {
             let isBist = symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol)
+            
+            if let cachedRaw = hermesVM.newsBySymbol[symbol], !cachedRaw.isEmpty {
+                allRawArticles.append(contentsOf: cachedRaw)
+            }
 
             // Check cache
             if isBist {
@@ -164,6 +178,8 @@ class HermesFeedState: ObservableObject {
                 }
 
                 guard !articles.isEmpty else { continue }
+                allRawArticles.append(contentsOf: articles)
+                hermesVM.newsBySymbol[symbol] = articles
 
                 // Analyze with LLM
                 let scope: HermesEventScope = isBist ? .bist : .global
@@ -192,8 +208,10 @@ class HermesFeedState: ObservableObject {
         // Sort by date
         self.events = allEvents.sorted { $0.publishedAt > $1.publishedAt }
         self.insights = allInsights.sorted { $0.createdAt > $1.createdAt }
+        self.rawArticles = Array(Dictionary(grouping: allRawArticles, by: { $0.id }).values.compactMap { $0.first })
+            .sorted { $0.publishedAt > $1.publishedAt }
 
-        if events.isEmpty && insights.isEmpty {
+        if events.isEmpty && insights.isEmpty && rawArticles.isEmpty {
             errorMessage = "Takip listenizdeki hisseler için haber bulunamadı."
         }
     }
@@ -202,25 +220,32 @@ class HermesFeedState: ObservableObject {
         // Fetch general market news
         do {
             let articles = try await RSSNewsProvider().fetchNews(symbol: "GENERAL", limit: 25)
+            self.rawArticles = articles.sorted { $0.publishedAt > $1.publishedAt }
 
             guard !articles.isEmpty else {
                 errorMessage = "Genel piyasa haberi bulunamadı."
                 return
             }
 
-            // Analyze with LLM
-            let events = try await HermesLLMService.shared.analyzeEvents(
-                articles: articles,
-                scope: .bist,
-                isGeneral: true
-            )
+            do {
+                // Analyze with LLM
+                let events = try await HermesLLMService.shared.analyzeEvents(
+                    articles: articles,
+                    scope: .bist,
+                    isGeneral: true
+                )
 
-            self.events = events.sorted { $0.publishedAt > $1.publishedAt }
+                self.events = events.sorted { $0.publishedAt > $1.publishedAt }
 
-            // Cache
-            HermesStateViewModel.shared.hermesEventsBySymbol["GENERAL"] = events
+                // Cache
+                HermesStateViewModel.shared.hermesEventsBySymbol["GENERAL"] = events
 
-            print("✅ HermesFeed: Genel piyasa için \(events.count) event yüklendi")
+                print("✅ HermesFeed: Genel piyasa için \(events.count) event yüklendi")
+            } catch {
+                self.events = []
+                self.errorMessage = nil
+                print("⚠️ HermesFeed: Genel piyasa analiz katmanı hatası, ham haberler listeleniyor: \(error.localizedDescription)")
+            }
 
         } catch {
             errorMessage = "Haber analizi yapılamadı: \(error.localizedDescription)"
@@ -290,14 +315,14 @@ struct HermesEventCompactCard: View {
             }
 
             // Rationale
-            Text(event.rationaleShort)
+            Text(event.summaryTRShort ?? event.rationaleShort)
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.8))
                 .lineLimit(3)
 
             // Tags
             HStack(spacing: 8) {
-                tag("Etki: \(Int(event.finalScore))")
+                tag("Skor: \(Int(event.finalScore))")
                 tag("Güven: \(Int(event.confidence * 100))%")
                 tag(event.horizonHint.rawValue)
             }
@@ -407,6 +432,42 @@ struct HermesInsightCard: View {
         case .weakNegative: return Color.red.opacity(0.7)
         case .strongNegative: return .red
         }
+    }
+
+    private func timeAgo(_ date: Date) -> String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+struct RawNewsCard: View {
+    let article: NewsArticle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(article.symbol)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(Theme.tint)
+                Spacer()
+                Text(timeAgo(article.publishedAt))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.gray)
+            }
+
+            Text(article.headline)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white)
+                .lineLimit(3)
+
+            Text(article.source)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundColor(.gray.opacity(0.9))
+        }
+        .padding(12)
+        .background(Theme.secondaryBackground.opacity(0.5))
+        .cornerRadius(10)
     }
 
     private func timeAgo(_ date: Date) -> String {

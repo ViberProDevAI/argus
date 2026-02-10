@@ -128,7 +128,7 @@ private func processScoutCandidate(symbol: String, score: Double) async {
 
 Run:
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | grep -E "error:|BUILD"
 ```
 
@@ -253,7 +253,7 @@ func loadOrionScore(for symbol: String, assetType: AssetType = .stock) async {
 **Step 4: Build and verify**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | tail -3
 ```
 
@@ -328,7 +328,7 @@ func generateVoiceReport(for symbol: String, tradeId: UUID? = nil) async {
 **Step 3: Build and verify**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | tail -3
 ```
 
@@ -395,7 +395,7 @@ func generateAISignals() async {
 **Step 2: Build and verify**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | tail -3
 ```
 
@@ -457,7 +457,7 @@ func loadArgusData(for symbol: String) async {
 **Step 3: Build and verify**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | tail -3
 ```
 
@@ -528,7 +528,7 @@ func testDetectAssetType() async {
 **Step 3: Build and test**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | tail -3
 ```
 
@@ -571,7 +571,7 @@ func testFacadeCanStartScoutLoop() async {
 **Step 2: Build and verify tests pass**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug test 2>&1 | grep -E "Test Suite|tests passed|FAILED"
 ```
 
@@ -625,7 +625,7 @@ Successfully migrated TradingViewModel+Argus.swift (1,101 lines) to SignalViewMo
 **Step 2: Build final version**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | tail -5
 ```
 

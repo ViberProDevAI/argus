@@ -132,7 +132,7 @@ func removeActivePlan(id: UUID) {
 **Step 3: Build and verify**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | tail -5
 ```
 

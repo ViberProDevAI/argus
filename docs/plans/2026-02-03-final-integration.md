@@ -46,7 +46,7 @@
 
 1. **Build clean**
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild clean -project argus.xcodeproj
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug
 ```
@@ -325,7 +325,7 @@ Refer to:
 **Run final build:**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus/.worktrees/split-trading-viewmodel
+cd ${PROJECT_ROOT}/.worktrees/split-trading-viewmodel
 xcodebuild clean -project argus.xcodeproj
 xcodebuild -project argus.xcodeproj -scheme argus -configuration Debug 2>&1 | tail -3
 ```

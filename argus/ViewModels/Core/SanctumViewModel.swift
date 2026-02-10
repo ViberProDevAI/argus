@@ -74,9 +74,15 @@ final class SanctumViewModel: ObservableObject {
             
         // 2b. Orion Score (Derived from Analysis)
         SignalStateViewModel.shared.$orionAnalysis
-            .map { $0[self.symbol]?.daily } // Access .daily -> OrionScoreResult?
             .receive(on: RunLoop.main)
-            .assign(to: \.orionScore, on: self)
+            .sink { [weak self] analysisBySymbol in
+                guard let self else { return }
+                if let analysis = analysisBySymbol[self.symbol] {
+                    self.orionScore = analysis.scoreFor(timeframe: self.selectedTimeframe)
+                } else {
+                    self.orionScore = nil
+                }
+            }
             .store(in: &cancellables)
             
         // 3. Grand Council (SignalStateViewModel)
@@ -124,16 +130,86 @@ final class SanctumViewModel: ObservableObject {
 
         // B. Fetch Analysis (Argus Core)
         do {
-            // Service akıllı cache kullanır, her seferinde apiye gitmez
             let fetchedSnapshot = try await analysisService.fetchSnapshot(symbol: symbol)
             self.snapshot = fetchedSnapshot
-
         } catch {
             print("⚠️ SanctumVM: Snapshot hatası: \(error)")
         }
 
         // C. Fetch Macro (Global)
         self.macroRating = await MacroRegimeService.shared.computeMacroEnvironment()
+
+        // D. Convene Grand Council (Konsey Kararı)
+        await conveneCouncil()
+    }
+
+    // MARK: - Grand Council
+    /// Konsey kararı: Tüm modülleri toplayıp nihai karar üretir
+    private func conveneCouncil() async {
+        let councilCandles = await resolveCouncilCandles()
+        guard councilCandles.count >= 30 else {
+            print("⚠️ SanctumVM: Konsey toplanamadı - candle verisi yok (\(symbol))")
+            return
+        }
+
+        let isBist = symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol)
+        let macro = await MacroSnapshotService.shared.getSnapshot()
+
+        // BIST: Sirkiye input hazırla
+        var sirkiyeInput: SirkiyeEngine.SirkiyeInput? = nil
+        if isBist {
+            let quotes = MarketDataStore.shared.liveQuotes
+            if let usdQuote = quotes["USD/TRY"] ?? quotes["USDTRY=X"] {
+                sirkiyeInput = SirkiyeEngine.SirkiyeInput(
+                    usdTry: usdQuote.currentPrice,
+                    usdTryPrevious: usdQuote.previousClose ?? usdQuote.currentPrice,
+                    dxy: 104.0,
+                    brentOil: 80.0,
+                    globalVix: macro.vix,
+                    newsSnapshot: nil,
+                    currentInflation: 45.0,
+                    policyRate: 50.0,
+                    xu100Change: nil,
+                    xu100Value: nil,
+                    goldPrice: nil
+                )
+            }
+        }
+
+        let decision = await ArgusGrandCouncil.shared.convene(
+            symbol: symbol,
+            candles: councilCandles,
+            snapshot: snapshot,
+            macro: macro,
+            news: nil,
+            engine: .pulse,
+            sirkiyeInput: sirkiyeInput,
+            origin: "SANCTUM_VM"
+        )
+
+        SignalStateViewModel.shared.grandDecisions[symbol] = decision
+        print("🏛️ SanctumVM: \(symbol) Konsey kararı: \(decision.action.rawValue) (Güven: %\(Int(decision.confidence * 100)))")
+    }
+
+    private func resolveCouncilCandles() async -> [Candle] {
+        if candles.count >= 30 {
+            return candles
+        }
+
+        var candidates: [String] = [selectedTimeframe.apiString, "1day", "1d", "1G"]
+        var seen = Set<String>()
+        candidates = candidates.filter { seen.insert($0).inserted }
+
+        for timeframe in candidates {
+            let data = await marketStore.ensureCandles(symbol: symbol, timeframe: timeframe).value ?? []
+            guard data.count >= 30 else { continue }
+            if candles != data {
+                candles = data
+            }
+            return data
+        }
+
+        return candles
     }
 
     // MARK: - Timeframe Change Handler
@@ -142,12 +218,13 @@ final class SanctumViewModel: ObservableObject {
         guard newTimeframe != selectedTimeframe else { return }
 
         selectedTimeframe = newTimeframe
-        await loadCandles(for: newTimeframe)
 
         // Update orionScore to reflect the selected timeframe
         if let analysis = orionAnalysis {
             orionScore = analysis.scoreFor(timeframe: newTimeframe)
         }
+
+        await loadCandles(for: newTimeframe)
     }
 
     // MARK: - Candle Loading (Timeframe-aware)
@@ -208,13 +285,7 @@ final class SanctumViewModel: ObservableObject {
 
             // 3. Map to Insights
             let insights = events.map { event -> NewsInsight in
-                let sentiment: NewsSentiment = event.sentimentLabel ?? {
-                    switch event.polarity {
-                    case .positive: return .weakPositive
-                    case .negative: return .weakNegative
-                    case .mixed: return .neutral
-                    }
-                }()
+                let sentiment: NewsSentiment = event.sentimentLabel ?? .neutral
 
                 let delayPenalty = HermesEventScoring.delayFactor(
                     ageMinutes: max(0.0, Date().timeIntervalSince(event.publishedAt) / 60.0)

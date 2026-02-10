@@ -1,4 +1,105 @@
+# ===========================
+# Secrets & Credentials
+# ===========================
 Secrets.xcconfig
 
-# Git worktrees
+# ===========================
+# Xcode
+# ===========================
+## Build artifacts
+build/
+DerivedData/
+*.moved-aside
+*.xcuserstate
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## User data
+xcuserdata/
+*.xcuserdata/
+*.xcworkspace/xcuserdata/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+
+# ===========================
+# macOS
+# ===========================
+.DS_Store
+**/.DS_Store
+*.swp
+*~
+.Spotlight-V100
+.Trashes
+._*
+
+# ===========================
+# CocoaPods
+# ===========================
+Pods/
+
+# ===========================
+# Swift Package Manager
+# ===========================
+.build/
+Package.resolved
+
+# ===========================
+# Git Worktrees
+# ===========================
 .worktrees/
+
+# ===========================
+# IDE & Editor
+# ===========================
+.idea/
+.vscode/
+*.code-workspace
+
+# ===========================
+# Claude / AI Tools
+# ===========================
+claude-mem/
+.gemini/
+
+# ===========================
+# Internal Docs (not for public)
+# ===========================
+REFACTOR_NEXT_STEPS.md
+VIEWMODEL_REFACTOR_PLAN.md
+VIEWMODEL_REFACTOR_VISUAL.md
+
+# ===========================
+# Archive & Backups
+# ===========================
+archive/
+*.backup
+*.phase1-backup
+
+# ===========================
+# Scripts (internal tooling)
+# ===========================
+Scripts/
+
+# ===========================
+# Environment
+# ===========================
+.env
+.env.*
+*.xcconfig
+!*.xcconfig.example
+
+# ===========================
+# Provisioning & Certificates
+# ===========================
+*.mobileprovision
+*.p12
+*.cer
+*.key
+*.pem

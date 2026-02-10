@@ -10,8 +10,7 @@ struct DiscoverView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background: Pure Black
-                Color.black.ignoresSafeArea()
+                InstitutionalTheme.Colors.background.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 32) {
@@ -71,12 +70,16 @@ struct DiscoverView: View {
                                         DiscoverMarketRow(quote: quote)
                                     }
                                     Divider()
-                                        .background(Color.white.opacity(0.1))
+                                        .background(InstitutionalTheme.Colors.borderSubtle)
                                         .padding(.leading, 70)
                                 }
                             }
-                            .background(Color(red: 0.1, green: 0.1, blue: 0.1)) // Slightly lighter black for list
-                            .cornerRadius(16)
+                            .background(InstitutionalTheme.Colors.surface1)
+                            .cornerRadius(InstitutionalTheme.Radius.lg)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
+                                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                            )
                             .padding(.horizontal)
                         }
                         
@@ -92,13 +95,13 @@ struct DiscoverView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { showDrawer = true }) {
                         Image(systemName: "line.3.horizontal")
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { viewModel.loadDiscoverData() }) {
                         Image(systemName: "arrow.clockwise")
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
             }
@@ -109,7 +112,6 @@ struct DiscoverView: View {
                 viewModel.loadDiscoverData()
             }
         }
-        .preferredColorScheme(.dark) // Force Dark Mode for this view
         .overlay {
             if showDrawer {
                 ArgusDrawerView(isPresented: $showDrawer) { openSheet in
@@ -199,12 +201,12 @@ struct DiscoverSectionHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.title2)
+                .font(InstitutionalTheme.Typography.headline)
                 .bold()
-                .foregroundColor(.white)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             Text(subtitle)
-                .font(.caption)
-                .foregroundColor(Color.gray)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
         .padding(.horizontal)
     }
@@ -222,8 +224,8 @@ struct DiscoverMarketCard: View {
     
     var cardColor: Color {
         switch type {
-        case .gainer: return Theme.positive
-        case .loser: return Theme.negative
+        case .gainer: return InstitutionalTheme.Colors.positive
+        case .loser: return InstitutionalTheme.Colors.negative
         }
     }
     
@@ -243,7 +245,7 @@ struct DiscoverMarketCard: View {
                 
                 // Percent Badge
                 Text(String(format: "%.2f%%", quote.percentChange))
-                    .font(.caption)
+                    .font(InstitutionalTheme.Typography.micro)
                     .bold()
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -257,25 +259,22 @@ struct DiscoverMarketCard: View {
             // Symbol & Price
             VStack(alignment: .leading, spacing: 2) {
                 Text(quote.symbol ?? "---")
-                    .font(.headline)
+                    .font(InstitutionalTheme.Typography.bodyStrong)
                     .bold()
-                    .foregroundColor(.white)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 
                 let isBist = (quote.symbol ?? "").uppercased().hasSuffix(".IS")
                 Text(String(format: isBist ? "₺%.0f" : "$%.2f", quote.currentPrice))
-                    .font(.subheadline)
-                    .foregroundColor(Color.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
         }
         .padding(12)
         .frame(width: 140, height: 110)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(red: 0.12, green: 0.12, blue: 0.12)) // Dark gray card
-        )
+        .institutionalCard(scale: .micro)
         .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .stroke(cardColor.opacity(0.3), lineWidth: 1) // Neon border effect
+            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous)
+                .stroke(cardColor.opacity(0.45), lineWidth: 1)
         )
         .contextMenu {
             Button {
@@ -307,22 +306,22 @@ struct DiscoverMarketRow: View {
             // Logo / Initial
             ZStack {
                 Circle()
-                    .fill(Color(red: 0.2, green: 0.2, blue: 0.2))
+                    .fill(InstitutionalTheme.Colors.surface2)
                     .frame(width: 40, height: 40)
                 Text((quote.symbol ?? "?").prefix(1))
                     .bold()
-                    .foregroundColor(.gray)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(quote.symbol ?? "---")
-                    .font(.headline)
+                    .font(InstitutionalTheme.Typography.bodyStrong)
                     .bold()
-                    .foregroundColor(.white)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 if let name = quote.shortName, !name.isEmpty {
                     Text(name)
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .lineLimit(1)
                 }
             }
@@ -332,8 +331,8 @@ struct DiscoverMarketRow: View {
             VStack(alignment: .trailing, spacing: 4) {
                 let isBist = (quote.symbol ?? "").uppercased().hasSuffix(".IS")
                 Text(String(format: isBist ? "₺%.0f" : "$%.2f", quote.currentPrice))
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(InstitutionalTheme.Typography.data)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 
                 HStack(spacing: 4) {
                     Image(systemName: quote.change >= 0 ? "arrow.up" : "arrow.down")
@@ -342,10 +341,10 @@ struct DiscoverMarketRow: View {
                         .font(.caption)
                         .bold()
                 }
-                .foregroundColor(quote.change >= 0 ? Theme.positive : Theme.negative)
+                .foregroundColor(quote.change >= 0 ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative)
             }
         }
         .padding()
-        .background(Color.clear) // Transparent, container has background
+        .background(Color.clear)
     }
 }

@@ -41,7 +41,10 @@ class ChatViewModel: ObservableObject {
                 messages.append(aiMsg)
                 isLoading = false
             } catch {
-                errorMessage = "Bağlantı hatası: \(error.localizedDescription)"
+                print("❌ Chat Error: \(error)")
+                let errorText = "Hata: \(error.localizedDescription)"
+                let errorMsg = ChatMessage(id: UUID(), role: .assistant, content: errorText, timestamp: Date())
+                messages.append(errorMsg)
                 isLoading = false
             }
         }

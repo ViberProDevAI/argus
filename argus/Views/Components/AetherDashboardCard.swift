@@ -67,19 +67,16 @@ struct AetherDashboardCard: View {
                     // Category Breakdown
                     VStack(alignment: .leading, spacing: 8) {
                         CategoryRow(
-                            icon: "",
                             label: "Öncü",
                             score: rating.leadingScore ?? 50,
                             weight: "x1.5"
                         )
                         CategoryRow(
-                            icon: "",
                             label: "Eşzamanlı",
                             score: rating.coincidentScore ?? 50,
                             weight: "x1.0"
                         )
                         CategoryRow(
-                            icon: "",
                             label: "Gecikmeli",
                             score: rating.laggingScore ?? 50,
                             weight: "x0.8"
@@ -108,9 +105,9 @@ struct AetherDashboardCard: View {
                     
                     // Mini Category Pills
                     HStack(spacing: 6) {
-                        MiniCategoryPill(emoji: "", score: rating.leadingScore ?? 50)
-                        MiniCategoryPill(emoji: "", score: rating.coincidentScore ?? 50)
-                        MiniCategoryPill(emoji: "", score: rating.laggingScore ?? 50)
+                        MiniCategoryPill(label: "Ö", score: rating.leadingScore ?? 50)
+                        MiniCategoryPill(label: "E", score: rating.coincidentScore ?? 50)
+                        MiniCategoryPill(label: "G", score: rating.laggingScore ?? 50)
                     }
                     
                     Image(systemName: "chevron.right")
@@ -155,16 +152,12 @@ struct AetherDashboardCard: View {
 
 // MARK: - Category Row
 struct CategoryRow: View {
-    let icon: String
     let label: String
     let score: Double
     let weight: String
     
     var body: some View {
         HStack(spacing: 8) {
-            Text(icon)
-                .font(.system(size: 12))
-            
             Text(label)
                 .font(.caption)
                 .foregroundColor(Theme.textSecondary)
@@ -206,12 +199,12 @@ struct CategoryRow: View {
 
 // MARK: - Mini Category Pill
 struct MiniCategoryPill: View {
-    let emoji: String
+    let label: String
     let score: Double
     
     var body: some View {
         HStack(spacing: 4) {
-            Text(emoji)
+            Text(label)
                 .font(.system(size: 10))
             Text("\(Int(score))")
                 .font(.caption2)
@@ -266,4 +259,3 @@ struct MiniCategoryPill: View {
     .padding()
     .background(Theme.background)
 }
-

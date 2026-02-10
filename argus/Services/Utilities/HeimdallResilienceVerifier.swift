@@ -90,7 +90,7 @@ final class HeimdallResilienceVerifier {
         if readBack == testKey {
             print("✅ Secrets Proxy matches KeyStore (SSoT Active).")
         } else {
-            print("❌ Secrets Proxy Mismatch! Expected \(testKey), got \(readBack)")
+            print("❌ Secrets Proxy mismatch detected.")
         }
     }
     

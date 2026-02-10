@@ -15,6 +15,7 @@ enum ArgusModule: String, CaseIterable {
         case .atlas: return "AtlasIcon"
         case .aether: return "AetherIcon"
         case .hermes: return "HermesIcon"
+        case .demeter: return "DemeterIcon"
         default: return nil
         }
     }

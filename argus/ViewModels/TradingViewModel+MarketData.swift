@@ -155,21 +155,40 @@ extension TradingViewModel {
         // Optimize: Prioritize Portfolio & Top 20 Watchlist to avoid network congestion
         let prioritySymbols = Set(portfolio.map { $0.symbol } + watchlist.prefix(20))
         print("📡 TradingViewModel: Background Batch Candle Fetch for \(prioritySymbols.count) priority symbols (Optimization Active)")
-        
-        // Detached Task to avoid blocking Main Actor interaction
-        Task.detached(priority: .utility) {
-            await withTaskGroup(of: Void.self) { group in
+
+        Task.detached(priority: .utility) { [weak self] in
+            guard let self else { return }
+            var forecastUpdates: [String: PrometheusForecast] = [:]
+
+            await withTaskGroup(of: (String, [Candle]?).self) { group in
                 for symbol in prioritySymbols {
                     group.addTask {
-                        // Yield to allow other high-priority requests (like Detail View) to slip in
-                        await Task.yield() 
-                        _ = await MarketDataStore.shared.ensureCandles(symbol: symbol, timeframe: "1D")
+                        await Task.yield()
+                        let fetched = await MarketDataStore.shared.ensureCandles(symbol: symbol, timeframe: "1D").value
+                        return (symbol, fetched)
                     }
                 }
+
+                for await (symbol, candles) in group {
+                    guard let candles, candles.count >= 30 else { continue }
+                    let pricesNewestFirst = Array(candles.map(\.close).reversed())
+                    let forecast = await PrometheusEngine.shared.forecast(
+                        symbol: symbol,
+                        historicalPrices: pricesNewestFirst
+                    )
+                    forecastUpdates[symbol] = forecast
+                }
+            }
+
+            let updates = forecastUpdates
+            guard !updates.isEmpty else { return }
+            await MainActor.run {
+                for (symbol, forecast) in updates {
+                    self.prometheusForecastBySymbol[symbol] = forecast
+                }
+                self.refreshTerminal()
             }
         }
-        
-        // Note: Analysis is now triggered reactively via $candles subscription in TradingViewModel.swift
     }
     
 
@@ -198,7 +217,7 @@ extension TradingViewModel {
         
         if shouldRefresh {
             print("🔄 Macro Data Stale (>12h). Refreshing...")
-            loadMacroEnvironment()
+            loadMacroEnvironment(forceRefresh: true)
         } else {
             print("✅ Macro Data Fresh. Using cache.")
             // Ensure we have the data in ViewModel even if we don't fetch new
@@ -207,18 +226,31 @@ extension TradingViewModel {
                     self.macroRating = cached
                 } else {
                     // Cache expired but service returned nil? Fetch.
-                    loadMacroEnvironment()
+                    loadMacroEnvironment(forceRefresh: false)
                 }
             }
         }
     }
     
-    func loadMacroEnvironment() {
+    func loadMacroEnvironment(forceRefresh: Bool = false) {
         print("DEBUG: loadMacroEnvironment called")
-        Task {
-            print("DEBUG: Starting computeMacroEnvironment (forceRefresh)...")
-            // REFORM: Her zaman forceRefresh yap - eski 58 puan sorunu çözülsün
-            let rating = await MacroRegimeService.shared.computeMacroEnvironment(forceRefresh: true)
+        if macroRefreshTask != nil {
+            print("⏳ Macro refresh already in-flight, skipping duplicate request.")
+            return
+        }
+
+        // Fast path: use cache immediately if available and no forced refresh requested.
+        if !forceRefresh,
+           let cached = MacroRegimeService.shared.getCachedRating() {
+            self.macroRating = cached
+            print("⚡️ Macro: served from cache (no forced refresh).")
+            return
+        }
+
+        macroRefreshTask = Task { [weak self] in
+            guard let self else { return }
+            print("DEBUG: Starting computeMacroEnvironment (forceRefresh=\(forceRefresh))...")
+            let rating = await MacroRegimeService.shared.computeMacroEnvironment(forceRefresh: forceRefresh)
             print("DEBUG: computeMacroEnvironment success: \(rating.letterGrade) (Score: \(Int(rating.numericScore)))")
             await MainActor.run {
                 self.macroRating = rating
@@ -241,6 +273,10 @@ extension TradingViewModel {
                     isHermesAvailable: false
                 )
                 _ = ChironRegimeEngine.shared.evaluateGlobal(context: context)
+            }
+
+            await MainActor.run {
+                self.macroRefreshTask = nil
             }
         }
     }

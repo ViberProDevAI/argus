@@ -26,7 +26,7 @@ actor HeimdallProbe {
             return .unknown
         }
         
-        print("🕵️ Probe: Testing FMP Capabilities with Key: \(k.prefix(6))...")
+        print("🕵️ Probe: Testing FMP capabilities...")
         
         // 0. Reset previous locks to allow fresh probe/fallback logic
         await ProviderCapabilityRegistry.shared.reportSuccess(provider: "FMP", field: .quote)
@@ -120,7 +120,7 @@ actor HeimdallProbe {
         guard let u = URL(string: url) else { return }
         print(">> \(label)")
         // Masked URL for Log
-        let masked = url.replacingOccurrences(of: "apikey=[^&]+", with: "apikey=MASKED", options: .regularExpression)
+        let masked = maskSensitiveURL(url)
         print("   URL: \(masked)")
         
         do {
@@ -154,7 +154,7 @@ actor HeimdallProbe {
         var isValid = false
         
         func append(_ msg: String) { log += msg + "\n" }
-        append("🔍 Verifying \(provider.rawValue) Key: \(key.prefix(8))...")
+        append("🔍 Verifying \(provider.rawValue) key...")
         
         let urlString: String
         switch provider {
@@ -176,7 +176,7 @@ actor HeimdallProbe {
         }
         
         // Log Actual Request (Masked)
-        append("   URL: \(urlString.replacingOccurrences(of: key, with: "***"))")
+        append("   URL: \(maskSensitiveURL(urlString))")
         
         do {
             let (data, response) = try await URLSession.shared.data(from: url)
@@ -255,6 +255,24 @@ actor HeimdallProbe {
         } catch {
             return .networkError
         }
+    }
+
+    private func maskSensitiveURL(_ url: String) -> String {
+        var masked = url
+        let patterns = [
+            "(?i)(apikey|api_key|api_token|token|auth|authorization|key)=([^&]+)"
+        ]
+
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            masked = regex.stringByReplacingMatches(
+                in: masked,
+                range: NSRange(masked.startIndex..., in: masked),
+                withTemplate: "$1=***"
+            )
+        }
+
+        return masked
     }
 
 }

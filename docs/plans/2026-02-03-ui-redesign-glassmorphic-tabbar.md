@@ -99,7 +99,7 @@ extension View {
 **Step 3: Run build to verify no errors**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild build -workspace argus.xcworkspace -scheme argus 2>&1 | head -50
 ```
 
@@ -213,7 +213,7 @@ class PulsingFABViewTests: XCTestCase {
 **Step 3: Run tests**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild test -workspace argus.xcworkspace -scheme argus -testPlan PulsingFABViewTests 2>&1 | grep -E "(Test|PASSED|FAILED)"
 ```
 
@@ -268,7 +268,7 @@ In `DeepLinkManager.swift`, change line 25:
 **Step 3: Build and verify**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild build -workspace argus.xcworkspace -scheme argus 2>&1 | grep -E "(error|warning)" | head -20
 ```
 
@@ -422,7 +422,7 @@ typealias AppTabBar = PremiumGlassmorphicTabBar
 **Step 3: Build and test visually**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild build -workspace argus.xcworkspace -scheme argus 2>&1 | head -30
 ```
 
@@ -446,7 +446,7 @@ git commit -m "feat: Implement PremiumGlassmorphicTabBar - Bloomberg Terminal ae
 **Step 1: Find existing terminal/radar/cockpit views**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 find . -name "*Cockpit*" -o -name "*Radar*" -o -name "*Terminal*" | grep -i swift
 ```
 
@@ -479,7 +479,7 @@ Add navigation mapping to `DeepLinkManager.swift` (after line 34, before closing
 **Step 3: Test routing by building**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild build -workspace argus.xcworkspace -scheme argus 2>&1 | grep -E "(error:|warning:)" | head -20
 ```
 
@@ -533,7 +533,7 @@ In `DesignTokens.swift`, replace the `Fonts` enum (lines 21-31):
 **Step 2: Build to verify**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild build -workspace argus.xcworkspace -scheme argus 2>&1 | grep -E "(error|warning)" | head -10
 ```
 
@@ -633,7 +633,7 @@ In `PremiumGlassmorphicTabBar`, update selectTab:
 **Step 4: Build and test**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild build -workspace argus.xcworkspace -scheme argus 2>&1 | grep -E "(error|warning)" | head -10
 ```
 
@@ -703,7 +703,7 @@ class UIIntegrationTests: XCTestCase {
 **Step 2: Run integration tests**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild test -workspace argus.xcworkspace -scheme argus -testPlan UIIntegrationTests 2>&1 | tail -20
 ```
 
@@ -726,7 +726,7 @@ git commit -m "test: Add UI integration tests - verify tab bar, FAB, glassmorphi
 **Step 1: Full clean build**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild clean -workspace argus.xcworkspace
 xcodebuild build -workspace argus.xcworkspace -scheme argus 2>&1 | tail -30
 ```
@@ -736,7 +736,7 @@ Expected: Build succeeds with no errors
 **Step 2: Verify app runs on simulator**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 xcodebuild build -workspace argus.xcworkspace -scheme argus -destination 'platform=iOS Simulator,name=iPhone 15' 2>&1 | tail -10
 ```
 
@@ -745,7 +745,7 @@ Expected: Build succeeds for simulator
 **Step 3: Verify all commits**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 git log --oneline -10
 ```
 
@@ -796,7 +796,7 @@ Transformed Argus iOS app from basic HStack tabs to premium glassmorphic bottom 
 **Step 5: Final commit**
 
 ```bash
-cd /Users/erenkapak/Desktop/argus
+cd ${PROJECT_ROOT}
 git add docs/plans/2026-02-03-ui-redesign-summary.md
 git commit -m "docs: Add UI redesign implementation summary - glassmorphic tab bar complete"
 ```

@@ -129,6 +129,7 @@ struct HermesEvent: Identifiable, Codable, Sendable {
     let sentimentLabel: NewsSentiment?
     let horizonHint: HermesEventHorizon
     let rationaleShort: String
+    let summaryTRShort: String?
     let evidenceQuotes: [String]
     let riskFlags: [HermesRiskFlag]
     let sourceName: String
@@ -152,6 +153,7 @@ struct HermesEvent: Identifiable, Codable, Sendable {
         sentimentLabel: NewsSentiment? = nil,
         horizonHint: HermesEventHorizon,
         rationaleShort: String,
+        summaryTRShort: String? = nil,
         evidenceQuotes: [String],
         riskFlags: [HermesRiskFlag],
         sourceName: String,
@@ -174,6 +176,7 @@ struct HermesEvent: Identifiable, Codable, Sendable {
         self.sentimentLabel = sentimentLabel
         self.horizonHint = horizonHint
         self.rationaleShort = rationaleShort
+        self.summaryTRShort = summaryTRShort
         self.evidenceQuotes = evidenceQuotes
         self.riskFlags = riskFlags
         self.sourceName = sourceName

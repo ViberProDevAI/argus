@@ -4,31 +4,180 @@ import SwiftUI
 /// Argus Sanctum görsel tema sabitleri.
 /// Bloomberg V2 tasarım dili.
 struct SanctumTheme {
-    // Background: Deep Charcoal (Pro Terminal)
-    static let bg = Color(hex: "0F172A") // Deep Navy Slate
-    static let terminalBg = Color(hex: "121212") // Pure Dark Charcoal
-    static let surface = Color(hex: "1E1E1E") // Card Surface
+    // Background: Institutional System
+    static let bg = InstitutionalTheme.Colors.background
+    static let terminalBg = InstitutionalTheme.Colors.surface1
+    static let surface = InstitutionalTheme.Colors.surface2
     
     // Core Palette (Bloomberg V3)
-    static let hologramBlue = Color(hex: "38BDF8") // Active/Focus
-    static let auroraGreen = Color(hex: "34D399") // Positive
-    static let neonGreen = Color(hex: "00FF41") // Terminal Green (Sharp)
-    static let titanGold = Color(hex: "FBBF24") // Mythic/Accent
-    static let ghostGrey = Color(hex: "94A3B8") // Passive Text
-    static let crimsonRed = Color(hex: "F43F5E") // Negative/Alert
+    static let hologramBlue = InstitutionalTheme.Colors.primary
+    static let auroraGreen = InstitutionalTheme.Colors.positive
+    static let neonGreen = InstitutionalTheme.Colors.positive
+    static let titanGold = InstitutionalTheme.Colors.warning
+    static let ghostGrey = InstitutionalTheme.Colors.textSecondary
+    static let crimsonRed = InstitutionalTheme.Colors.negative
     
     // Module Colors (Mapped to V2)
     static let orionColor = hologramBlue     // Technical -> Hologram Blue
     static let atlasColor = titanGold        // Fundamental -> Titan Gold
     static let aetherColor = ghostGrey       // Macro -> Ghost Grey (Neutral base)
     static let athenaColor = titanGold       // Smart Beta -> Titan Gold (Wisdom)
-    static let hermesColor = Color(hex: "FB923C") // News -> Orange (distinct from gold)
+    static let hermesColor = InstitutionalTheme.Colors.warning
     static let demeterColor = auroraGreen    // Sectors -> Aurora Green (Growth)
-    static let chironColor = Color.white     // System -> White (Ultimate contrast)
+    static let chironColor = InstitutionalTheme.Colors.textPrimary
     
     // Glass Effect
     static let glassMaterial = Material.thickMaterial
     static let proCardMaterial = Material.ultraThinMaterial
+}
+
+// MARK: - Council Education Language
+/// Konsey kararlarını tavsiye-dışı, öğretici bir 5 aşamalı dile çevirir.
+struct CouncilEducationStage {
+    let level: Int
+    let title: String
+    let scenarioLabel: String
+    let color: Color
+    let why: String
+    let uncertainty: String
+    let invalidation: String
+    let learningNote: String
+
+    let disclaimer = "Eğitim amaçlıdır, yatırım tavsiyesi değildir."
+
+    var badgeText: String { "SEVIYE \(level)" }
+}
+
+extension ArgusGrandDecision {
+    var educationStage: CouncilEducationStage {
+        let normalizedConfidence = max(0, min(confidence, 1))
+
+        var level = Self.baseEducationLevel(normalizedConfidence)
+        if contributors.count <= 1 { level = min(level, 2) }
+        if action == .neutral { level = min(level, 3) }
+        if !vetoes.isEmpty { level = min(level, 3) }
+
+        let title: String
+        switch level {
+        case 1: title = "Veri Zayif"
+        case 2: title = "Erken Sinyal"
+        case 3: title = "Karisik Gorunum"
+        case 4: title = "Guclu Senaryo"
+        default: title = "Teyitli Senaryo"
+        }
+
+        let scenarioLabel: String
+        switch action {
+        case .aggressiveBuy, .accumulate:
+            scenarioLabel = "Olumlu Senaryo"
+        case .neutral:
+            scenarioLabel = "Notr Senaryo"
+        case .trim, .liquidate:
+            scenarioLabel = "Temkinli Senaryo"
+        }
+
+        let color: Color
+        switch level {
+        case 1: color = SanctumTheme.crimsonRed
+        case 2: color = Color.orange
+        case 3: color = SanctumTheme.titanGold
+        case 4: color = SanctumTheme.hologramBlue
+        default: color = SanctumTheme.auroraGreen
+        }
+
+        let whyText = Self.cleanText(reasoning, fallback: "Bu asamada veri toplama suruyor.")
+        let uncertaintyText = Self.uncertaintyText(
+            confidence: normalizedConfidence,
+            contributors: contributors,
+            vetoes: vetoes
+        )
+        let invalidationText = Self.invalidationText(
+            action: action,
+            confidence: normalizedConfidence,
+            vetoes: vetoes
+        )
+        let learningText = Self.learningNote(contributors: contributors)
+
+        return CouncilEducationStage(
+            level: level,
+            title: title,
+            scenarioLabel: scenarioLabel,
+            color: color,
+            why: whyText,
+            uncertainty: uncertaintyText,
+            invalidation: invalidationText,
+            learningNote: learningText
+        )
+    }
+
+    private static func baseEducationLevel(_ confidence: Double) -> Int {
+        switch confidence {
+        case ..<0.20: return 1
+        case ..<0.40: return 2
+        case ..<0.60: return 3
+        case ..<0.80: return 4
+        default: return 5
+        }
+    }
+
+    private static func uncertaintyText(
+        confidence: Double,
+        contributors: [ModuleContribution],
+        vetoes: [ModuleVeto]
+    ) -> String {
+        if let veto = vetoes.first {
+            return "\(veto.module.uppercased()) cekincesi var: \(cleanText(veto.reason, fallback: "Veto nedeni belirsiz."))"
+        }
+        if contributors.count < 3 {
+            return "Tum modullerden yeterli katilim yok; bu asamada senaryo erken olabilir."
+        }
+        if confidence < 0.5 {
+            return "Guven duzeyi dusuk; yeni veri geldikce seviye degisebilir."
+        }
+        return "Piyasa kosullari hizli degisebilir; senaryoyu duzenli yeniden degerlendirin."
+    }
+
+    private static func invalidationText(
+        action: ArgusAction,
+        confidence: Double,
+        vetoes: [ModuleVeto]
+    ) -> String {
+        if let veto = vetoes.first {
+            return "Gecersizlik kosulu: \(cleanText(veto.reason, fallback: "\(veto.module) cekincesi devam ediyor."))"
+        }
+
+        switch action {
+        case .aggressiveBuy, .accumulate:
+            let threshold = max(25, Int(confidence * 100) - 20)
+            return "Guven %\(threshold) altina inerse olumlu senaryo zayiflar."
+        case .neutral:
+            return "Yeni veri olmadan notr senaryo teyitli sayilmaz."
+        case .trim, .liquidate:
+            let threshold = min(80, Int(confidence * 100) + 15)
+            return "Guven %\(threshold) uzerine toparlanirsa temkinli senaryo zayiflar."
+        }
+    }
+
+    private static func learningNote(contributors: [ModuleContribution]) -> String {
+        let topModules = contributors
+            .sorted { $0.confidence > $1.confidence }
+            .prefix(2)
+            .map { $0.module.uppercased() }
+
+        if topModules.isEmpty {
+            return "Once veri kalitesini artirip moduller arasi tutarliligi kontrol edin."
+        }
+
+        let joined = topModules.joined(separator: " + ")
+        return "Bu asamada \(joined) gerekcelerini kendi planin ve risk sinirinla karsilastir."
+    }
+
+    private static func cleanText(_ text: String, fallback: String) -> String {
+        let trimmed = text
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
+    }
 }
 
 // MARK: - MODULE TYPE (Global Markets)
@@ -51,6 +200,9 @@ enum SanctumModuleType: String, CaseIterable {
         case .atlas: return "AtlasIcon"
         case .aether: return "AetherIcon"
         case .hermes: return "HermesIcon"
+        case .athena: return "AthenaIcon"
+        case .demeter: return "DemeterIcon"
+        case .chiron: return "ChironIcon"
         default: return nil
         }
     }
@@ -126,6 +278,8 @@ enum SanctumBistModuleType: String, CaseIterable {
         case .kasa, .bilanco: return "AtlasIcon"       // Temel = Atlas
         case .rejim, .sirkiye: return "AetherIcon"     // Makro = Aether
         case .kulis: return "HermesIcon"               // Haber = Hermes
+        case .faktor: return "AthenaIcon"              // Faktor = Athena
+        case .sektor: return "DemeterIcon"             // Sektor = Demeter
         default: return nil
         }
     }
@@ -155,7 +309,7 @@ enum SanctumBistModuleType: String, CaseIterable {
         // Yeni modüller
         case .tahta: return SanctumTheme.orionColor // Cyan/Blue
         case .kasa: return SanctumTheme.atlasColor // Gold
-        case .rejim: return Color.purple // Purple
+        case .rejim: return SanctumTheme.aetherColor
         // Eski modüller
         case .bilanco: return SanctumTheme.atlasColor
         case .grafik: return SanctumTheme.orionColor
@@ -164,8 +318,8 @@ enum SanctumBistModuleType: String, CaseIterable {
         case .faktor: return SanctumTheme.athenaColor
         case .vektor: return SanctumTheme.hologramBlue
         case .sektor: return SanctumTheme.demeterColor
-        case .oracle: return Color.purple
-        case .moneyflow: return Color.green
+        case .oracle: return SanctumTheme.aetherColor
+        case .moneyflow: return SanctumTheme.auroraGreen
         }
     }
 

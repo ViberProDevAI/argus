@@ -31,8 +31,8 @@ enum TimeframeMode: String, CaseIterable {
         case .m15: return "15m"
         case .h1: return "1h"
         case .h4: return "4h"
-        case .daily: return "1G"  // MarketDataStore uses "1G" for daily
-        case .weekly: return "1W"
+        case .daily: return "1day"
+        case .weekly: return "1week"
         }
     }
 }

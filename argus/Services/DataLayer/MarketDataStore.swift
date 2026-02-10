@@ -220,7 +220,7 @@ final class MarketDataStore: ObservableObject {
         
         // 3. Fetch
         let task = Task<[Candle], Error> {
-            let limit = (timeframe == "1day") ? 365 : 100
+            let limit = candleLimit(for: timeframe)
             return try await HeimdallOrchestrator.shared.requestCandles(symbol: symbol, timeframe: timeframe, limit: limit)
         }
         
@@ -240,6 +240,28 @@ final class MarketDataStore: ObservableObject {
             candles[key] = missing
             return missing
         }
+    }
+
+    private func candleLimit(for timeframe: String) -> Int {
+        let trimmed = timeframe.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // UI kısa kodları (case-sensitive)
+        switch trimmed {
+        case "1H": return 260 // Haftalık
+        case "1G": return 365
+        case "1S": return 240
+        case "4S": return 240
+        case "15D", "5D": return 300
+        default: break
+        }
+
+        let normalized = trimmed.lowercased()
+        if ["1week", "1wk", "1w"].contains(normalized) { return 260 }
+        if ["1day", "1d", "1g"].contains(normalized) { return 365 }
+        if ["4h", "4hour", "240m", "240min"].contains(normalized) { return 240 }
+        if ["1h", "1hour", "60min"].contains(normalized) { return 240 }
+        if ["15m", "15min", "5m", "5min"].contains(normalized) { return 300 }
+        return 200
     }
     
     // MARK: - Fundamentals (Atlas)

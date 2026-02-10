@@ -9,6 +9,7 @@ enum APIProvider: String, CaseIterable, Identifiable, Codable {
     case tiingo = "Tiingo"
     case marketstack = "MarketStack"
     case gemini = "Gemini AI"
+    case glm = "GLM"
     case fred = "FRED"
     case pinecone = "Pinecone"
     case massive = "Massive" // New Options Provider

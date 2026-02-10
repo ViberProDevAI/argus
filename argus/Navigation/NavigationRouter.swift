@@ -34,7 +34,7 @@ enum NavigationRoute: Hashable, Identifiable {
     case backtest
     case backtestResults(id: String)
     case marketReport
-    case analystReport
+    case analystReport(symbol: String)
     case reports
     case debateSimulator
 
@@ -98,7 +98,7 @@ enum NavigationRoute: Hashable, Identifiable {
     case estrategyCenter
     case proDashboard
     case roadmap
-    case oracleChامber
+    case oracleChamber
     case immersiveChart(symbol: String)
 
     // MARK: - Components/Detail Sheets

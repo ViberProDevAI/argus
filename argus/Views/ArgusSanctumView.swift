@@ -17,7 +17,7 @@ struct ArgusSanctumView: View {
         self._vm = StateObject(wrappedValue: SanctumViewModel(symbol: symbol))
     }
 
-    @Environment(\.presentationMode) var presentationMode
+    @Environment(\.dismiss) private var dismiss
 
     // State
     @State private var selectedModule: SanctumModuleType? = nil
@@ -54,16 +54,25 @@ struct ArgusSanctumView: View {
     var moduleCount: Double {
         Double(bistModules.count)
     }
+    
+    private var isBistSymbol: Bool {
+        symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol)
+    }
+    
+    private var activeDecision: ArgusGrandDecision? {
+        vm.grandDecision ?? viewModel.grandDecisions[symbol]
+    }
 
     @State private var showTradeSheet = false
     @State private var tradeAction: TradeAction = .buy
+    @State private var hasAppliedLaunchOverride = false
     
     enum TradeAction { case buy, sell }
 
     var body: some View {
         ZStack {
             // 1. Background
-            Color.black.ignoresSafeArea() // Fallback to prevent white screen
+            InstitutionalTheme.Colors.background.ignoresSafeArea()
             SanctumTheme.bg.ignoresSafeArea()
             
             // 2. Main Content
@@ -73,7 +82,7 @@ struct ArgusSanctumView: View {
                     VStack(spacing: 20) {
                         ProgressView()
                             .scaleEffect(1.5)
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .progressViewStyle(CircularProgressViewStyle(tint: InstitutionalTheme.Colors.textPrimary))
                         
                         LoadingQuoteView()
                     }
@@ -83,7 +92,18 @@ struct ArgusSanctumView: View {
                         footerHelper // Pantheon modülleri - Header altında (küçük toplar)
                         Spacer().frame(height: 40)
                         centerCoreArea
-                        Spacer()
+                        if showDecision,
+                           let decision = activeDecision,
+                           selectedModule == nil,
+                           selectedBistModule == nil {
+                            SanctumContributionCard(
+                                decision: decision,
+                                isBist: isBistSymbol
+                            )
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                        }
+                        Spacer(minLength: 8)
                     }
                 }
             }
@@ -109,33 +129,45 @@ struct ArgusSanctumView: View {
                 .zIndex(100)
             }
             
-            // 5. BIST HoloPanel (Handling BIST Mapping)
+            // 5. BIST HoloPanel
             if let bistMod = selectedBistModule {
-                // Map BIST module to Global equivalent for HoloPanel
-                let mappedModule: ModuleType = {
-                    switch bistMod {
-                    case .tahta: return .orion
-                    case .kasa: return .atlas
-                    case .kulis: return .hermes
-                    case .rejim: return .aether
-                    default: return .orion // Fallback for other types
-                    }
-                }()
-                
-                HoloPanelView(
-                    module: mappedModule,
-                    viewModel: viewModel,
-                    vm: vm,
-                    symbol: symbol,
-                    router: router,
-                    onClose: { withAnimation { selectedBistModule = nil } }
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(100)
+                if bistMod == .oracle {
+                    // Oracle BIST içinde legacy bir modül; dedicated panel ile açılır.
+                    BistHoloPanelView(
+                        module: bistMod,
+                        viewModel: viewModel,
+                        symbol: symbol,
+                        onClose: { withAnimation { selectedBistModule = nil } }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(100)
+                } else {
+                    // Map BIST module to Global equivalent for HoloPanel
+                    let mappedModule: ModuleType = {
+                        switch bistMod {
+                        case .tahta: return .orion
+                        case .kasa: return .atlas
+                        case .kulis: return .hermes
+                        case .rejim: return .aether
+                        default: return .orion // Fallback for other types
+                        }
+                    }()
+                    
+                    HoloPanelView(
+                        module: mappedModule,
+                        viewModel: viewModel,
+                        vm: vm,
+                        symbol: symbol,
+                        router: router,
+                        onClose: { withAnimation { selectedBistModule = nil } }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(100)
+                }
             }
             
             // 6. Sheets & Modals
-            // Trade Action Panel (Floating)
+            // Trade Action Panel (Flanking FAB - near tab bar)
             VStack {
                 Spacer()
                 if let quote = vm.quote, selectedModule == nil && selectedBistModule == nil {
@@ -151,8 +183,7 @@ struct ArgusSanctumView: View {
                             self.showTradeSheet = true
                         }
                     )
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 100)
+                    .padding(.bottom, 8)
                     .transition(.move(edge: .bottom))
                 }
             }
@@ -180,8 +211,18 @@ struct ArgusSanctumView: View {
         // Navigation via Router - Orphaned sheets removed, use router.navigate() instead
         .task {
             // Ensure data is loaded when view appears
-            if vm.quote == nil {
+            if vm.quote == nil || vm.grandDecision == nil {
                 await vm.loadData()
+            }
+            if vm.grandDecision == nil {
+                await vm.refresh()
+            }
+            await applyLaunchModuleOverrideIfNeeded()
+        }
+        .onAppear {
+            // Re-apply after appearance in case parent navigation rebuilds the view.
+            Task {
+                await applyLaunchModuleOverrideIfNeeded()
             }
         }
     }
@@ -232,7 +273,7 @@ struct ArgusSanctumView: View {
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Analiz Raporu", subtitle: "Detayli rapor", icon: "doc.text.magnifyingglass") {
-                        router.navigate(to: .analystReport)
+                        router.navigate(to: .analystReport(symbol: symbol))
                         showDrawer = false
                     }
                 ]
@@ -296,55 +337,45 @@ struct ArgusSanctumView: View {
     // 1. BACK BUTTON
     private var backButtonOverlay: some View {
         VStack {
-            HStack {
-                Button(action: { presentationMode.wrappedValue.dismiss() }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.left")
-                        Text("Terminal")
-                    }
-                    .font(.system(size: 14, weight: .medium, design: .monospaced))
-                    .foregroundColor(SanctumTheme.ghostGrey)
-                    .padding(8)
-                    .background(Color.black.opacity(0.3))
-                    .cornerRadius(8)
-                }
-                Spacer()
-                
-                Spacer()
-                
-                // NEW: Menu/Drawer Button (Opens Contextual Drawer)
-                Button(action: { showDrawer = true }) { // Requires @State showDrawer
-                    Image(systemName: "line.3.horizontal")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(SanctumTheme.ghostGrey)
-                        .padding(8)
-                        .background(Color.black.opacity(0.3))
-                        .cornerRadius(8)
-                }
+            HStack(spacing: 8) {
+                SanctumCommandButton(
+                    title: "GERI",
+                    icon: "chevron.left",
+                    tint: InstitutionalTheme.Colors.textPrimary,
+                    isPrimary: true,
+                    action: handleBackAction
+                )
 
-                Spacer()
-                
-                // ICONS REMOVED FOR CLEANER UI (User Request)
-                
-                // NEW: Argus Analysis Button (Top Right)
-                Button(action: { router.navigate(to: .analystReport) }) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "sparkles.rectangle.stack")
-                            .font(.system(size: 16))
-                        Text("ANALİZ")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    }
-                    .foregroundColor(Theme.accent) // Cyan/Blue
-                    .padding(8)
-                    .background(Color.black.opacity(0.3))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Theme.accent.opacity(0.3), lineWidth: 1)
-                    )
-                }
+                Spacer(minLength: 0)
+
+                SanctumCommandButton(
+                    title: "MENU",
+                    icon: "line.3.horizontal",
+                    tint: InstitutionalTheme.Colors.textSecondary,
+                    isPrimary: false,
+                    action: { showDrawer = true }
+                )
+
+                SanctumCommandButton(
+                    title: "RAPOR",
+                    icon: "sparkles.rectangle.stack",
+                    tint: Theme.accent,
+                    isPrimary: false,
+                    action: { router.navigate(to: .analystReport(symbol: symbol)) }
+                )
             }
-            .padding(.top, 40)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 7)
+            .background(
+                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous)
+                    .fill(InstitutionalTheme.Colors.surface1.opacity(0.94))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous)
+                    .stroke(InstitutionalTheme.Colors.borderStrong, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.35), radius: 10, x: 0, y: 4)
+            .padding(.top, 52)
             .padding(.horizontal, 16)
             Spacer()
         }
@@ -355,7 +386,7 @@ struct ArgusSanctumView: View {
         VStack(spacing: 8) {
             Text(symbol)
                 .font(.system(size: 28, weight: .black, design: .monospaced))
-                .foregroundColor(.white)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .tracking(2)
                 .shadow(color: SanctumTheme.hologramBlue.opacity(0.5), radius: 10)
             
@@ -383,7 +414,7 @@ struct ArgusSanctumView: View {
     private var centerCoreArea: some View {
         ZStack {
             // The Dial
-            CenterCoreView(symbol: symbol, viewModel: viewModel, showDecision: $showDecision)
+            CenterCoreView(symbol: symbol, decision: activeDecision, showDecision: $showDecision)
             
             // Orbiting Satellites (Modules)
             // BIST vs Global Separation
@@ -398,7 +429,7 @@ struct ArgusSanctumView: View {
                         .onTapGesture {
                             withAnimation(.spring()) {
                                 self.selectedBistModule = mod
-                                self.showDecision = true
+                                self.showDecision = false
                             }
                         }
                 }
@@ -414,7 +445,7 @@ struct ArgusSanctumView: View {
                         .onTapGesture {
                             withAnimation(.spring()) {
                                 self.selectedModule = mod
-                                self.showDecision = true
+                                self.showDecision = false
                             }
                         }
                 }
@@ -433,6 +464,116 @@ struct ArgusSanctumView: View {
             selectedModule: $selectedModule,
             selectedBistModule: $selectedBistModule
         )
+    }
+
+    private func handleBackAction() {
+        if selectedModule != nil || selectedBistModule != nil || showDecision {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                selectedModule = nil
+                selectedBistModule = nil
+                showDecision = false
+            }
+            return
+        }
+
+        dismiss()
+    }
+
+    @MainActor
+    private func applyLaunchModuleOverrideIfNeeded() async {
+        guard !hasAppliedLaunchOverride else { return }
+
+        // Small delay avoids race with initial deep-link navigation state propagation.
+        try? await Task.sleep(nanoseconds: 350_000_000)
+
+        let arguments = ProcessInfo.processInfo.arguments
+        let isBistSymbol = symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol)
+
+        let bistRaw: String? = {
+            if let inline = arguments.first(where: { $0.hasPrefix("--argus-bist-module=") }) {
+                return inline.replacingOccurrences(of: "--argus-bist-module=", with: "")
+            }
+            if let index = arguments.firstIndex(of: "--argus-bist-module"), arguments.indices.contains(index + 1) {
+                return arguments[index + 1]
+            }
+            return nil
+        }()
+
+        if isBistSymbol, let bistRaw {
+            let rawBist = bistRaw.uppercased()
+            if let bistModule = SanctumBistModuleType(rawValue: rawBist) {
+                withAnimation(.spring()) {
+                    selectedBistModule = bistModule
+                }
+                hasAppliedLaunchOverride = true
+                return
+            }
+        }
+
+        let globalRaw: String? = {
+            if let inline = arguments.first(where: { $0.hasPrefix("--argus-module=") }) {
+                return inline.replacingOccurrences(of: "--argus-module=", with: "")
+            }
+            if let index = arguments.firstIndex(of: "--argus-module"), arguments.indices.contains(index + 1) {
+                return arguments[index + 1]
+            }
+            return nil
+        }()
+
+        guard let globalRaw else {
+            return
+        }
+
+        let rawModule = globalRaw.uppercased()
+
+        if isBistSymbol, let bistModule = SanctumBistModuleType(rawValue: rawModule) {
+            withAnimation(.spring()) {
+                selectedBistModule = bistModule
+            }
+            hasAppliedLaunchOverride = true
+            return
+        }
+
+        if let globalModule = SanctumModuleType(rawValue: rawModule) {
+            withAnimation(.spring()) {
+                selectedModule = globalModule
+            }
+            hasAppliedLaunchOverride = true
+        }
+    }
+}
+
+private struct SanctumCommandButton: View {
+    let title: String
+    let icon: String
+    let tint: Color
+    let isPrimary: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 11, weight: .semibold))
+
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .tracking(0.5)
+            }
+            .foregroundColor(tint)
+            .padding(.horizontal, isPrimary ? 12 : 10)
+            .padding(.vertical, 8)
+            .frame(minHeight: 34)
+            .background(
+                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
+                    .fill(InstitutionalTheme.Colors.surface2.opacity(isPrimary ? 0.95 : 0.82))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
+                    .stroke(isPrimary ? tint.opacity(0.30) : InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -490,7 +631,7 @@ struct HoloPanelView: View {
                         .font(.headline)
                         .bold()
                         .tracking(2)
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     
                     // NEW: Info Button
                     Button(action: { withAnimation { showInfoCard = true } }) {
@@ -514,9 +655,9 @@ struct HoloPanelView: View {
                     
                     Button(action: onClose) {
                         Image(systemName: "xmark")
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             .padding(8)
-                            .background(Circle().fill(Color.white.opacity(0.1)))
+                            .background(Circle().fill(InstitutionalTheme.Colors.surface3))
                     }
                 }
                 .padding()
@@ -530,7 +671,7 @@ struct HoloPanelView: View {
                         Text(module.description)
                             .font(.caption)
                             .italic()
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         
                         // DYNAMIC CONTENT BASED ON MODULE
                         contentForModule(module)
@@ -628,7 +769,7 @@ struct HoloPanelView: View {
                                 .tint(SanctumTheme.orionColor)
                             Text("Orion analizi yükleniyor...")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                         .frame(maxWidth: .infinity, minHeight: 200)
                     } else {
@@ -645,16 +786,16 @@ struct HoloPanelView: View {
                         Spacer()
                         Text("Scalp • Swing • Position")
                             .font(.caption2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Image(systemName: "chevron.right")
                     }
-                    .foregroundColor(.white)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     .padding()
-                    .background(Color(red: 0.1, green: 0.12, blue: 0.18))
+                    .background(InstitutionalTheme.Colors.surface2)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color(red: 0.0, green: 0.8, blue: 1.0).opacity(0.3), lineWidth: 1)
+                            .stroke(SanctumTheme.hologramBlue.opacity(0.3), lineWidth: 1)
                     )
                 }
                 .padding(.horizontal)
@@ -725,7 +866,7 @@ struct HoloPanelView: View {
                                 .tint(SanctumTheme.aetherColor)
                             Text("Aether Konseyi toplanıyor...")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -737,10 +878,10 @@ struct HoloPanelView: View {
                     } else {
                         VStack(spacing: 12) {
                             ProgressView()
-                                .tint(.purple)
+                                .tint(SanctumTheme.hologramBlue)
                             Text("Makro veriler yükleniyor...")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -805,15 +946,15 @@ struct HoloPanelView: View {
                                 .foregroundColor(SanctumTheme.hermesColor)
                             Text("Hermes Kulak Kesidi")
                                 .font(.headline)
-                                .foregroundColor(.white)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         }
                         
                         // Description
                         Text("Hermes, finansal haberleri ve piyasa dedikodularını analiz ederek hisse senedinin medyadaki algısını değerlendirir.")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         
-                        Divider().background(Color.white.opacity(0.2))
+                        Divider().background(InstitutionalTheme.Colors.borderSubtle)
                         
                         // Dynamic Tips
                         VStack(alignment: .leading, spacing: 8) {
@@ -836,7 +977,7 @@ struct HoloPanelView: View {
                     HStack {
                         if vm.isLoadingNews {
                             ProgressView()
-                                .tint(.white)
+                                .tint(InstitutionalTheme.Colors.textPrimary)
                                 .scaleEffect(0.8)
                         } else {
                             Image(systemName: "sparkles")
@@ -847,9 +988,9 @@ struct HoloPanelView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
-                    .background(Color.orange.opacity(0.3))
+                    .background(SanctumTheme.titanGold.opacity(0.3))
                     .cornerRadius(10)
-                    .foregroundColor(.white)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 }
                 .disabled(vm.isLoadingNews)
 
@@ -857,7 +998,7 @@ struct HoloPanelView: View {
                 if let error = vm.newsErrorMessage {
                     Text(error)
                         .font(.caption2)
-                        .foregroundColor(.red)
+                        .foregroundColor(SanctumTheme.crimsonRed)
                         .padding(.horizontal)
                 }
 
@@ -866,19 +1007,19 @@ struct HoloPanelView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Haber Analizi")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
 
                         ForEach(Array(vm.newsInsights.prefix(5))) { insight in
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(insight.headline)
                                     .font(.caption)
                                     .bold()
-                                    .foregroundColor(.white)
+                                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                     .lineLimit(2)
 
                                 Text(insight.impactSentenceTR)
                                     .font(.caption2)
-                                    .foregroundColor(.white.opacity(0.7))
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                     .lineLimit(3)
 
                                 HStack {
@@ -887,25 +1028,35 @@ struct HoloPanelView: View {
                                         .font(.caption2)
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 2)
-                                        .background((insight.sentiment == .strongPositive || insight.sentiment == .weakPositive) ? Color.green.opacity(0.3) : ((insight.sentiment == .strongNegative || insight.sentiment == .weakNegative) ? Color.red.opacity(0.3) : Color.gray.opacity(0.3)))
+                                        .background(
+                                            (insight.sentiment == .strongPositive || insight.sentiment == .weakPositive) ? SanctumTheme.auroraGreen.opacity(0.3) :
+                                            ((insight.sentiment == .strongNegative || insight.sentiment == .weakNegative) ? SanctumTheme.crimsonRed.opacity(0.3) : InstitutionalTheme.Colors.textSecondary.opacity(0.3))
+                                        )
                                         .cornerRadius(4)
-                                        .foregroundColor(.white)
+                                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
                                     // Impact Score
                                     Text("Etki: \(Int(insight.impactScore))")
                                         .font(.caption2)
-                                        .foregroundColor(insight.impactScore > 60 ? .green : (insight.impactScore < 40 ? .red : .gray))
+                                        .foregroundColor(
+                                            insight.impactScore > 60 ? SanctumTheme.auroraGreen :
+                                            (insight.impactScore < 40 ? SanctumTheme.crimsonRed : InstitutionalTheme.Colors.textSecondary)
+                                        )
 
                                     Spacer()
 
                                     // Time
                                     Text(insight.createdAt, style: .relative)
                                         .font(.caption2)
-                                        .foregroundColor(.gray)
+                                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                 }
                             }
                             .padding()
-                            .background(Color.white.opacity(0.05))
+                            .background(InstitutionalTheme.Colors.surface2)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                            )
                             .cornerRadius(10)
                         }
                     }
@@ -915,7 +1066,7 @@ struct HoloPanelView: View {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(isBist ? "Kulis Analizleri" : "Hermes Analizleri")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
 
                         ForEach(Array(events.prefix(5))) { event in
                             HermesEventTeachingCard(
@@ -930,13 +1081,13 @@ struct HoloPanelView: View {
                     VStack(spacing: 12) {
                         Image(systemName: "newspaper")
                             .font(.title)
-                            .foregroundColor(.gray.opacity(0.3))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         Text("Henüz haber analizi yok")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Text("Yukarıdaki butona tıklayarak haber taraması başlatın")
                             .font(.caption2)
-                            .foregroundColor(.gray.opacity(0.6))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                             .multilineTextAlignment(.center)
                     }
                     .frame(maxWidth: .infinity)
@@ -948,41 +1099,41 @@ struct HoloPanelView: View {
             if let athena = viewModel.athenaResults[symbol] {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text("Smart Beta Puan:").foregroundColor(.white)
+                        Text("Smart Beta Puan:").foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         Spacer()
                         Text("\(Int(athena.factorScore))")
                             .font(.title)
                             .bold()
-                            .foregroundColor(athena.factorScore > 50 ? .green : .red)
+                            .foregroundColor(athena.factorScore > 50 ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative)
                     }
                     
                     // Factor breakdown
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Momentum:").foregroundColor(.gray)
+                            Text("Momentum:").foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
-                            Text("\(Int(athena.momentumFactorScore))").foregroundColor(.white)
+                            Text("\(Int(athena.momentumFactorScore))").foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         }
                         HStack {
-                            Text("Value:").foregroundColor(.gray)
+                            Text("Value:").foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
-                            Text("\(Int(athena.valueFactorScore))").foregroundColor(.white)
+                            Text("\(Int(athena.valueFactorScore))").foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         }
                         HStack {
-                            Text("Quality:").foregroundColor(.gray)
+                            Text("Quality:").foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
-                            Text("\(Int(athena.qualityFactorScore))").foregroundColor(.white)
+                            Text("\(Int(athena.qualityFactorScore))").foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         }
                     }
                     .font(.caption)
                     
                     Text(athena.styleLabel)
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
                 }
             } else {
                 Text("Athena analizi yükleniyor...")
-                    .italic().foregroundColor(.gray)
+                    .italic().foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
             
         case .demeter:
@@ -992,39 +1143,39 @@ struct HoloPanelView: View {
             if let demeter = demeterScore {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Text("Sektör Puanı:").foregroundColor(.white)
+                        Text("Sektör Puanı:").foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         Spacer()
                         Text("\(Int(demeter.totalScore))")
                             .font(.title)
                             .bold()
-                            .foregroundColor(demeter.totalScore > 50 ? .green : .red)
+                            .foregroundColor(demeter.totalScore > 50 ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative)
                     }
                     
                     Text("Sektör: \(demeter.sector.name)")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.8))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
                     
                     // Component breakdown
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Text("Momentum:").foregroundColor(.gray)
+                            Text("Momentum:").foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
-                            Text("\(Int(demeter.momentumScore))").foregroundColor(.white)
+                            Text("\(Int(demeter.momentumScore))").foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         }
                         HStack {
-                            Text("Şok Etkisi:").foregroundColor(.gray)
+                            Text("Şok Etkisi:").foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
-                            Text("\(Int(demeter.shockImpactScore))").foregroundColor(.white)
+                            Text("\(Int(demeter.shockImpactScore))").foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         }
                         HStack {
-                            Text("Rejim:").foregroundColor(.gray)
+                            Text("Rejim:").foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
-                            Text("\(Int(demeter.regimeScore))").foregroundColor(.white)
+                            Text("\(Int(demeter.regimeScore))").foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         }
                         HStack {
-                            Text("Genişlik:").foregroundColor(.gray)
+                            Text("Genişlik:").foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
-                            Text("\(Int(demeter.breadthScore))").foregroundColor(.white)
+                            Text("\(Int(demeter.breadthScore))").foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         }
                     }
                     .font(.caption)
@@ -1032,11 +1183,11 @@ struct HoloPanelView: View {
                     // Active shocks
                     if !demeter.activeShocks.isEmpty {
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Aktif Şoklar:").font(.caption).foregroundColor(.orange)
+                            Text("Aktif Şoklar:").font(.caption).foregroundColor(SanctumTheme.titanGold)
                             ForEach(demeter.activeShocks) { shock in
                                 Text("• \(shock.type.displayName) \(shock.direction.symbol)")
                                     .font(.caption2)
-                                    .foregroundColor(.orange.opacity(0.8))
+                                    .foregroundColor(InstitutionalTheme.Colors.warning)
                             }
                         }
                     }
@@ -1044,15 +1195,18 @@ struct HoloPanelView: View {
                     Text("Değerlendirme: \(demeter.grade)")
                         .font(.caption)
                         .bold()
-                        .foregroundColor(demeter.totalScore > 60 ? .green : (demeter.totalScore > 40 ? .yellow : .red))
+                        .foregroundColor(
+                            demeter.totalScore > 60 ? InstitutionalTheme.Colors.positive :
+                            (demeter.totalScore > 40 ? InstitutionalTheme.Colors.warning : InstitutionalTheme.Colors.negative)
+                        )
                 }
             } else {
                 VStack(spacing: 8) {
                     Text("Sektör analizi yükleniyor...")
-                        .italic().foregroundColor(.gray)
+                        .italic().foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Text("Demeter verisi için lütfen bekleyin veya seç modülünden yükletin.")
                         .font(.caption2)
-                        .foregroundColor(.gray.opacity(0.7))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         .multilineTextAlignment(.center)
                 }
             }
@@ -1064,10 +1218,10 @@ struct HoloPanelView: View {
                 HStack {
                     AlkindusAvatarView(size: 14, isThinking: false, hasIdea: false)
                         .font(.title2)
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     Text("Chiron Öğrenme Sistemi")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     Spacer()
                 }
                 
@@ -1078,87 +1232,97 @@ struct HoloPanelView: View {
                         HStack {
                             Text("Market Rejimi")
                                 .font(.caption)
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
                             Text(chironResult.regime.descriptor)
                                 .font(.headline)
                                 .bold()
-                                .foregroundColor(chironResult.regime == .trend ? .green : 
-                                                chironResult.regime == .riskOff ? .red : .yellow)
+                                .foregroundColor(
+                                    chironResult.regime == .trend ? InstitutionalTheme.Colors.positive :
+                                    (chironResult.regime == .riskOff ? InstitutionalTheme.Colors.negative : InstitutionalTheme.Colors.warning)
+                                )
                         }
                         
                         Text(chironResult.explanationTitle)
                             .font(.caption)
                             .bold()
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         
                         Text(chironResult.explanationBody)
                             .font(.caption2)
-                            .foregroundColor(.white.opacity(0.8))
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
                     }
                     .padding()
-                    .background(Color.white.opacity(0.05))
+                    .background(InstitutionalTheme.Colors.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                    )
                     .cornerRadius(12)
                 }
                 
-                Divider().background(Color.white.opacity(0.2))
+                Divider().background(InstitutionalTheme.Colors.borderSubtle)
                 
                 // PULSE Weights (Short-term)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "bolt.fill")
-                            .foregroundColor(.purple)
+                            .foregroundColor(SanctumTheme.hologramBlue)
                         Text("PULSE Ağırlıkları (Kısa Vade)")
                             .font(.caption)
                             .bold()
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     }
                     
                     if let weights = chironPulseWeights {
-                        chironWeightProgressRows(weights: weights, color: .purple)
+                        chironWeightProgressRows(weights: weights)
                         
                         Text(weights.reasoning)
                             .font(.caption2)
                             .italic()
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             .padding(.top, 4)
                     } else {
                         Text("Varsayılan ağırlıklar kullanılıyor...")
                             .font(.caption2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
                 .padding()
-                .background(Color.purple.opacity(0.1))
+                .background(SanctumTheme.hologramBlue.opacity(0.1))
                 .cornerRadius(12)
                 
                 // CORSE Weights (Long-term)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         Image(systemName: "tortoise.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(SanctumTheme.hologramBlue)
                         Text("CORSE Ağırlıkları (Uzun Vade)")
                             .font(.caption)
                             .bold()
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     }
                     
                     if let weights = chironCorseWeights {
-                        chironWeightProgressRows(weights: weights, color: .blue)
+                        chironWeightProgressRows(weights: weights)
                         
                         Text(weights.reasoning)
                             .font(.caption2)
                             .italic()
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             .padding(.top, 4)
                     } else {
                         Text("Varsayılan ağırlıklar kullanılıyor...")
                             .font(.caption2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
                 .padding()
-                .background(Color.blue.opacity(0.1))
+                .background(InstitutionalTheme.Colors.surface2)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                )
                 .cornerRadius(12)
                 
                 // Learning tips
@@ -1166,18 +1330,22 @@ struct HoloPanelView: View {
                     HStack(spacing: 4) {
                         Image(systemName: "lightbulb.fill")
                             .font(.caption)
-                            .foregroundColor(.yellow)
+                            .foregroundColor(SanctumTheme.titanGold)
                         Text("Nasıl Öğreniyor?")
                             .font(.caption)
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     }
                     
                     Text("Chiron, geçmiş kararlardan ve fiyat hareketlerinden öğrenerek modül ağırlıklarını dinamik olarak ayarlar. Başarılı modüllerin ağırlığı artar.")
                         .font(.caption2)
-                        .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 .padding()
-                .background(Color.white.opacity(0.03))
+                .background(InstitutionalTheme.Colors.surface1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                )
                 .cornerRadius(8)
                 
                 // CHRONOS LAB Button (Navigation)
@@ -1187,30 +1355,30 @@ struct HoloPanelView: View {
                     HStack {
                         Image(systemName: "clock.arrow.2.circlepath")
                             .font(.title3)
-                            .foregroundColor(.cyan)
+                            .foregroundColor(SanctumTheme.hologramBlue)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Chronos Lab")
                                 .font(.subheadline)
                                 .bold()
-                                .foregroundColor(.white)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             Text("Walk-Forward Validation & Backtest")
                                 .font(.caption2)
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                         
                         Spacer()
                         
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     .padding()
-                    .background(Color.cyan.opacity(0.1))
+                    .background(InstitutionalTheme.Colors.surface2)
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.cyan.opacity(0.3), lineWidth: 1)
+                            .stroke(SanctumTheme.hologramBlue.opacity(0.3), lineWidth: 1)
                     )
                 }
                 
@@ -1221,30 +1389,30 @@ struct HoloPanelView: View {
                     HStack {
                         Image(systemName: "flask.fill")
                             .font(.title3)
-                            .foregroundColor(.purple)
+                            .foregroundColor(SanctumTheme.hologramBlue)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Argus Lab")
                                 .font(.subheadline)
                                 .bold()
-                                .foregroundColor(.white)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             Text("İşlem Geçmişi & Öğrenmeler")
                                 .font(.caption2)
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                         
                         Spacer()
                         
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     .padding()
-                    .background(Color.purple.opacity(0.1))
+                    .background(SanctumTheme.hologramBlue.opacity(0.1))
                     .cornerRadius(12)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color.purple.opacity(0.3), lineWidth: 1)
+                            .stroke(SanctumTheme.hologramBlue.opacity(0.3), lineWidth: 1)
                     )
                 }
             }
@@ -1256,23 +1424,23 @@ struct HoloPanelView: View {
                 HStack {
                     Image(systemName: "crystal.ball")
                         .font(.title2)
-                        .foregroundColor(.orange)
+                        .foregroundColor(SanctumTheme.titanGold)
                     Text("Prometheus Öngörü Sistemi")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     Spacer()
                 }
                 
                 // Info Box
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: "info.circle")
-                        .foregroundColor(.orange.opacity(0.8))
+                        .foregroundColor(SanctumTheme.titanGold)
                     Text("Prometheus, geçmiş fiyat verilerini Holt-Winters algoritması ile analiz ederek 5 günlük fiyat tahmini üretir. Güven skoru, son dönem volatilitesine göre hesaplanır.")
                         .font(.caption)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
                 .padding()
-                .background(Color.orange.opacity(0.1))
+                .background(SanctumTheme.titanGold.opacity(0.1))
                 .cornerRadius(12)
                 
                 // Forecast Card
@@ -1284,17 +1452,21 @@ struct HoloPanelView: View {
                 } else {
                     VStack(spacing: 12) {
                         ProgressView()
-                            .tint(.orange)
+                            .tint(SanctumTheme.titanGold)
                         Text("Fiyat verisi yükleniyor...")
                             .font(.caption)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Text("En az 30 günlük veri gerekli")
                             .font(.caption2)
-                            .foregroundColor(.gray.opacity(0.7))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     }
                     .frame(maxWidth: .infinity, minHeight: 150)
                     .padding()
-                    .background(Color.white.opacity(0.03))
+                    .background(InstitutionalTheme.Colors.surface1)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                    )
                     .cornerRadius(12)
                 }
             }
@@ -1312,14 +1484,14 @@ struct HoloPanelView: View {
         if let v = value {
             HStack {
                 Text(label)
-                    .foregroundColor(.gray)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 Spacer()
                 if isPercentage {
                     Text(String(format: "%.1f%%", v * 100))
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 } else {
                     Text(String(format: "%.2f", v))
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 }
             }
             .font(.caption)
@@ -1331,17 +1503,20 @@ struct HoloPanelView: View {
         HStack {
             Text(label)
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .frame(width: 70, alignment: .leading)
             
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.2))
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
                         .frame(height: 8)
                     
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(score / max > 0.6 ? Color.green : (score / max > 0.4 ? Color.yellow : Color.red))
+                        .fill(
+                            score / max > 0.6 ? InstitutionalTheme.Colors.positive :
+                            (score / max > 0.4 ? InstitutionalTheme.Colors.warning : InstitutionalTheme.Colors.negative)
+                        )
                         .frame(width: geometry.size.width * CGFloat(min(score / max, 1.0)), height: 8)
                 }
             }
@@ -1349,7 +1524,7 @@ struct HoloPanelView: View {
             
             Text("\(Int(score))/\(Int(max))")
                 .font(.caption2)
-                .foregroundColor(.white)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .frame(width: 40, alignment: .trailing)
         }
     }
@@ -1359,13 +1534,13 @@ struct HoloPanelView: View {
         HStack {
             Text(label)
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .frame(width: 100, alignment: .leading)
             
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.gray.opacity(0.2))
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
                         .frame(height: 10)
                     
                     RoundedRectangle(cornerRadius: 4)
@@ -1378,21 +1553,21 @@ struct HoloPanelView: View {
             Text("\(Int(score))/\(Int(max))")
                 .font(.caption2)
                 .bold()
-                .foregroundColor(.white)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .frame(width: 45, alignment: .trailing)
         }
     }
     
     @ViewBuilder
-    func chironWeightProgressRows(weights: ChironModuleWeights, color: Color) -> some View {
+    func chironWeightProgressRows(weights: ChironModuleWeights) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            chironWeightRow("Orion", weight: weights.orion, color: .cyan)
-            chironWeightRow("Atlas", weight: weights.atlas, color: .yellow)
-            chironWeightRow("Phoenix", weight: weights.phoenix, color: .orange)
-            chironWeightRow("Aether", weight: weights.aether, color: .purple)
-            chironWeightRow("Hermes", weight: weights.hermes, color: .green)
-            chironWeightRow("Demeter", weight: weights.demeter, color: .brown)
-            chironWeightRow("Athena", weight: weights.athena, color: .pink)
+            chironWeightRow("Orion", weight: weights.orion, color: SanctumTheme.orionColor)
+            chironWeightRow("Atlas", weight: weights.atlas, color: SanctumTheme.atlasColor)
+            chironWeightRow("Phoenix", weight: weights.phoenix, color: InstitutionalTheme.Colors.negative)
+            chironWeightRow("Aether", weight: weights.aether, color: SanctumTheme.aetherColor)
+            chironWeightRow("Hermes", weight: weights.hermes, color: SanctumTheme.hermesColor)
+            chironWeightRow("Demeter", weight: weights.demeter, color: SanctumTheme.demeterColor)
+            chironWeightRow("Athena", weight: weights.athena, color: SanctumTheme.athenaColor)
         }
     }
     
@@ -1401,13 +1576,13 @@ struct HoloPanelView: View {
         HStack {
             Text(label)
                 .font(.caption2)
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .frame(width: 55, alignment: .leading)
             
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Color.gray.opacity(0.2))
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
                         .frame(height: 6)
                     
                     RoundedRectangle(cornerRadius: 3)
@@ -1419,7 +1594,7 @@ struct HoloPanelView: View {
             
             Text("\(Int(weight * 100))%")
                 .font(.caption2)
-                .foregroundColor(.white)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .frame(width: 35, alignment: .trailing)
         }
     }
@@ -1522,38 +1697,61 @@ struct BistHoloPanelView: View {
                 HStack {
                     SanctumModuleIconView(bistModule: module, size: 28)
                         .foregroundColor(module.color)
-                    Text(module.rawValue) // TR ISIM
-                        .font(.headline)
-                        .bold()
-                        .tracking(2)
-                        .foregroundColor(.white)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(module.rawValue) // TR ISIM
+                            .font(.headline)
+                            .bold()
+                            .tracking(2)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        Text(module.description)
+                            .font(.caption2)
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                            .lineLimit(1)
+                    }
                     
                     Button(action: { withAnimation { showInfoCard = true } }) {
                         Image(systemName: "info.circle")
-                            .foregroundColor(module.color.opacity(0.8))
+                            .foregroundColor(module.color.opacity(0.85))
                     }
                     
                     Spacer()
                     
                     Button(action: onClose) {
                         Image(systemName: "xmark")
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             .padding(8)
-                            .background(Circle().fill(Color.white.opacity(0.1)))
+                            .background(Circle().fill(InstitutionalTheme.Colors.surface3))
+                            .overlay(
+                                Circle()
+                                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                            )
                     }
                 }
                 .padding()
-                .background(module.color.opacity(0.2))
+                .background(module.color.opacity(0.14))
                 
                 Divider().background(module.color)
                 
                 // Content
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(module.description)
-                            .font(.caption)
-                            .italic()
-                            .foregroundColor(.gray)
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.caption)
+                                .foregroundColor(module.color.opacity(0.9))
+                                .padding(.top, 1)
+                            Text(module.description)
+                                .font(.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(InstitutionalTheme.Colors.surface2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         
                         bistContentForModule(module)
                     }
@@ -1588,7 +1786,7 @@ struct BistHoloPanelView: View {
                     case .faktor: return .argus
                     case .vektor: return .orion
                     case .sektor: return .poseidon
-                    case .oracle: return .demeter
+                    case .oracle: return .aether
                     case .moneyflow: return .poseidon // Moneyflow map to Whale/Poseidon
                     }
                 }()
@@ -1652,25 +1850,28 @@ struct BistHoloPanelView: View {
         let usdTry = await MainActor.run { viewModel.quotes["USD/TRY"]?.currentPrice ?? 35.0 }
         let usdTryPrev = await MainActor.run { viewModel.quotes["USD/TRY"]?.previousClose ?? 35.0 }
         
+        // TCMB'den gerçek makro veriler
+        let tcmbSnapshot = await TCMBDataService.shared.getMacroSnapshot()
+        
         let sirkiyeInput = SirkiyeEngine.SirkiyeInput(
             usdTry: usdTry,
             usdTryPrevious: usdTryPrev,
-            dxy: 104.0, // Default or fetch
-            brentOil: 80.0,
-            globalVix: 15.0,
+            dxy: 104.0, // DXY için ayrı kaynak gerekli
+            brentOil: tcmbSnapshot.brentOil ?? 80.0,
+            globalVix: 15.0, // VIX için ayrı kaynak gerekli
             newsSnapshot: nil,
-            currentInflation: 45.0,
-            policyRate: 50.0,
+            currentInflation: tcmbSnapshot.inflation ?? 45.0,
+            policyRate: tcmbSnapshot.policyRate ?? 50.0,
             xu100Change: nil,
             xu100Value: nil,
-            goldPrice: nil
+            goldPrice: tcmbSnapshot.goldPrice
         )
         
         let macro = await MacroSnapshotService.shared.getSnapshot()
         let decision = await ArgusGrandCouncil.shared.convene(
             symbol: symbol,
             candles: candleList,
-            snapshot: nil, // Corrected parameter label
+            snapshot: nil,
             macro: macro,
             news: nil,
             engine: .pulse,
@@ -1685,9 +1886,6 @@ struct BistHoloPanelView: View {
     
     @ViewBuilder
     private func bistContentForModule(_ module: ArgusSanctumView.BistModuleType) -> some View {
-        // Backend'den BIST karar verilerini al
-        let bistDetails = viewModel.grandDecisions[symbol]?.bistDetails
-
         switch module {
         // MARK: - YENİ KONSOLİDE MODÜLLER
 
@@ -1704,7 +1902,7 @@ struct BistHoloPanelView: View {
             }
 
         case .kasa:
-            // KASA MERKEZİ: Bilanço + Faktörler
+            // KASA MERKEZİ: Bilanço + Faktörler + Analist
             VStack(spacing: 24) {
                 // 1. Temel Analiz (Atlas)
                 let bistSymbol = symbol.uppercased().hasSuffix(".IS") ? symbol : "\(symbol.uppercased()).IS"
@@ -1714,41 +1912,65 @@ struct BistHoloPanelView: View {
                 
                 // 2. Faktör Analizi (Smart Beta)
                 BistFaktorCard(symbol: symbol)
+                
+                Divider().background(SanctumTheme.atlasColor.opacity(0.3))
+                
+                // 3. Analist Konsensüs (borsapy)
+                BistAnalystCard(symbol: symbol)
             }
 
         case .rejim:
-            // REJİM MERKEZİ: Makro (Sirkiye) + Sektör + Gelecek (Oracle)
+            // REJİM MERKEZİ: Makro Pano + Sirkiye + Oracle + Sektör
             VStack(spacing: 24) {
-                // 1. Sirkiye (Makro Rüzgar)
+                // DEBUGl
+                Text("V4 BIST INTEGRATION ACTIVE")
+                    .font(.caption.bold())
+                    .foregroundColor(.red)
+                    .padding(4)
+                    .background(Color.white)
+                
+                // 1. Türkiye Makro Özet Panosu (TCMB + borsapy fallback)
+                BistMacroSummaryCard()
+                
+                Divider().background(SanctumTheme.hologramBlue.opacity(0.3))
+                
+                // 2. Sirkiye (Makro Rüzgar)
                 SirkiyeDashboardView(viewModel: viewModel)
                 
-                Divider().background(Color.purple.opacity(0.3))
+                Divider().background(SanctumTheme.hologramBlue.opacity(0.3))
                 
-                // 2. Oracle (Gelecek Sinyalleri)
+                // 3. Oracle (Gelecek Sinyalleri)
                 OracleChamberEmbeddedView()
                     .frame(height: 300)
                 
-                Divider().background(Color.purple.opacity(0.3))
+                Divider().background(SanctumTheme.hologramBlue.opacity(0.3))
                 
-                // 3. Sektör
+                // 4. Sektör
                 BistSektorCard()
             }
             
         case .kulis:
-            // KULİS MERKEZİ: Haberler ve Sentiment
+            // KULİS MERKEZİ: Haberler, Sentiment ve KAP
              VStack(spacing: 16) {
-                // Intro
+                // 1. Piyasa Duygu Analizi
                 BISTSentimentPulseCard(symbol: symbol)
-                // Analist Görüşleri
+                // 2. Analist Görüşleri
                 HermesAnalystCard(symbol: symbol, currentPrice: viewModel.quotes[symbol]?.currentPrice ?? 0)
+                // 3. KAP Bildirimleri (borsapy)
+                KulisKAPCard(symbol: symbol)
             }
+
+        case .oracle:
+            // ORACLE: dedicated makro sinyal görünümü
+            OracleChamberEmbeddedView()
+                .frame(height: 360)
 
         // ESKİ MODÜLLER (Fallback)
         default:
              VStack {
                  Text("Modül taşındı.")
                     .font(.caption)
-                    .foregroundColor(.gray)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
              }
         }
     }
@@ -1769,7 +1991,7 @@ struct HermesInfoRow: View {
             
             Text(text)
                 .font(.system(size: 11))
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
     }
 }
@@ -1781,11 +2003,11 @@ struct OrionMotherboardErrorView: View {
         VStack(spacing: 16) {
              Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 48))
-                .foregroundColor(.orange)
+                .foregroundColor(SanctumTheme.titanGold)
              
              Text("Analiz Başarısız")
                 .font(.headline)
-                .foregroundColor(.white)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
              
              Text("Heimdall protokolü \(symbol) için teknik verileri derleyemedi. Lütfen internet bağlantısını kontrol edin veya daha sonra tekrar deneyin.")
                 .font(.caption)
@@ -1798,7 +2020,7 @@ struct OrionMotherboardErrorView: View {
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.orange.opacity(0.3), lineWidth: 1)
+                .stroke(SanctumTheme.titanGold.opacity(0.3), lineWidth: 1)
         )
     }
 }

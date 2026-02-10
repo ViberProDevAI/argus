@@ -68,27 +68,19 @@ struct ProviderQuotaStatus: Codable {
 // MARK: - Masking Helpers
 enum DebugMasker {
     static func maskURL(_ urlString: String) -> String {
-        // Simple regex to mask apikey/token params
-        // e.g. ?apikey=123 -> ?apikey=***
-        // e.g. /token/123 -> /token/***
-        
+        // Mask common credential-like query params.
         var masked = urlString
-        let patterns = [
-            "apikey=([^&]+)",
-            "token=([^&]+)",
-            "key=([^&]+)",
-            "auth=([^&]+)"
-        ]
-        
-        for p in patterns {
-            if let regex = try? NSRegularExpression(pattern: p, options: .caseInsensitive) {
-                masked = regex.stringByReplacingMatches(
-                    in: masked,
-                    range: NSRange(masked.startIndex..., in: masked),
-                    withTemplate: "$1=***"
-                )
-            }
+
+        if let queryRegex = try? NSRegularExpression(
+            pattern: "(?i)(apikey|api_key|api-token|api_token|token|auth|authorization|key)=([^&]+)"
+        ) {
+            masked = queryRegex.stringByReplacingMatches(
+                in: masked,
+                range: NSRange(masked.startIndex..., in: masked),
+                withTemplate: "$1=***"
+            )
         }
+
         return masked
     }
     
@@ -98,9 +90,28 @@ enum DebugMasker {
             return "[HTML Page Received - Likely Proxy/Error Page]"
         }
         if body.count > 500 {
-            return String(body.prefix(500)) + "... (truncated)"
+            return maskSensitiveBody(String(body.prefix(500))) + "... (truncated)"
         }
-        return body
+        return maskSensitiveBody(body)
+    }
+
+    private static func maskSensitiveBody(_ body: String) -> String {
+        var masked = body
+        let patterns = [
+            #"(?i)("?(api[_-]?key|token|secret|authorization|auth)"?\s*[:=]\s*"?)([^"\s,}]+)"?"#,
+            #"(?i)(bearer\s+)([A-Za-z0-9._\-]+)"#
+        ]
+
+        for pattern in patterns {
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+            masked = regex.stringByReplacingMatches(
+                in: masked,
+                range: NSRange(masked.startIndex..., in: masked),
+                withTemplate: "$1***"
+            )
+        }
+
+        return masked
     }
 }
 

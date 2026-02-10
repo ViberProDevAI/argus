@@ -8,7 +8,7 @@ fileprivate extension ExecutionModel {
 /// Simulated broker for paper trading - gerçek para kullanmadan test
 
 actor PaperBroker: BrokerProtocol {
-    static let shared = PaperBroker()
+    nonisolated static let shared = PaperBroker()
     
     // MARK: - Properties
     

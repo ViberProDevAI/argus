@@ -22,7 +22,11 @@ struct PrometheusBadge: View {
                 Text(String(format: "%+.1f%%", f.changePercent))
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(color(for: f.changePercent))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .allowsTightening(true)
             }
+            .frame(width: 96, alignment: .leading)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .background(Color.white.opacity(0.05))
@@ -40,7 +44,9 @@ struct PrometheusBadge: View {
                 Text("---%")
                     .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundColor(.gray.opacity(0.3))
+                    .lineLimit(1)
             }
+            .frame(width: 96, alignment: .leading)
             .padding(.horizontal, 6)
             .padding(.vertical, 4)
             .background(Color.white.opacity(0.02))

@@ -2,7 +2,7 @@
 //  Persistence.swift
 //  argus
 //
-//  Created by Eren Kapak on 30.01.2026.
+//  Created by Argus Team on 30.01.2026.
 //
 
 import CoreData

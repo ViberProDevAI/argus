@@ -4,219 +4,127 @@ struct SystemGuideSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
                     introSection
-                    flowDiagram
-                    dataSourcesSection
-                    enginesOverview
-                    decisionSection
+                    argusInThreeLines
+                    decisionFlowSection
+                    sanctumReadingSection
+                    quickPracticeSection
+                    mistakeGuardSection
                 }
                 .padding(20)
             }
-            .background(Theme.background)
-            .navigationTitle("Argus Nasil Calisir?")
+            .background(InstitutionalTheme.Colors.background)
+            .navigationTitle("Ders 1 · Sistem")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Kapat") { dismiss() }
-                        .foregroundColor(Theme.tint)
+                        .foregroundColor(InstitutionalTheme.Colors.primary)
                 }
             }
         }
     }
-
-    // MARK: - Intro
 
     private var introSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("ARGUS KARAR SISTEMI")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(Theme.textSecondary)
-
-            Text("Argus, birden fazla analiz motorunun ciktisini birlestirerek yatirim kararlari ureten bir karar destek sistemidir.")
-                .font(.subheadline)
-                .foregroundColor(.white)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Argus Karar Sistemi")
+                .font(InstitutionalTheme.Typography.title)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+            Text("Amaç: Ekrandaki çıktıyı ezberlemek değil, kararın hangi zincirden geldiğini görmek.")
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            Text("Bu ders 6 dakikadır. Bitince aynı sembolde Sanctum’a dönüp tekrar okumalısın.")
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.primary)
+                .tracking(0.3)
         }
     }
 
-    // MARK: - Flow Diagram
-
-    private var flowDiagram: some View {
-        VStack(spacing: 16) {
-            flowStep(number: "1", title: "Veri Toplama", description: "BIST, TCMB, Yahoo Finance")
-            flowArrow
-            flowStep(number: "2", title: "Motor Analizi", description: "Her motor kendi bakis acisiyla degerlendirir")
-            flowArrow
-            flowStep(number: "3", title: "Konsey Oylamasi", description: "Motorlarin sinyalleri agirliklandirilir")
-            flowArrow
-            flowStep(number: "4", title: "Karar", description: "AL / SAT / BEKLE")
+    private var argusInThreeLines: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("3 CÜMLEDE ARGUS")
+            bullet("Argus tek bir model değil; birden çok motorun birlikte çalıştığı bir karar sistemi.")
+            bullet("Sinyal önce veriyle beslenir, sonra motorlar puan üretir, en son konsey ağırlıklandırır.")
+            bullet("Doğru okuma sırası: rejim -> motor ayrışması -> nihai karar.")
         }
-        .padding(16)
-        .background(Color.white.opacity(0.03))
-        .cornerRadius(Theme.Radius.medium)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.medium)
-                .stroke(Theme.tint.opacity(0.2), lineWidth: 1)
-        )
     }
 
-    private func flowStep(number: String, title: String, description: String) -> some View {
-        HStack(spacing: 14) {
-            Text(number)
-                .font(.headline)
-                .fontWeight(.bold)
-                .foregroundColor(Theme.background)
-                .frame(width: 28, height: 28)
-                .background(Circle().fill(Theme.tint))
+    private var decisionFlowSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("KARAR ZİNCİRİ")
+            numbered("1", "Veri Toplama", "Fiyat, hacim, haber ve makro veri aynı anda çekilir.")
+            numbered("2", "Motor Skorları", "Orion/Atlas/Hermes/Aether kendi uzmanlığında puan üretir.")
+            numbered("3", "Ağırlıklandırma", "Rejim bilgisine göre hangi motorun sesi daha güçlü olacağı belirlenir.")
+            numbered("4", "Nihai Çıktı", "AL · SAT · BEKLE kararı ve açıklama birlikte üretilir.")
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 2) {
+    private var sanctumReadingSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("SANCTUM EKRANINI OKUMA")
+            bullet("Merkez alan: Konseyin birleşik yorumu (tek cümlelik yön).")
+            bullet("Çevredeki motorlar: Ayrışmayı görürsün; kimin neden farklı düşündüğünü buradan anlarsın.")
+            bullet("Sağ üst ANALİZ: Tüm sistemi metne döker; kararın nedeni burada netleşir.")
+        }
+    }
+
+    private var quickPracticeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("90 SANİYELİK PRATİK")
+            numbered("A", "Rejimi Gör", "Aether ne diyor? Risk artırmalı mısın azaltmalı mısın?")
+            numbered("B", "Ayrışmayı Bul", "Hangi motor uyumsuz? Ayrışma varsa nedeni anlamadan işlem yok.")
+            numbered("C", "ANALİZ ile Kilitle", "Metin, senin okumanla uyumluysa karar tamam.")
+        }
+    }
+
+    private var mistakeGuardSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("HATA ÖNLEYİCİ KURALLAR")
+            bullet("Tek motor skoru ile işlem açma.")
+            bullet("Rejim çaprazken agresif trend işlemi zorlama.")
+            bullet("ANALİZ metnini tek başına değil, motor dağılımıyla birlikte oku.")
+        }
+    }
+
+    private func bullet(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("•")
+                .foregroundColor(InstitutionalTheme.Colors.primary)
+            Text(text)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+        }
+    }
+
+    private func numbered(_ index: String, _ title: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
+                Text(index)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(InstitutionalTheme.Colors.primary)
+                    .frame(width: 16, alignment: .leading)
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.white)
-
-                Text(description)
-                    .font(.caption2)
-                    .foregroundColor(Theme.textSecondary)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             }
-
-            Spacer()
+            Text(text)
+                .font(.system(size: 11))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .padding(.leading, 24)
+            Rectangle()
+                .fill(InstitutionalTheme.Colors.borderSubtle)
+                .frame(height: 1)
         }
     }
 
-    private var flowArrow: some View {
-        Image(systemName: "arrow.down")
-            .font(.caption)
-            .foregroundColor(Theme.tint.opacity(0.5))
-    }
-
-    // MARK: - Data Sources
-
-    private var dataSourcesSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("VERI KAYNAKLARI")
-
-            VStack(spacing: 8) {
-                dataSourceRow("BIST", "Anlik fiyat, hacim, derinlik verileri")
-                dataSourceRow("TCMB", "Faiz, kur, enflasyon verileri")
-                dataSourceRow("Yahoo Finance", "Global piyasa verileri")
-                dataSourceRow("KAP", "Sirket haberleri ve finansal tablolar")
-            }
-        }
-    }
-
-    private func dataSourceRow(_ source: String, _ description: String) -> some View {
-        HStack(spacing: 12) {
-            Text(source)
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundColor(Theme.tint)
-                .frame(width: 80, alignment: .leading)
-
-            Text(description)
-                .font(.caption)
-                .foregroundColor(Theme.textSecondary)
-
-            Spacer()
-        }
-        .padding(10)
-        .background(Color.white.opacity(0.02))
-        .cornerRadius(Theme.Radius.small)
-    }
-
-    // MARK: - Engines Overview
-
-    private var enginesOverview: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("ANALIZ MOTORLARI")
-
-            VStack(spacing: 8) {
-                engineRow("Orion", "Teknik momentum", "SAR, TSI, RSI, ADX")
-                engineRow("Atlas", "Temel degerleme", "F/K, PD/DD, CAGR")
-                engineRow("Phoenix", "Trend yakalama", "Breakout, ADX")
-                engineRow("Chiron", "Makro rejim", "VIX, faiz, yabanci akis")
-            }
-
-            Text("Her motor bagimsiz sinyal uretir. Konsey bu sinyalleri agirliklandirarak nihai karari olusturur.")
-                .font(.caption)
-                .foregroundColor(Theme.textSecondary)
-                .padding(.top, 4)
-        }
-    }
-
-    private func engineRow(_ name: String, _ role: String, _ indicators: String) -> some View {
-        HStack(spacing: 12) {
-            Text(name)
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.white)
-                .frame(width: 60, alignment: .leading)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(role)
-                    .font(.caption)
-                    .foregroundColor(Theme.tint)
-
-                Text(indicators)
-                    .font(.caption2)
-                    .foregroundColor(Theme.textSecondary)
-            }
-
-            Spacer()
-        }
-        .padding(10)
-        .background(Color.white.opacity(0.02))
-        .cornerRadius(Theme.Radius.small)
-    }
-
-    // MARK: - Decision Section
-
-    private var decisionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeader("KARAR SURECI")
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Argus Konseyi, her motorun ciktisini motor agirligi ile carparak toplam skor hesaplar.")
-                    .font(.caption)
-                    .foregroundColor(.white)
-
-                HStack(spacing: 20) {
-                    decisionBadge("AL", color: Theme.positive)
-                    decisionBadge("SAT", color: Theme.negative)
-                    decisionBadge("BEKLE", color: Theme.neutral)
-                }
-                .padding(.top, 4)
-
-                Text("Motor agirliklari piyasa rejimine gore dinamik olarak ayarlanir. Ornegin trend rejiminde Orion agirligi artar.")
-                    .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
-                    .padding(.top, 8)
-            }
-        }
-    }
-
-    private func decisionBadge(_ text: String, color: Color) -> some View {
+    private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(.caption)
-            .fontWeight(.semibold)
-            .foregroundColor(color)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(color.opacity(DesignTokens.Opacity.glassCard))
-            .cornerRadius(Theme.Radius.small)
-    }
-
-    // MARK: - Components
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.caption)
-            .fontWeight(.semibold)
-            .foregroundColor(Theme.textSecondary)
-            .tracking(0.5)
+            .font(InstitutionalTheme.Typography.micro)
+            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            .tracking(0.8)
     }
 }
 

@@ -71,6 +71,7 @@ actor HeimdallDebugBundleExporter {
             case .tiingo: argusProvider = .tiingo
             case .marketstack: argusProvider = .marketStack
             case .gemini: argusProvider = .gemini
+            case .glm: argusProvider = .gemini
             case .fred: argusProvider = .fred
             case .pinecone: argusProvider = .fred // Map to fred for now
             case .massive: argusProvider = .fred // Map to fred for now to avoid breaking ArgusProvider enum if it doesn't have massive yet
@@ -187,4 +188,3 @@ actor HeimdallDebugBundleExporter {
         return txt
     }
 }
-

@@ -8,11 +8,13 @@ struct ArgusGrandCouncilCard: View {
     @State private var isPulsing = false
     
     var body: some View {
+        let education = decision.educationStage
+
         VStack(spacing: 0) {
             // 1. Verdict Banner
             HStack {
                 // Icon
-                Image(systemName: iconForAction(decision.action))
+                Image(systemName: "graduationcap.fill")
                     .font(.system(size: 32, weight: .black))
                     .foregroundColor(.white)
                     .symbolEffect(.bounce, value: isPulsing)
@@ -24,9 +26,14 @@ struct ArgusGrandCouncilCard: View {
                         .foregroundColor(.white.opacity(0.7))
                         .tracking(2)
                     
-                    Text(decision.action.rawValue)
+                    Text(education.badgeText)
                         .font(.system(size: 28, weight: .heavy, design: .rounded))
                         .foregroundColor(.white)
+                        .minimumScaleFactor(0.8)
+                    
+                    Text(education.title.uppercased())
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.88))
                         .minimumScaleFactor(0.8)
                 }
                 
@@ -51,15 +58,26 @@ struct ArgusGrandCouncilCard: View {
                 }
             }
             .padding(20)
-            .background(colorForAction(decision.action))
+            .background(education.color)
+            
+            HStack(spacing: 6) {
+                ForEach(1...5, id: \.self) { idx in
+                    Capsule()
+                        .fill(idx <= education.level ? Color.white.opacity(0.92) : Color.white.opacity(0.22))
+                        .frame(height: 5)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(education.color.opacity(0.92))
             
             // 2. Reasoning Strip
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "quote.opening")
                     .font(.caption)
-                    .foregroundColor(colorForAction(decision.action))
+                    .foregroundColor(education.color)
                 
-                Text(decision.reasoning)
+                Text(education.why)
                     .font(.system(size: 15, weight: .medium, design: .serif))
                     .foregroundColor(Theme.textPrimary)
                     .italic()
@@ -68,6 +86,19 @@ struct ArgusGrandCouncilCard: View {
                 Spacer()
             }
             .padding(16)
+            .background(Theme.cardBackground)
+            
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.shield.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(.orange)
+                Text(education.disclaimer)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(.orange)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
             .background(Theme.cardBackground)
             
             // 3. Council Chamber (The 4 Members)
@@ -129,7 +160,7 @@ struct ArgusGrandCouncilCard: View {
         )
         .shadow(color: Color.black.opacity(0.2), radius: 10, x: 0, y: 5)
         .onAppear {
-            if decision.action == .aggressiveBuy || decision.action == .liquidate {
+            if education.level >= 4 {
                 isPulsing = true
             }
         }

@@ -18,6 +18,7 @@ final class TwelveDataService: NSObject, HeimdallProvider, @unchecked Sendable {
     private var webSocketTask: URLSessionWebSocketTask?
     private var isConnected = false
     private var subscriptions: Set<String> = []
+    private var reconnectBlockedUntil: Date?
     
     // Publishers
     let priceUpdate = PassthroughSubject<Quote, Never>()
@@ -201,6 +202,11 @@ final class TwelveDataService: NSObject, HeimdallProvider, @unchecked Sendable {
     
     func connect() {
         guard !isConnected else { return }
+        if let blockedUntil = reconnectBlockedUntil, Date() < blockedUntil {
+            let remaining = max(1, Int(blockedUntil.timeIntervalSinceNow))
+            print("⏳ TwelveData: Reconnect blocked (\(remaining)s) due to prior rate limit.")
+            return
+        }
         print("🔌 TwelveData: Connecting...")
         
         let session = URLSession(configuration: .default, delegate: self, delegateQueue: OperationQueue())
@@ -211,17 +217,26 @@ final class TwelveDataService: NSObject, HeimdallProvider, @unchecked Sendable {
     }
     
     func subscribe(symbols: [String]) {
-        if !isConnected { connect() }
-        
         // Filter new
         let newSymbols = symbols.filter { !subscriptions.contains($0) }
         guard !newSymbols.isEmpty else { return }
         
         for s in newSymbols { subscriptions.insert(s) }
         
+        if !isConnected {
+            connect()
+            return
+        }
+        
+        sendSubscription(newSymbols)
+    }
+    
+    private func sendSubscription(_ symbols: [String]) {
+        guard !symbols.isEmpty else { return }
+        
         // Send Subscribe Message
         // Format: { "action": "subscribe", "params": { "symbols": "AAPL,BTC/USD" } }
-        let joined = newSymbols.joined(separator: ",")
+        let joined = symbols.joined(separator: ",")
         let msg = """
         {
             "action": "subscribe",
@@ -379,10 +394,20 @@ extension TwelveDataService: URLSessionWebSocketDelegate {
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
         print("🔌 TwelveData: Connected!")
         isConnected = true
+        reconnectBlockedUntil = nil
+        
+        if !subscriptions.isEmpty {
+            sendSubscription(Array(subscriptions))
+        }
     }
     
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didCloseWith closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
-        print("🔌 TwelveData: Closed.")
+        if closeCode.rawValue == 1013 {
+            reconnectBlockedUntil = Date().addingTimeInterval(90)
+            print("⚠️ TwelveData: Closed with 1013 (rate limit). Pausing reconnect for 90s.")
+        } else {
+            print("🔌 TwelveData: Closed (\(closeCode.rawValue)).")
+        }
         isConnected = false
     }
 }

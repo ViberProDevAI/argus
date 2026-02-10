@@ -16,7 +16,7 @@ struct PantheonDeckView: View {
             if !isBist {
                 MiniPantheonOrb(
                     name: "ATHENA",
-                    icon: "AlkindusIcon",
+                    icon: "AthenaIcon",
                     color: SanctumTheme.athenaColor
                 )
                 .onTapGesture {
@@ -27,7 +27,7 @@ struct PantheonDeckView: View {
             // CHIRON (Orta)
             MiniPantheonOrb(
                 name: "CHIRON",
-                icon: "hourglass",
+                icon: "ChironIcon",
                 color: SanctumTheme.chironColor,
                 isPrimary: true
             )
@@ -43,7 +43,7 @@ struct PantheonDeckView: View {
             if !isBist {
                 MiniPantheonOrb(
                     name: "DEMETER",
-                    icon: "leaf.fill",
+                    icon: "DemeterIcon",
                     color: SanctumTheme.demeterColor
                 )
                 .onTapGesture {
@@ -73,17 +73,27 @@ struct MiniPantheonOrb: View {
         VStack(spacing: 3) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "1E293B"))
+                    .fill(InstitutionalTheme.Colors.surface2)
                     .frame(width: size, height: size)
                     .shadow(color: color.opacity(0.4), radius: 6, x: 0, y: 0)
-                
                 Circle()
-                    .stroke(color, lineWidth: isPrimary ? 1.5 : 1)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
                     .frame(width: size, height: size)
                 
-                Image(systemName: icon)
-                    .font(.system(size: iconSize, weight: .semibold))
-                    .foregroundColor(color)
+                Circle()
+                    .stroke(color.opacity(0.7), lineWidth: isPrimary ? 1.5 : 1)
+                    .frame(width: size, height: size)
+                
+                if icon.hasSuffix("Icon") {
+                    Image(icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: iconSize + 4, height: iconSize + 4)
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: iconSize, weight: .semibold))
+                        .foregroundColor(color)
+                }
             }
             
             Text(name)
@@ -106,11 +116,14 @@ struct PantheonFlankView: View {
         VStack(spacing: 4) {
             ZStack {
                 Circle()
-                    .fill(Color(hex: "1E293B"))
+                    .fill(InstitutionalTheme.Colors.surface2)
+                    .frame(width: 44, height: 44)
+                Circle()
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
                     .frame(width: 44, height: 44)
                 
                 Circle()
-                    .stroke(color.opacity(0.8), lineWidth: 1.5)
+                    .stroke(color.opacity(0.7), lineWidth: 1.5)
                     .frame(width: 44, height: 44)
                 
                 Image(systemName: icon)
@@ -126,7 +139,7 @@ struct PantheonFlankView: View {
                 
                 Text(score)
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(.white)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             }
         }
     }

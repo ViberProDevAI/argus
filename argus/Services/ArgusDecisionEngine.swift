@@ -707,7 +707,7 @@ struct ArgusDecisionEngine {
          var stdOutputs: [String: StandardModuleOutput] = [:]
          
          if let s = scores.atlas { stdOutputs["Atlas"] = StandardModuleOutput(direction: s > 50 ? "AL" : "SAT", strength: s, confidence: 100, timeframe: "1D", reasons: []) }
-         if let s = scores.orion { stdOutputs["Orion"] = StandardModuleOutput(direction: s > 50 ? "AL" : "SAT", strength: s, confidence: 100, timeframe: "1H", reasons: []) }
+         if let s = scores.orion { stdOutputs["Orion"] = StandardModuleOutput(direction: s > 50 ? "AL" : "SAT", strength: s, confidence: 100, timeframe: "1D", reasons: []) }
          if let s = scores.hermes { stdOutputs["Hermes"] = StandardModuleOutput(direction: s > 50 ? "AL" : "SAT", strength: s, confidence: 100, timeframe: "LIVE", reasons: []) }
          if let s = scores.aether { stdOutputs["Aether"] = StandardModuleOutput(direction: s > 50 ? "AL" : "SAT", strength: s, confidence: 100, timeframe: "MACRO", reasons: []) }
          if let s = scores.demeterScore { stdOutputs["Demeter"] = StandardModuleOutput(direction: s > 50 ? "AL" : "SAT", strength: s, confidence: 100, timeframe: "SECTOR", reasons: []) }

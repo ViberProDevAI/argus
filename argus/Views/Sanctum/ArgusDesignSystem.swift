@@ -5,26 +5,26 @@ import SwiftUI
 
 struct Sanctum2Theme {
     // Colors
-    static let voidBlack = Color(hex: "050505") // Deepest black
-    static let neonGreen = Color(hex: "00FF9D") // Matrix green
-    static let crimsonRed = Color(hex: "FF2A6D") // Cyberpunk red
-    static let hologramBlue = Color(hex: "05D9E8") // Sci-Fi blue
-    static let amberWarning = Color(hex: "FFB300") // Industrial yellow
-    static let midGray = Color(hex: "1F1F1F")
+    static let voidBlack = InstitutionalTheme.Colors.background
+    static let neonGreen = InstitutionalTheme.Colors.positive
+    static let crimsonRed = InstitutionalTheme.Colors.negative
+    static let hologramBlue = InstitutionalTheme.Colors.primary
+    static let amberWarning = InstitutionalTheme.Colors.warning
+    static let midGray = InstitutionalTheme.Colors.surface3
 
     // Gradients
     static let glassGradient = LinearGradient(
-        colors: [Color.white.opacity(0.05), Color.white.opacity(0.02)],
+        colors: [InstitutionalTheme.Colors.surface3, InstitutionalTheme.Colors.surface1],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
     
     // Borders
     static func neonBorder(_ color: Color) -> some View {
-        RoundedRectangle(cornerRadius: 16)
+        RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
             .strokeBorder(
                 LinearGradient(
-                    colors: [color.opacity(0.6), color.opacity(0.1)],
+                    colors: [color.opacity(0.35), InstitutionalTheme.Colors.borderSubtle],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ),
@@ -51,8 +51,8 @@ struct CinematicHeader: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(Sanctum2Theme.hologramBlue)
                     .frame(width: 36, height: 36)
-                    .background(Color.black.opacity(0.5))
-                    .cornerRadius(12)
+                    .background(InstitutionalTheme.Colors.surface2)
+                    .cornerRadius(InstitutionalTheme.Radius.sm)
                     .overlay(Sanctum2Theme.neonBorder(Sanctum2Theme.hologramBlue))
             }
             
@@ -61,32 +61,36 @@ struct CinematicHeader: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(symbol.replacingOccurrences(of: ".IS", with: ""))
                         .font(.system(size: 20, weight: .heavy, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         .shadow(color: Sanctum2Theme.hologramBlue.opacity(0.5), radius: 8, x: 0, y: 0)
                     
                     Text("•")
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         .font(.caption)
                     
                     Text(sector.uppercased())
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.white.opacity(0.05))
+                        .background(InstitutionalTheme.Colors.surface2)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                        )
                         .cornerRadius(4)
                 }
                 
                 // Live Status
                 HStack(spacing: 4) {
                     Circle()
-                        .fill(isMarketOpen ? Sanctum2Theme.neonGreen : .red)
+                        .fill(isMarketOpen ? Sanctum2Theme.neonGreen : Sanctum2Theme.crimsonRed)
                         .frame(width: 6, height: 6)
-                        .shadow(color: (isMarketOpen ? Sanctum2Theme.neonGreen : .red).opacity(0.8), radius: 4)
+                        .shadow(color: (isMarketOpen ? Sanctum2Theme.neonGreen : Sanctum2Theme.crimsonRed).opacity(0.8), radius: 4)
                     
                     Text(isMarketOpen ? "PİYASA AÇIK" : "PİYASA KAPALI")
                         .font(.system(size: 9, weight: .bold))
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
             }
             
@@ -97,7 +101,7 @@ struct CinematicHeader: View {
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(String(format: "%.2f", p))
                         .font(.system(size: 22, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     
                     HStack(spacing: 4) {
                         Image(systemName: c >= 0 ? "arrow.up.right" : "arrow.down.right")
@@ -110,8 +114,8 @@ struct CinematicHeader: View {
         }
         .padding(.horizontal)
         .padding(.vertical, 12)
-        .background(Sanctum2Theme.voidBlack) // Solid bg for header
-        .overlay(Divider().background(Color.white.opacity(0.1)), alignment: .bottom)
+        .background(Sanctum2Theme.voidBlack)
+        .overlay(Divider().background(InstitutionalTheme.Colors.borderSubtle), alignment: .bottom)
     }
     
     // Quick Logic for Market Hours (Simplified)
@@ -190,11 +194,12 @@ struct BentoCard<Content: View, HeaderAccessory: View>: View {
         }
         .frame(height: height) // If fixed height provided
         .background(Sanctum2Theme.glassGradient)
-        .background(Color(hex: "0A0A0A")) // Fallback dark base
-        .cornerRadius(16)
-        .overlay(Sanctum2Theme.neonBorder(accentColor))
-        .shadow(color: accentColor.opacity(0.05), radius: 10, x: 0, y: 0)
+        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
+        .institutionalCard(scale: .insight, elevated: true)
+        .overlay(
+            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
+                .stroke(accentColor.opacity(0.35), lineWidth: 1)
+        )
     }
 }
-
 

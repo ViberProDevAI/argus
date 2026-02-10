@@ -345,6 +345,7 @@ actor ArgusGrandCouncil {
         
         var contributors: [ModuleContribution] = []
         var vetoes: [ModuleVeto] = []
+        var hardVetoes: [ModuleVeto] = []
         var advisorNotes: [AdvisorNote] = []
         
         // --- ADVISORS ---
@@ -402,7 +403,19 @@ actor ArgusGrandCouncil {
             ))
             
             if isAtlasSell {
-                vetoes.append(ModuleVeto(module: "Atlas", reason: "Finansal Yapı Zayıf"))
+                if atlas.netSupport <= -0.35 {
+                    let veto = ModuleVeto(module: "Atlas", reason: "Finansal Yapı Zayıf")
+                    vetoes.append(veto)
+                    hardVetoes.append(veto)
+                } else {
+                    advisorNotes.append(
+                        AdvisorNote(
+                            module: "Atlas",
+                            advice: "Temel tarafta zayıflık var; alım yapılacaksa pozisyon küçük tutulmalı.",
+                            tone: .caution
+                        )
+                    )
+                }
             }
         }
         
@@ -410,7 +423,8 @@ actor ArgusGrandCouncil {
         // Using 'marketMode' and 'stance' (riskOn/riskOff)
         
         let isRiskOff = aether.stance == .riskOff
-        let isCrash = aether.marketMode == .panic || aether.marketMode == .fear
+        let isPanic = aether.marketMode == .panic
+        let isFear = aether.marketMode == .fear
         
         // Aether ALWAYS contributes - determine action based on stance
         let aetherAction: ProposedAction
@@ -430,8 +444,18 @@ actor ArgusGrandCouncil {
             reasoning: "Makro Rejim: \(aether.stance.rawValue)"
         ))
         
-        if isRiskOff || isCrash {
-            vetoes.append(ModuleVeto(module: "Aether", reason: "Makro Ortam: \(aether.marketMode.rawValue)"))
+        if isRiskOff || isPanic {
+            let veto = ModuleVeto(module: "Aether", reason: "Makro Ortam: \(aether.marketMode.rawValue)")
+            vetoes.append(veto)
+            hardVetoes.append(veto)
+        } else if isFear {
+            advisorNotes.append(
+                AdvisorNote(
+                    module: "Aether",
+                    advice: "Makro ortam korku bölgesinde. Agresif yerine kademeli alım tercih edilmeli.",
+                    tone: .caution
+                )
+            )
         }
         
         // --- 4. HERMES (News) ---
@@ -466,7 +490,19 @@ actor ArgusGrandCouncil {
             
             // Still veto on high-impact negative
             if isNegative && hermes.isHighImpact {
-                vetoes.append(ModuleVeto(module: "Hermes", reason: "Kötü Haber Akışı"))
+                if hermes.netSupport <= -0.35 {
+                    let veto = ModuleVeto(module: "Hermes", reason: "Kötü Haber Akışı")
+                    vetoes.append(veto)
+                    hardVetoes.append(veto)
+                } else {
+                    advisorNotes.append(
+                        AdvisorNote(
+                            module: "Hermes",
+                            advice: "Haber akışı negatif ama mutlak veto seviyesinde değil; temkinli kalınmalı.",
+                            tone: .caution
+                        )
+                    )
+                }
             }
         }
         
@@ -477,7 +513,7 @@ actor ArgusGrandCouncil {
         var reasoning = ""
 
         // Veto Check
-        if !vetoes.isEmpty {
+        if !hardVetoes.isEmpty {
             let sellVotes = contributors.filter { $0.action == .sell }
             if sellVotes.count >= 2 || isOrionSell {
                 finalAction = .liquidate
@@ -486,7 +522,7 @@ actor ArgusGrandCouncil {
             } else {
                 finalAction = .neutral
                 strength = .vetoed
-                reasoning = "Konsey VETOSU: \(vetoes.map{ $0.reason }.joined(separator: ", "))"
+                reasoning = "Konsey VETOSU: \(hardVetoes.map{ $0.reason }.joined(separator: ", "))"
             }
         } else {
             // No Vetoes - Ağırlıklı Oylama Sistemi
@@ -531,8 +567,11 @@ actor ArgusGrandCouncil {
 
             // Karar mantığı: En yüksek ağırlıklı oy kazanır
             let maxWeight = max(totalBuyWeight, totalSellWeight, totalHoldWeight)
+            let buyLead = totalBuyWeight - max(totalSellWeight, totalHoldWeight)
 
-            if maxWeight == totalBuyWeight && totalBuyWeight > 0.15 {
+            // BUY tarafına küçük tolerans:
+            // Hold ile yakın farkta teknik/fundamental al sinyalini tamamen boğmuyoruz.
+            if totalBuyWeight > 0.15 && (maxWeight == totalBuyWeight || buyLead >= -0.03) {
                 // Alım kararı
                 if totalBuyWeight > 0.45 && buyVoters.count >= 3 {
                     finalAction = .aggressiveBuy
@@ -547,6 +586,10 @@ actor ArgusGrandCouncil {
                     strength = .normal
                     reasoning = "Kademeli Alım Önerisi: \(buyVoters.joined(separator: ", "))"
                 }
+            } else if isStrongOrion && totalBuyWeight >= 0.14 && totalSellWeight < 0.12 {
+                finalAction = .accumulate
+                strength = .normal
+                reasoning = "Orion öncülüğünde kademeli alım (yakın oy farkı)."
             } else if maxWeight == totalSellWeight && totalSellWeight > 0.15 {
                 // Satış kararı
                 if totalSellWeight > 0.40 && sellVoters.count >= 2 {
@@ -950,13 +993,54 @@ actor BistGrandCouncil {
     
     private func analyzeKulis(_ data: HermesDecision?) -> BistModuleResult {
         guard let data = data else { return .neutral(name: "Kulis") }
-        let support = data.netSupport
+        // Hermes netSupport teorik olarak >1 olabilir; normalize ediyoruz.
+        let normalizedNet = max(-1.0, min(1.0, data.netSupport / 1.2))
         
-        // Sentiment metnini düzelt
-        let sentimentText = data.sentiment.displayTitle // "Olumlu", "Nötr" vb.
-        let comm = "Haber akışı: \(sentimentText). Piyasa algısı \(data.isHighImpact ? "yüksek" : "normal") seviyede."
+        let winningConfidence = data.winningProposal?.confidence ?? 0.5
+        let approveWeight = data.votes
+            .filter { $0.decision == .approve }
+            .reduce(0.0) { $0 + max(0, $1.weight) }
+        let vetoWeight = data.votes
+            .filter { $0.decision == .veto }
+            .reduce(0.0) { $0 + max(0, $1.weight) }
+        let weightedConsensus = (approveWeight - vetoWeight) / max(approveWeight + vetoWeight, 0.01) // -1..1
         
-        let action = data.actionBias
-        return BistModuleResult(name: "Kulis", score: 50 + (support * 50), action: action, commentary: comm, supportLevel: support)
+        // Kalite kapısı: düşük uzlaşı + düşük güven durumunda support küçültülür.
+        let consensusQuality = max(0.0, weightedConsensus) // yalnız pozitif uzlaşı kaliteyi arttırsın
+        let catalystBoost = min(Double(data.catalysts.count) * 0.08, 0.18)
+        let impactGate = data.isHighImpact ? 1.0 : 0.78
+        
+        var qualityGate = 0.35 + (winningConfidence * 0.35) + (consensusQuality * 0.30) + catalystBoost
+        qualityGate = min(max(qualityGate, 0.35), 1.15)
+        
+        var support = normalizedNet * qualityGate * impactGate
+        support = max(-1.0, min(1.0, support))
+        
+        let action: ProposedAction
+        if support >= 0.22 {
+            action = .buy
+        } else if support <= -0.22 {
+            action = .sell
+        } else {
+            action = .hold
+        }
+        
+        let sentimentText = data.sentiment.displayTitle
+        var commentary = "Haber akışı: \(sentimentText). Uzlaşı: %\(Int(weightedConsensus * 100)). Kalite kapısı: %\(Int(qualityGate * 100))."
+        if !data.catalysts.isEmpty {
+            commentary += " Katalizör: \(data.catalysts.prefix(2).joined(separator: ", "))."
+        }
+        if data.winningProposal == nil {
+            commentary += " Belirgin öneri yok; kulis etkisi temkinli işlendi."
+        }
+        
+        let score = max(0.0, min(100.0, 50.0 + (support * 45.0)))
+        return BistModuleResult(
+            name: "Kulis",
+            score: score,
+            action: action,
+            commentary: commentary,
+            supportLevel: support
+        )
     }
 }

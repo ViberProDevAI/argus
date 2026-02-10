@@ -1,24 +1,35 @@
 #!/bin/bash
+set -euo pipefail
 
 # ============================================
 # LEARNING DATA MIGRATION SCRIPT
 # Algo-Trading → Argus
 # ============================================
 
-ALGO_DOCS="/Users/erenkapak/Library/Developer/CoreSimulator/Devices/6024487F-6BAC-437D-9880-9D37D80E2800/data/Containers/Data/Application/C33AF206-282B-4B25-BA53-589EDA2EFCCA/Documents"
+find_source_docs() {
+    find "$HOME/Library/Developer/CoreSimulator/Devices" -type d -name "Documents" 2>/dev/null | while read -r dir; do
+        if [ -f "$dir/ArgusScience_V1.sqlite" ]; then
+            printf "%s\n" "$dir"
+        fi
+    done | head -1
+}
+
+find_target_docs() {
+    find "$HOME/Library/Developer/CoreSimulator/Devices" -type d -name "Documents" 2>/dev/null | while read -r dir; do
+        if ls "$dir" 2>/dev/null | grep -qiE "argus"; then
+            printf "%s\n" "$dir"
+        fi
+    done | head -1
+}
+
+ALGO_DOCS="${ALGO_DOCS:-$(find_source_docs)}"
+ARGUS_DOCS="${ARGUS_DOCS:-$(find_target_docs)}"
 
 echo "🔍 Argus uygulamasını arıyorum..."
 
-# En son değiştirilen argus Documents klasörünü bul
-ARGUS_DOCS=$(find ~/Library/Developer/CoreSimulator/Devices -type d -name "Documents" 2>/dev/null | while read dir; do
-    if ls "$dir" 2>/dev/null | grep -q "argus\|Argus"; then
-        echo "$dir"
-    fi
-done | head -1)
-
 # Alternatif: Bundle ID ile ara
 if [ -z "$ARGUS_DOCS" ]; then
-    for plist in $(find ~/Library/Developer/CoreSimulator/Devices -name ".com.apple.mobile_container_manager.metadata.plist" 2>/dev/null); do
+    for plist in $(find "$HOME/Library/Developer/CoreSimulator/Devices" -name ".com.apple.mobile_container_manager.metadata.plist" 2>/dev/null); do
         if plutil -p "$plist" 2>/dev/null | grep -qi "argus"; then
             ARGUS_DOCS="$(dirname "$plist")/Documents"
             if [ -d "$ARGUS_DOCS" ]; then
@@ -31,16 +42,20 @@ fi
 echo ""
 echo "📊 Kaynak Veriler (Algo-Trading):"
 echo "================================="
-sqlite3 "$ALGO_DOCS/ArgusScience_V1.sqlite" "
-SELECT 'events' as tablo, COUNT(*) as kayit FROM events
-UNION ALL SELECT 'blobs', COUNT(*) FROM blobs
-UNION ALL SELECT 'trades', COUNT(*) FROM trades
-UNION ALL SELECT 'lessons', COUNT(*) FROM lessons
-UNION ALL SELECT 'weight_history', COUNT(*) FROM weight_history;
-" 2>/dev/null || echo "SQLite bulunamadı"
+if [ -n "$ALGO_DOCS" ] && [ -f "$ALGO_DOCS/ArgusScience_V1.sqlite" ]; then
+    sqlite3 "$ALGO_DOCS/ArgusScience_V1.sqlite" "
+    SELECT 'events' as tablo, COUNT(*) as kayit FROM events
+    UNION ALL SELECT 'blobs', COUNT(*) FROM blobs
+    UNION ALL SELECT 'trades', COUNT(*) FROM trades
+    UNION ALL SELECT 'lessons', COUNT(*) FROM lessons
+    UNION ALL SELECT 'weight_history', COUNT(*) FROM weight_history;
+    " 2>/dev/null || echo "SQLite sorgusu calistirilamadi"
+else
+    echo "❌ Kaynak veritabanı bulunamadı."
+fi
 
 echo ""
-if [ -n "$ARGUS_DOCS" ] && [ -d "$ARGUS_DOCS" ]; then
+if [ -n "$ALGO_DOCS" ] && [ -d "$ALGO_DOCS" ] && [ -n "$ARGUS_DOCS" ] && [ -d "$ARGUS_DOCS" ]; then
     echo "✅ Argus Documents bulundu: $ARGUS_DOCS"
     echo ""
     echo "📋 Kopyalama başlıyor..."
@@ -69,8 +84,10 @@ if [ -n "$ARGUS_DOCS" ] && [ -d "$ARGUS_DOCS" ]; then
     echo "📁 Argus Documents içeriği:"
     ls -la "$ARGUS_DOCS"
 else
-    echo "❌ Argus Documents bulunamadı!"
+    echo "❌ Kaynak veya hedef Documents klasörü bulunamadı!"
     echo ""
-    echo "👉 Çözüm: Xcode'da argus projesini açın ve simülatörde bir kez çalıştırın."
-    echo "   Sonra bu scripti tekrar çalıştırın."
+    echo "👉 Cozum:"
+    echo "   1) Eski uygulamayi ve Argus'u simulator'da bir kez acin."
+    echo "   2) Gerekirse manuel yol verin:"
+    echo "      ALGO_DOCS=\"/path/to/source/Documents\" ARGUS_DOCS=\"/path/to/target/Documents\" ./Scripts/migrate_learning_data.sh"
 fi

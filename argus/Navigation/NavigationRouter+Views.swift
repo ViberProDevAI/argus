@@ -45,42 +45,25 @@ extension NavigationRouter {
 
         // MARK: - Market Tools
         case .sectorDetail(let sector):
-            // SectorDetailView requires a DemeterScore object - placeholder
-            ZStack {
-                Color.black
-                Text("Sector: \(sector)")
-                    .foregroundColor(.white)
-            }
+            SectorDetailRouterView(sectorName: sector)
 
         case .atlasDashboard:
-            ArgusLabView() // Atlas Lab alternative
+            AtlasLabView()
 
         case .atlasDetail(let symbol):
             AtlasV2DetailView(symbol: symbol)
 
         case .poseidon:
-            ZStack {
-                Color.black
-                Text("Poseidon View")
-                    .foregroundColor(.white)
-            }
+            PoseidonRouterView()
 
         case .phoenix:
-            ZStack {
-                Color.black
-                Text("Phoenix View")
-                    .foregroundColor(.white)
-            }
+            PhoenixView()
 
         case .phoenixDetail(let id):
-            ZStack {
-                Color.black
-                Text("Phoenix Detail: \(id)")
-                    .foregroundColor(.white)
-            }
+            PhoenixDetailRouterView(symbol: id)
 
         case .chiron:
-            ArgusCockpitView() // Chiron as cockpit alternative
+            ChironDetailView()
 
         case .chironDetail(let id):
             ChironDetailView()
@@ -90,42 +73,22 @@ extension NavigationRouter {
 
         // MARK: - Analysis Views
         case .backtest:
-            ZStack {
-                Color.black
-                Text("Argus Backtest View")
-                    .foregroundColor(.white)
-            }
+            BacktestRouterView()
 
         case .backtestResults(let id):
-            ZStack {
-                Color.black
-                Text("Backtest Results: \(id)")
-                    .foregroundColor(.white)
-            }
+            BacktestResultsRouterView(resultId: id)
 
         case .marketReport:
-            ZStack {
-                Color.black
-                Text("Market Report")
-                    .foregroundColor(.white)
-            }
+            MarketReportRouterView()
 
-        case .analystReport:
-            ArgusAnalystReportView(symbol: "", viewModel: viewModel)
+        case .analystReport(let symbol):
+            ArgusAnalystReportView(symbol: symbol, viewModel: viewModel)
 
         case .reports:
-            ZStack {
-                Color.black
-                Text("Reports")
-                    .foregroundColor(.white)
-            }
+            PortfolioReportsView(viewModel: viewModel)
 
         case .debateSimulator:
-            ZStack {
-                Color.black
-                Text("Debate Simulator")
-                    .foregroundColor(.white)
-            }
+            DebateSimulatorRouterView()
 
         // MARK: - Discovery & Signals
         case .discover:
@@ -229,14 +192,10 @@ extension NavigationRouter {
 
         // MARK: - Watchlist & Aether
         case .aetherDetail(let id):
-            ZStack {
-                Color.black
-                Text("Aether Detail: \(id)")
-                    .foregroundColor(.white)
-            }
+            AetherDetailRouterView(id: id)
 
         case .aetherDashboard:
-            AlkindusDashboardView() // Dashboard as aether alternative
+            AetherDetailRouterView(id: "GLOBAL")
 
         // MARK: - Voice & Assistant
         case .voiceAssistant:
@@ -244,11 +203,7 @@ extension NavigationRouter {
 
         // MARK: - Council & Debate
         case .symbolDebate(let symbol):
-            ZStack {
-                Color.black
-                Text("Symbol Debate: \(symbol)")
-                    .foregroundColor(.white)
-            }
+            SymbolDebateRouterView(symbol: symbol, viewModel: viewModel)
 
         // MARK: - Legacy/Specialty Views
         case .splash:
@@ -275,7 +230,7 @@ extension NavigationRouter {
         case .roadmap:
             RoadmapView()
 
-        case .oracleChامber:
+        case .oracleChamber:
             OracleChamberView()
 
         case .immersiveChart(let symbol):
@@ -283,11 +238,7 @@ extension NavigationRouter {
 
         // MARK: - Components/Detail Sheets
         case .intelligenceCards(let symbol):
-            ZStack {
-                Color.black
-                Text("Intelligence Cards: \(symbol)")
-                    .foregroundColor(.white)
-            }
+            IntelligenceCardsRouterView(symbol: symbol)
 
         case .fundDetail(let id):
             FundDetailView(fundCode: id)

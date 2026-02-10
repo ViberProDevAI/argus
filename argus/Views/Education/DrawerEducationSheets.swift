@@ -128,122 +128,142 @@ struct SystemOverviewSheet: View {
 // MARK: - Alkindus Education Sheet
 
 struct AlkindusEducationSheet: View {
-    @Environment(\.dismiss) var dismiss
-    
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    title("ALKINDUS MOTORU")
-                    subtitle("Yapay Zeka Piyasa Rehberi")
-                    
-                    Divider().background(Theme.tint.opacity(0.3))
-                    
-                    educationSection("YETENEK 1: PİYASA SORGULAMA") {
-                        contentItem("Girdi", "Doğal dil soruları")
-                        contentItem("Örnek", "XU100 bugün ne yapacak?")
-                        contentItem("Çıktı", "Teknik + temel sinyal özeti")
-                        
-                        financialTip("İP: Sorguları Türkçe yazın, sistem anlar.")
-                    }
-                    
-                    educationSection("YETENEK 2: STRATEJİ ÖNERİLERİ") {
-                        contentItem("Senaryo", "Piyasa rejimi (trend/çapraz/riskli)")
-                        contentItem("Öneri", "Uygun motor önerilir")
-                        contentItem("Örnek", "Çapraz piyasa → Çorba Dalgası Aktif")
-                        
-                        financialTip("İP: 'Hangi motoru kullanmalıyım?' diye sorun.")
-                    }
-                    
-                    educationSection("YETENEK 3: SINAV MANTIĞI") {
-                        contentItem("Konsey", "Her motor kendi bakış açısını sunar")
-                        contentItem("Toplama", "Alkindus doğal dilde özetler")
-                        contentItem("İyileşme", "Geri bildirimle gelişir")
-                        
-                        financialTip("İP: Alkindus 'roket' değil, 'rehber'. Öğretir, emir vermez.")
-                    }
-                    
-                    educationSection("VERİ AKIŞI") {
-                        contentItem("1", "Soru → LLM Servisi")
-                        contentItem("2", "Sorgu → Tüm Motorlar")
-                        contentItem("3", "Toplama → Konsey Oylaması")
-                        contentItem("4", "Çıktı → Doğal Dil Özeti")
-                    }
+                    introSection
+                    promptSection
+                    responseSection
+                    dailyFlowSection
+                    safetySection
                 }
-                .padding()
+                .padding(20)
             }
-            .navigationTitle("Alkindus Rehberi")
+            .background(InstitutionalTheme.Colors.background)
+            .navigationTitle("Ders 4 · Alkindus")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Kapat") { dismiss() }
+                        .foregroundColor(InstitutionalTheme.Colors.primary)
                 }
             }
         }
     }
-    
-    private func title(_ text: String) -> some View {
-        Text(text)
-            .font(.title2)
-            .fontWeight(.bold)
-            .foregroundColor(.white)
-            .tracking(1.5)
+
+    private var introSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Alkindus Ne İşe Yarar?")
+                .font(InstitutionalTheme.Typography.title)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+            Text("Alkindus emir veren bir bot değil; Argus çıktısını doğal dilde anlaşılır hale getiren karar asistanıdır.")
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            Text("Doğru kullanım: önce veri ekranını oku, sonra Alkindus ile neden-sonuç netleştir.")
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.primary)
+                .tracking(0.3)
+        }
     }
-    
-    private func subtitle(_ text: String) -> some View {
-        Text(text)
-            .font(.caption)
-            .foregroundColor(Theme.textSecondary)
-            .padding(.bottom, 8)
+
+    private var promptSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("SORU YAZIM ŞABLONU")
+            promptRow("Bağlam", "“THYAO için bugün rejim ne söylüyor?”")
+            promptRow("Ayrışma", "“Orion ve Atlas neden ayrıştı?”")
+            promptRow("Aksiyon", "“Bu tabloda riski nasıl ayarlamalıyım?”")
+        }
     }
-    
-    private func educationSection<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+
+    private var responseSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(Theme.tint)
-            
-            content()
-        }
-        .padding(16)
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Theme.tint.opacity(0.2), lineWidth: 1)
-        )
-    }
-    
-    private func contentItem(_ key: String, _ value: String) -> some View {
-        HStack {
-            Text(key)
-                .font(.subheadline)
-                .foregroundColor(.gray)
-                .frame(width: 120, alignment: .leading)
-            
-            Text(value)
-                .font(.subheadline)
-                .foregroundColor(.white)
-                .fontWeight(.medium)
+            sectionTitle("ÇIKTIYI DOĞRU OKUMA")
+            bullet("Özet cümle: Alkindus’un ana yorumu.")
+            bullet("Neden bölümü: Hangi motor ve hangi veri bunu üretti?")
+            bullet("Risk notu: Pozisyon boyutunu artır mı azalt mı?")
+            bullet("Karar kilidi: Senin gözlemin ile metin çelişiyorsa işlemi ertele.")
         }
     }
-    
-    private func financialTip(_ message: String) -> some View {
-        HStack {
-            Image(systemName: "lightbulb.fill")
-                .foregroundColor(Theme.tint)
-                .font(.caption)
-            
-            Text(message)
-                .font(.caption)
-                .foregroundColor(Theme.textSecondary)
-            
-            Spacer()
+
+    private var dailyFlowSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            sectionTitle("GÜNLÜK KULLANIM AKIŞI")
+            stepRow("1", "Sembolü aç ve rejimi kontrol et.")
+            stepRow("2", "Motor dağılımını oku (özellikle ayrışma).")
+            stepRow("3", "Alkindus’a 1 net soru sor.")
+            stepRow("4", "Cevabı ANALİZ butonundaki rapor ile eşleştir.")
+            stepRow("5", "Yalnızca uyum varsa işlem kararını onayla.")
+        }
+    }
+
+    private var safetySection: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "shield.lefthalf.filled")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(InstitutionalTheme.Colors.warning)
+                .padding(.top, 2)
+            Text("Alkindus hızlı cevap verir ama kesinlik vadetmez. Kesin karar için her zaman rejim + motor + fiyat davranışı üçlüsünü birlikte değerlendir.")
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(12)
-        .background(Theme.tint.opacity(0.1))
-        .cornerRadius(8)
-        .padding(.top, 8)
+        .background(InstitutionalTheme.Colors.surface1)
+        .overlay(
+            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous))
+    }
+
+    private func promptRow(_ label: String, _ text: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Text(label)
+                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .foregroundColor(InstitutionalTheme.Colors.primary)
+                .frame(width: 56, alignment: .leading)
+            Text(text)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+        }
+    }
+
+    private func stepRow(_ index: String, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Text(index)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(InstitutionalTheme.Colors.primary)
+                    .frame(width: 14, alignment: .leading)
+                Text(text)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+            }
+            Rectangle()
+                .fill(InstitutionalTheme.Colors.borderSubtle)
+                .frame(height: 1)
+        }
+    }
+
+    private func bullet(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text("•")
+                .foregroundColor(InstitutionalTheme.Colors.primary)
+            Text(text)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(InstitutionalTheme.Typography.micro)
+            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            .tracking(0.8)
     }
 }
 

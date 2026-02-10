@@ -21,103 +21,44 @@ final class HermesLLMService: Sendable {
 
     // MARK: - Hermes V3: Event Extraction
     
-    private func applyKulisAdjustments(
-        scope: HermesEventScope,
-        article: NewsArticle,
-        eventType: HermesEventType,
-        flags: [HermesRiskFlag],
-        severity: Double,
-        confidence: Double
-    ) -> (severity: Double, confidence: Double, flags: [HermesRiskFlag], extraMultiplier: Double) {
-        guard scope == .bist else {
-            return (severity, confidence, flags, 1.0)
+    private func cleanRationale(_ text: String, polarity: HermesEventPolarity) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowered = trimmed.lowercased()
+        let banned = ["hermes", "ai", "model", "llm", "analiz", "prompt", "sistem"]
+        if trimmed.isEmpty || banned.contains(where: { lowered.contains($0) }) {
+            switch polarity {
+            case .positive:
+                return "Haber, kisa vadede alici ilgisini ve fiyatlama destegini artirabilir."
+            case .negative:
+                return "Haber, kisa vadede satis baskisi ve risk algisi olusturabilir."
+            case .mixed:
+                return "Haberin etkisi karisik; oynaklik artarken yon teyidi icin ek veri gerekir."
+            }
         }
-        
-        let text = (article.headline + " " + (article.summary ?? "")).lowercased()
-        var adjustedSeverity = severity
-        var adjustedConfidence = confidence
-        var flagSet = Set(flags)
-        var extraMultiplier = 1.0
-        
-        let isRumor = HermesLLMService.kulisRumorKeywords.contains { text.contains($0) }
-        let isOfficial = HermesLLMService.kulisOfficialKeywords.contains { text.contains($0) }
-            || HermesLLMService.kulisOfficialKeywords.contains { article.source.lowercased().contains($0) }
-        let typeMultiplier = HermesLLMService.kulisEventTypeMultipliers[eventType] ?? 1.0
-        extraMultiplier *= typeMultiplier
-        
-        if isRumor {
-            flagSet.insert(.rumor)
-            adjustedConfidence = max(0.1, adjustedConfidence * 0.7)
-            adjustedSeverity = max(0.0, adjustedSeverity - 10.0)
-            extraMultiplier *= 0.85
-        }
-        
-        if isOfficial {
-            adjustedConfidence = min(1.0, adjustedConfidence + 0.1)
-            adjustedSeverity = min(100.0, adjustedSeverity + 5.0)
-            flagSet.remove(.rumor)
-            extraMultiplier *= 1.05
-        }
-        
-        if article.sourceReliability < 0.5 {
-            flagSet.insert(.lowReliability)
-            extraMultiplier *= 0.9
-        }
-        
-        return (
-            max(0.0, min(adjustedSeverity, 100.0)),
-            max(0.0, min(adjustedConfidence, 1.0)),
-            Array(flagSet),
-            extraMultiplier
-        )
+        return trimmed
     }
-    
-    private static let kulisRumorKeywords: [String] = [
-        "kulis",
-        "iddia",
-        "soylenti",
-        "dedikodu",
-        "fisi",
-        "fısılt",
-        "iddialara gore",
-        "iddialara göre",
-        "iddia edildi",
-        "iddia ediliyor"
-    ]
-    
-    private static let kulisOfficialKeywords: [String] = [
-        "kap",
-        "kamuyu aydinlatma",
-        "kamu aydinlatma",
-        "spk",
-        "borsa istanbul",
-        "resmi aciklama",
-        "resmi açıklama",
-        "duyuru",
-        "bildirim"
-    ]
-    
-    private static let kulisEventTypeMultipliers: [HermesEventType: Double] = [
-        .kapDisclosure: 1.05,
-        .bedelliCapitalIncrease: 0.9,
-        .bedelsizBonusIssue: 1.05,
-        .temettuAnnouncement: 1.0,
-        .ihaleKazandi: 1.0,
-        .ihaleIptal: 0.95,
-        .spkAction: 1.05,
-        .ortaklikAnlasmasi: 1.0,
-        .borclanmaIhraci: 0.9,
-        .karUyarisi: 1.1,
-        .kurRiski: 0.95,
-        .ihracatSiparisi: 1.0,
-        .yatirimPlani: 0.95,
-        .tesisAcilisi: 0.95,
-        .sektorTesvik: 0.95,
-        .davaOlumsuz: 0.95,
-        .davaOlumlu: 1.0,
-        .yonetimDegisim: 0.95,
-        .operasyonelAriza: 0.9
-    ]
+
+    private func cleanSummaryTRShort(_ text: String, polarity: HermesEventPolarity) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return trimmed
+        }
+        switch polarity {
+        case .positive: return "Haber kisa vadede hisseyi destekleyebilecek olumlu bir gelisme iceriyor."
+        case .negative: return "Haber kisa vadede hisse uzerinde baski yaratabilecek olumsuz bir gelisme iceriyor."
+        case .mixed: return "Haberin etkisi karisik; net yon icin ek veri ve fiyat teyidi gerekli."
+        }
+    }
+
+    private func isSentimentConsistent(sentiment: NewsSentiment, impactScore: Double) -> Bool {
+        switch sentiment {
+        case .strongPositive: return impactScore >= 75
+        case .weakPositive: return impactScore >= 60 && impactScore < 75
+        case .neutral: return impactScore >= 45 && impactScore < 60
+        case .weakNegative: return impactScore >= 30 && impactScore < 45
+        case .strongNegative: return impactScore < 30
+        }
+    }
 
     func analyzeEvents(articles: [NewsArticle], scope: HermesEventScope, isGeneral: Bool = false) async throws -> [HermesEvent] {
         guard !articles.isEmpty else { return [] }
@@ -146,8 +87,8 @@ final class HermesLLMService: Sendable {
             .init(role: "user", content: promptText)
         ]
         
-        let responseDTO: HermesEventExtractionResponse = try await GroqClient.shared.generateJSON(messages: messages, maxTokens: 1400)
         let analysisDate = Date()
+        let responseDTO: HermesEventExtractionResponse = try await GroqClient.shared.generateJSON(messages: messages, maxTokens: 1400)
         
         var mappedEvents: [HermesEvent] = []
         for item in responseDTO.results {
@@ -158,35 +99,17 @@ final class HermesLLMService: Sendable {
             let polarity = HermesEventPolarity(rawValue: item.polarity ?? "") ?? .mixed
             let horizon = HermesEventHorizon(rawValue: item.horizon_hint ?? "") ?? .shortTerm
             let flags = (item.risk_flags ?? []).compactMap { HermesRiskFlag(rawValue: $0) }
-            
-            let adjustments = applyKulisAdjustments(
-                scope: scope,
-                article: article,
-                eventType: eventType,
-                flags: flags,
-                severity: item.severity ?? 50.0,
-                confidence: item.confidence ?? 0.6
-            )
-            
+            guard let llmSentimentRaw = item.sentiment_label,
+                  let llmSentiment = NewsSentiment(rawValue: llmSentimentRaw) else {
+                continue
+            }
+            guard let llmImpactScore = item.impact_score else { continue }
+            guard isSentimentConsistent(sentiment: llmSentiment, impactScore: llmImpactScore) else { continue }
+
+            let severity = max(0.0, min(item.severity ?? llmImpactScore, 100.0))
+            let confidence = max(0.0, min(item.confidence ?? 0.6, 1.0))
             let sourceReliability = article.sourceReliability * 100.0
-            let baseScore = HermesEventScoring.score(
-                scope: scope,
-                eventType: eventType,
-                severity: adjustments.severity,
-                confidence: adjustments.confidence,
-                sourceReliability: sourceReliability,
-                horizon: horizon,
-                publishedAt: article.publishedAt,
-                flags: adjustments.flags,
-                analysisDate: analysisDate,
-                extraMultiplier: adjustments.extraMultiplier
-            )
-            let finalScore = await HermesCalibrationService.shared.adjustedScore(
-                for: baseScore,
-                scope: scope,
-                eventType: eventType,
-                flags: adjustments.flags
-            )
+            let finalScore = max(0.0, min(llmImpactScore, 100.0))
             let ingestDelayMinutes = max(0.0, analysisDate.timeIntervalSince(article.publishedAt) / 60.0)
             
             mappedEvents.append(
@@ -197,13 +120,14 @@ final class HermesLLMService: Sendable {
                     headline: article.headline,
                     eventType: eventType,
                     polarity: polarity,
-                    severity: adjustments.severity,
-                    confidence: adjustments.confidence,
-                    sentimentLabel: NewsSentiment(rawValue: item.sentiment_label ?? ""),
+                    severity: severity,
+                    confidence: confidence,
+                    sentimentLabel: llmSentiment,
                     horizonHint: horizon,
-                    rationaleShort: item.rationale_short ?? "Bu haberin piyasa etkisi analiz edildi.",
+                    rationaleShort: cleanRationale(item.rationale_short ?? "", polarity: polarity),
+                    summaryTRShort: cleanSummaryTRShort(item.summary_tr_short ?? "", polarity: polarity),
                     evidenceQuotes: Array((item.evidence_quotes ?? []).prefix(2)),
-                    riskFlags: adjustments.flags,
+                    riskFlags: flags,
                     sourceName: article.source,
                     sourceReliability: sourceReliability,
                     publishedAt: article.publishedAt,
@@ -221,9 +145,6 @@ final class HermesLLMService: Sendable {
         }
         
         eventStore.saveEvents(mappedEvents)
-        for event in mappedEvents {
-            Task.detached { await HermesCalibrationService.shared.enqueue(event: event) }
-        }
         results.append(contentsOf: mappedEvents)
         return results
     }
@@ -280,23 +201,12 @@ final class HermesLLMService: Sendable {
                     resolvedSymbol = originalArticle?.symbol ?? "MARKET"
                 }
                 
-                var correctedScore = item.impact_score
-                if let sentiment = item.sentiment?.uppercased() {
-                    if sentiment == "POSITIVE" && correctedScore < 55 {
-                        correctedScore = min(65.0, correctedScore + 10.0)
-                    } else if sentiment == "NEGATIVE" && correctedScore > 45 {
-                        correctedScore = max(35.0, correctedScore - 10.0)
-                    } else if sentiment == "NEUTRAL" && (correctedScore > 55 || correctedScore < 45) {
-                        correctedScore = 50.0
-                    }
-                }
-                
                 let summary = HermesSummary(
                     id: item.id,
                     symbol: resolvedSymbol,
                     summaryTR: item.summary_tr,
                     impactCommentTR: item.impact_comment_tr,
-                    impactScore: Int(correctedScore),
+                    impactScore: Int(max(0.0, min(item.impact_score, 100.0))),
                     relatedSectors: item.related_sectors,
                     rippleEffectScore: Int(item.ripple_effect_score),
                     createdAt: Date(),
@@ -336,9 +246,29 @@ final class HermesLLMService: Sendable {
     /// - Returns: HermesQuickSentiment with score and news count
     func getQuickSentiment(for symbol: String) async -> HermesQuickSentiment {
         // Get all cached summaries for this symbol
-        let symbolSummaries = cache.values.filter { 
+        var symbolSummaries = cache.values.filter {
             $0.symbol.uppercased() == symbol.uppercased() ||
             $0.symbol.uppercased() == symbol.replacingOccurrences(of: ".IS", with: "").uppercased()
+        }
+
+        // Fallback: derive from HermesEvent cache if summary cache is empty
+        if symbolSummaries.isEmpty {
+            let eventSummaries = eventStore.getEvents(for: symbol).map { event in
+                HermesSummary(
+                    id: event.articleId,
+                    symbol: event.symbol,
+                    summaryTR: event.rationaleShort,
+                    impactCommentTR: event.rationaleShort,
+                    impactScore: Int(max(0.0, min(event.finalScore, 100.0))),
+                    relatedSectors: [],
+                    rippleEffectScore: Int(max(0.0, min(event.severity, 100.0))),
+                    createdAt: event.createdAt,
+                    mode: .full,
+                    publishedAt: event.publishedAt,
+                    sourceReliability: event.sourceReliability / 100.0
+                )
+            }
+            symbolSummaries = eventSummaries
         }
         
         guard !symbolSummaries.isEmpty else {
@@ -379,11 +309,30 @@ final class HermesLLMService: Sendable {
     
     /// Gets recent news summaries for a symbol from cache
     func getCachedSummaries(for symbol: String, count: Int = 5) -> [HermesSummary] {
-        let symbolSummaries = cache.values.filter { 
+        var symbolSummaries = cache.values.filter {
             $0.symbol.uppercased() == symbol.uppercased() ||
             $0.symbol.uppercased() == symbol.replacingOccurrences(of: ".IS", with: "").uppercased()
         }
         .sorted { ($0.publishedAt ?? $0.createdAt) > ($1.publishedAt ?? $1.createdAt) }
+
+        if symbolSummaries.isEmpty {
+            symbolSummaries = eventStore.getEvents(for: symbol).map { event in
+                HermesSummary(
+                    id: event.articleId,
+                    symbol: event.symbol,
+                    summaryTR: event.rationaleShort,
+                    impactCommentTR: event.rationaleShort,
+                    impactScore: Int(max(0.0, min(event.finalScore, 100.0))),
+                    relatedSectors: [],
+                    rippleEffectScore: Int(max(0.0, min(event.severity, 100.0))),
+                    createdAt: event.createdAt,
+                    mode: .full,
+                    publishedAt: event.publishedAt,
+                    sourceReliability: event.sourceReliability / 100.0
+                )
+            }
+            .sorted { ($0.publishedAt ?? $0.createdAt) > ($1.publishedAt ?? $1.createdAt) }
+        }
         
         return Array(symbolSummaries.prefix(count))
     }
@@ -509,8 +458,10 @@ final class HermesLLMService: Sendable {
               "polarity": "positive|negative|mixed",
               "sentiment_label": "strong_positive|weak_positive|neutral|weak_negative|strong_negative",
               "severity": 0-100,
+              "impact_score": 0-100,
               "confidence": 0.0-1.0,
               "horizon_hint": "intraday|1-3d|multiweek",
+              "summary_tr_short": "Turkce, tek cumlelik haber ozeti (max 140 karakter)",
               "rationale_short": "en fazla 200 karakter",
               "evidence_quotes": ["max 160 karakter", "max 160 karakter"],
               "risk_flags": ["rumor","low_reliability","priced_in","regulatory_uncertainty"]
@@ -520,8 +471,18 @@ final class HermesLLMService: Sendable {
         
         KURALLAR:
         - sentiment_label, haberi okuyup etkisini yorumlayarak secilmeli.
-        - sentiment_label, polarity ve severity ile celismemeli.
+        - sentiment_label, polarity, severity ve impact_score birbiriyle celismemeli.
+        - impact_score LLM tarafindan dogrudan belirlenmeli (otomatik hesap yok).
+        - score bantlari:
+          strong_positive: 75-100
+          weak_positive: 60-74
+          neutral: 45-59
+          weak_negative: 30-44
+          strong_negative: 0-29
         - strong_* sadece gercekten guclu ve beklenmedik etki varsa kullanilmali.
+        - weak_positive / weak_negative secimi sadece etki zayifsa yapilmali, varsayilan secim olarak kullanma.
+        - summary_tr_short zorunlu; Turkce, tek cumle ve net olmali.
+        - rationale_short yalnizca piyasa etkisini anlatmali; "Hermes", "AI", "model", "LLM", "analiz", "prompt", "sistem" gibi ifadeler kullanilmamali.
         
         HABERLER:
         \(articlesText)
@@ -559,8 +520,10 @@ private struct HermesEventExtractionItem: Codable {
     let polarity: String?
     let sentiment_label: String?
     let severity: Double?
+    let impact_score: Double?
     let confidence: Double?
     let horizon_hint: String?
+    let summary_tr_short: String?
     let rationale_short: String?
     let evidence_quotes: [String]?
     let risk_flags: [String]?

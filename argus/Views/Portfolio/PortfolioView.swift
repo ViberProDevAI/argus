@@ -36,7 +36,7 @@ struct PortfolioView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                InstitutionalTheme.Colors.background.ignoresSafeArea()
                 
                 // Contextual Drawer
                 if showDrawer {
@@ -60,6 +60,13 @@ struct PortfolioView: View {
                             )
                             .padding(.horizontal)
                             .padding(.top, 8)
+
+                            TradeBrainStatusBand(
+                                viewModel: viewModel,
+                                market: selectedMarket,
+                                openTradeBrain: { showTradeBrain = true }
+                            )
+                            .padding(.horizontal)
                             
                             // A. REPORTS & SELECTOR
                             PortfolioReportsView(viewModel: viewModel, mode: selectedMarket)
@@ -112,10 +119,10 @@ struct PortfolioView: View {
                                             VStack(spacing: 16) {
                                                 Image(systemName: "binoculars.fill")
                                                     .font(.system(size: 48))
-                                                    .foregroundColor(Theme.textSecondary.opacity(0.3))
+                                                    .foregroundColor(InstitutionalTheme.Colors.textTertiary.opacity(0.5))
                                                 Text("Gözcü Taraması Bekleniyor...")
                                                     .font(.headline)
-                                                    .foregroundColor(Theme.textSecondary)
+                                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                             }
                                             .padding(.top, 40)
                                         }
@@ -147,7 +154,7 @@ struct PortfolioView: View {
                                             }
                                         } else {
                                             Text("\(selectedEngine.rawValue) motorunda açık işlem yok.")
-                                                .foregroundColor(Theme.textSecondary)
+                                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                                 .padding(.top, 40)
                                         }
                                     }
@@ -178,13 +185,13 @@ struct PortfolioView: View {
                                         VStack(spacing: 16) {
                                             Image(systemName: "case.fill")
                                                 .font(.system(size: 48))
-                                                .foregroundColor(Theme.bistAccent.opacity(0.3))
+                                                .foregroundColor(InstitutionalTheme.Colors.warning.opacity(0.45))
                                             Text("BIST Portföyün Boş")
                                                 .font(.headline)
-                                                .foregroundColor(.white)
+                                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                             Text("Piyasa ekranından BIST hissesi al.")
                                                 .font(.caption)
-                                                .foregroundColor(Theme.textSecondary)
+                                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                         }
                                         .padding(.top, 40)
                                     }
@@ -207,9 +214,9 @@ struct PortfolioView: View {
                                 .fontWeight(.bold)
                                 .foregroundColor(.white)
                                 .frame(width: 56, height: 56)
-                                .background(Theme.tint)
+                                .background(InstitutionalTheme.Colors.primary)
                                 .clipShape(Circle())
-                                .shadow(color: Theme.tint.opacity(0.4), radius: 10, x: 0, y: 5)
+                                .shadow(color: InstitutionalTheme.Colors.primary.opacity(0.35), radius: 10, x: 0, y: 5)
                             }
                         .padding()
                     }
@@ -390,6 +397,118 @@ struct PortfolioView: View {
         case .manual: selectedEntityForInfo = .corse // Fallback
         }
         withAnimation { showModelInfo = true }
+    }
+}
+
+// MARK: - Trade Brain Status Band
+struct TradeBrainStatusBand: View {
+    @ObservedObject var viewModel: TradingViewModel
+    let market: TradeMarket
+    let openTradeBrain: () -> Void
+
+    private var filteredOpenTrades: [Trade] {
+        switch market {
+        case .global:
+            return viewModel.globalPortfolio.filter { $0.isOpen }
+        case .bist:
+            return viewModel.bistOpenPortfolio.filter { $0.isOpen }
+        }
+    }
+
+    private var filteredBalance: Double {
+        market == .bist ? viewModel.bistBalance : viewModel.balance
+    }
+
+    private var filteredEquity: Double {
+        let value = filteredOpenTrades.reduce(0.0) { total, trade in
+            let price = viewModel.quotes[trade.symbol]?.currentPrice ?? trade.entryPrice
+            return total + trade.quantity * price
+        }
+        return filteredBalance + value
+    }
+
+    private var health: PortfolioRiskManager.PortfolioHealth {
+        PortfolioRiskManager.shared.checkPortfolioHealth(
+            portfolio: filteredOpenTrades,
+            cashBalance: filteredBalance,
+            totalEquity: max(filteredEquity, 1),
+            quotes: viewModel.quotes
+        )
+    }
+
+    private var dominantDecision: ArgusGrandDecision? {
+        filteredOpenTrades
+            .compactMap { viewModel.grandDecisions[$0.symbol] }
+            .max(by: { $0.confidence < $1.confidence })
+    }
+
+    private var actionColor: Color {
+        guard let decision = dominantDecision else { return InstitutionalTheme.Colors.textSecondary }
+        switch decision.action {
+        case .aggressiveBuy: return InstitutionalTheme.Colors.positive
+        case .accumulate: return InstitutionalTheme.Colors.primary
+        case .neutral: return InstitutionalTheme.Colors.textSecondary
+        case .trim: return InstitutionalTheme.Colors.warning
+        case .liquidate: return InstitutionalTheme.Colors.negative
+        }
+    }
+
+    private var healthColor: Color {
+        switch health.status {
+        case .healthy: return InstitutionalTheme.Colors.positive
+        case .warning: return InstitutionalTheme.Colors.warning
+        case .critical: return InstitutionalTheme.Colors.negative
+        }
+    }
+
+    var body: some View {
+        Button(action: openTradeBrain) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("TRADE BRAIN DURUMU")
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .tracking(1.0)
+
+                    if let decision = dominantDecision {
+                        Text("\(decision.symbol) • \(decision.action.rawValue) • %\(Int(decision.confidence * 100)) güven")
+                            .font(InstitutionalTheme.Typography.caption)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                            .lineLimit(1)
+                    } else {
+                        Text("Açık pozisyon yok, yeni plan oluşmadı")
+                            .font(InstitutionalTheme.Typography.caption)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            .lineLimit(1)
+                    }
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 5) {
+                    Text("Skor \(Int(health.score))")
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(healthColor)
+                    Text("\(filteredOpenTrades.count) pozisyon")
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(actionColor)
+            }
+            .padding(InstitutionalTheme.Spacing.md)
+            .background(
+                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous)
+                    .fill(InstitutionalTheme.Colors.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous)
+                            .stroke(actionColor.opacity(0.28), lineWidth: 1)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

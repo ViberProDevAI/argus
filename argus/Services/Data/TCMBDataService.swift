@@ -12,9 +12,9 @@ actor TCMBDataService {
     // Header olarak gonderilmeli: key: API_KEY
     private let baseURL = "https://evds2.tcmb.gov.tr/service/evds"
     
-    // API Key - Settings'ten alinacak, simdilik bos
-    private var apiKey: String {
-        UserDefaults.standard.string(forKey: "tcmb_evds_api_key") ?? ""
+    // API Key - Settings ekranindaki guvenli depodan okunur
+    private func currentAPIKey() async -> String {
+        await APIKeyStore.shared.getCustomValue(for: "tcmb_evds_api_key") ?? ""
     }
     
     // MARK: - Serie Codes (TCMB Veri Kodlari)
@@ -184,6 +184,8 @@ actor TCMBDataService {
     private var cachedSnapshot: TCMBMacroSnapshot?
     private var lastFetchTime: Date?
     private let cacheValiditySeconds: TimeInterval = 3600 // 1 saat
+    private var seriesHistoryCache: [String: (data: [MacroDataPoint], fetchedAt: Date)] = [:]
+    private let seriesHistoryCacheValidity: TimeInterval = 10 * 60 // 10 dakika
     
     // MARK: - Public API
     
@@ -201,36 +203,22 @@ actor TCMBDataService {
             return cached
         }
         
-        // API Key yoksa varsayilan degerler don
-        // API Key yoksa varsayilan degerler don (Son Güncel Veriler - Ocak 2026)
+        let apiKey = await currentAPIKey()
+
+        // API Key yoksa, resmi keyless kaynaklardan (tcmb.gov.tr + yahoo) canli fallback dene
         guard !apiKey.isEmpty else {
-            print("⚠️ TCMB: API Key ayarlanmamis, GÜNCEL MANUAL FALLBACK verileri kullaniliyor (Ocak 2026)")
-            // Fallback to real researched values (Jan 2026 / Dec 2025 Data)
-            return TCMBMacroSnapshot(
-                usdTry: 43.30,            // 21.01.2026 Piyasa Ortalaması
-                eurTry: 45.15,            // Tahmini Pariteye göre (43.3 * 1.04)
-                policyRate: 38.0,         // TCMB Aralık 2025 Kararı (%38)
-                depositRate: 42.5,        // Tahmini Piyasa Faiz Oranı
-                loanRate: 54.0,           // Ticari Kredi Faizleri (Tahmini)
-                inflation: 30.89,         // TÜİK Aralık 2025 Yıllık TÜFE
-                coreInflation: 29.5,      // Tahmini Çekirdek
-                gdpGrowth: 3.5,           // Tahmini Büyüme
-                industrialProduction: 1.2,// Sanayi Üretimi
-                unemployment: 8.6,        // Kasım 2025 İşsizlik Oranı
-                currentAccount: -3.99,    // Kasım 2025 Cari Açık (Milyar $)
-                exports: 22.0,            // Tahmini
-                imports: 28.0,            // Tahmini
-                reserves: 205.0,          // TCMB Brü Rezerv (Tarihi Zirve - Ocak 2026)
-                netReserves: 78.0,        // Net Rezerv
-                totalCredits: nil,
-                tlDeposits: nil,
-                brentOil: 64.0,           // Brent Petrol (Ocak 2026)
-                goldPrice: 2900.0,        // Ons Altın ($) - Safe Conservative Update
-                bist100: 11500.0,         // Endeks Tahmini
-                capacityUsage: 76.5,      // KKO (Ocak 2026 tahmini)
-                creditCardSpendingBillionTL: 250.0, // Haftalık kredi kartı harcama (Milyar TL)
-                timestamp: Date()
-            )
+            if let publicSnapshot = await fetchPublicKeylessSnapshot() {
+                cachedSnapshot = publicSnapshot
+                lastFetchTime = Date()
+                print("✅ TCMB: Keyless resmi fallback verileri guncellendi")
+                return publicSnapshot
+            }
+
+            print("⚠️ TCMB: API Key yok ve keyless fallback de alinmadi, bos snapshot donuluyor")
+            let emptySnapshot = TCMBMacroSnapshot.empty
+            cachedSnapshot = emptySnapshot
+            lastFetchTime = Date()
+            return emptySnapshot
         }
         
         // Yeni veri cek
@@ -238,13 +226,14 @@ actor TCMBDataService {
     }
     
     /// API Key'i ayarla
-    func setAPIKey(_ key: String) {
-        UserDefaults.standard.set(key, forKey: "tcmb_evds_api_key")
+    func setAPIKey(_ key: String) async {
+        await APIKeyStore.shared.setCustomValue(key, for: "tcmb_evds_api_key")
         cachedSnapshot = nil // Cache'i invalidate et
     }
     
     /// API baglantisini test et
     func testConnection() async -> Bool {
+        let apiKey = await currentAPIKey()
         guard !apiKey.isEmpty else { return false }
         
         do {
@@ -258,8 +247,18 @@ actor TCMBDataService {
     
     /// Belirtilen seri icin gecmis veri ceker
     func getSeriesHistory(_ serie: SerieCode, days: Int = 30) async -> [MacroDataPoint] {
+        let apiKey = await currentAPIKey()
         guard !apiKey.isEmpty else { return [] }
-        return (try? await fetchSerie(serie, days: days)) ?? []
+
+        let cacheKey = "\(serie.rawValue)_\(days)"
+        if let cached = seriesHistoryCache[cacheKey],
+           Date().timeIntervalSince(cached.fetchedAt) < seriesHistoryCacheValidity {
+            return cached.data
+        }
+
+        let fetched = (try? await fetchSerie(serie, days: days)) ?? []
+        seriesHistoryCache[cacheKey] = (fetched, Date())
+        return fetched
     }
     
     // MARK: - Private Methods
@@ -357,6 +356,7 @@ actor TCMBDataService {
         }
 
         var request = URLRequest(url: url)
+        let apiKey = await currentAPIKey()
         request.setValue(apiKey, forHTTPHeaderField: "key")
         request.timeoutInterval = 15
 
@@ -409,6 +409,208 @@ actor TCMBDataService {
             return MacroDataPoint(date: item["Tarih"] as? String ?? "", value: value)
         }
     }
+
+    // MARK: - Public Keyless Fallback Sources
+
+    /// Resmi ve ucretsiz endpoint'lerden (API key'siz) temel snapshot olusturur.
+    private func fetchPublicKeylessSnapshot() async -> TCMBMacroSnapshot? {
+        async let fx = fetchPublicFXFromTCMB()
+        async let rates = fetchPublicRatesFromTCMB()
+        async let inflation = fetchPublicInflationFromTCMBHomepage()
+        async let oil = fetchYahooPublicPrice(symbol: "CL=F")
+        async let gold = fetchYahooPublicPrice(symbol: "GC=F")
+        async let bist = fetchYahooPublicPrice(symbol: "XU100.IS")
+
+        let fxValues = await fx
+        let rateValues = await rates
+        let inflationValue = await inflation
+        let oilValue = await oil
+        let goldValue = await gold
+        let bistValue = await bist
+
+        let hasAnyValue =
+            fxValues.usdTry != nil ||
+            fxValues.eurTry != nil ||
+            rateValues.policyRate != nil ||
+            inflationValue != nil ||
+            oilValue != nil ||
+            goldValue != nil ||
+            bistValue != nil
+
+        guard hasAnyValue else { return nil }
+
+        return TCMBMacroSnapshot(
+            usdTry: fxValues.usdTry,
+            eurTry: fxValues.eurTry,
+            policyRate: rateValues.policyRate,
+            depositRate: rateValues.depositRate,
+            loanRate: rateValues.loanRate,
+            inflation: inflationValue,
+            coreInflation: nil,
+            gdpGrowth: nil,
+            industrialProduction: nil,
+            unemployment: nil,
+            currentAccount: nil,
+            exports: nil,
+            imports: nil,
+            reserves: nil,
+            netReserves: nil,
+            totalCredits: nil,
+            tlDeposits: nil,
+            brentOil: oilValue,
+            goldPrice: goldValue,
+            bist100: bistValue,
+            capacityUsage: nil,
+            creditCardSpendingBillionTL: nil,
+            timestamp: Date()
+        )
+    }
+
+    /// tcmb.gov.tr/kurlar/today.xml
+    private func fetchPublicFXFromTCMB() async -> (usdTry: Double?, eurTry: Double?) {
+        guard let url = URL(string: "https://www.tcmb.gov.tr/kurlar/today.xml") else {
+            return (nil, nil)
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 15
+            request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                  let xml = String(data: data, encoding: .utf8) else {
+                return (nil, nil)
+            }
+
+            let usd = extractForexBuying(xml: xml, currencyCode: "USD")
+            let eur = extractForexBuying(xml: xml, currencyCode: "EUR")
+            return (usd, eur)
+        } catch {
+            print("⚠️ TCMB keyless FX alınamadı: \(error)")
+            return (nil, nil)
+        }
+    }
+
+    /// tcmb.gov.tr/.../anasayfa_faizorani.json
+    private func fetchPublicRatesFromTCMB() async -> (policyRate: Double?, depositRate: Double?, loanRate: Double?) {
+        guard let url = URL(string: "https://www.tcmb.gov.tr/wps/wcm/connect/tr/tcmb+tr/main+page+site+area/anasayfa_faizorani.json") else {
+            return (nil, nil, nil)
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 15
+            request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                return (nil, nil, nil)
+            }
+
+            let responseBody = try JSONDecoder().decode(TCMBHomepageRatesResponse.self, from: data)
+            let byName = Dictionary(uniqueKeysWithValues: responseBody.rates.map { ($0.name, $0.value) })
+
+            let policy = parseLocalizedDouble(byName["hr-bv"])
+            let deposit = parseLocalizedDouble(byName["gon-ba"])
+            let loan = parseLocalizedDouble(byName["gon-bv"])
+            return (policy, deposit, loan)
+        } catch {
+            print("⚠️ TCMB keyless faiz oranları alınamadı: \(error)")
+            return (nil, nil, nil)
+        }
+    }
+
+    /// tcmb.gov.tr anasayfa Highcharts serisinden son enflasyon degeri.
+    private func fetchPublicInflationFromTCMBHomepage() async -> Double? {
+        guard let url = URL(string: "https://www.tcmb.gov.tr/") else { return nil }
+
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 15
+            request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode),
+                  let html = String(data: data, encoding: .utf8) else {
+                return nil
+            }
+            return extractLatestInflationFromHomepage(html: html)
+        } catch {
+            print("⚠️ TCMB keyless enflasyon alınamadı: \(error)")
+            return nil
+        }
+    }
+
+    /// Yahoo public endpoint uzerinden destekleyici emtia/endeks fiyatı.
+    private func fetchYahooPublicPrice(symbol: String) async -> Double? {
+        await fetchYahooPublicQuote(symbol: symbol)?.c
+    }
+
+    /// Yahoo public endpoint'ten quote ceker (price + previous close + degisim).
+    private func fetchYahooPublicQuote(symbol: String) async -> Quote? {
+        do {
+            return try await YahooFinanceProvider.shared.fetchQuote(symbol: symbol)
+        } catch {
+            return nil
+        }
+    }
+
+    private func extractForexBuying(xml: String, currencyCode: String) -> Double? {
+        let escapedCode = NSRegularExpression.escapedPattern(for: currencyCode)
+        let pattern = "<Currency[^>]*Kod=\\\"\(escapedCode)\\\"[\\s\\S]*?<ForexBuying>([^<]+)</ForexBuying>"
+
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: [.dotMatchesLineSeparators]) else {
+            return nil
+        }
+        let nsRange = NSRange(xml.startIndex..<xml.endIndex, in: xml)
+        guard let match = regex.firstMatch(in: xml, options: [], range: nsRange),
+              let range = Range(match.range(at: 1), in: xml) else {
+            return nil
+        }
+        return parseLocalizedDouble(String(xml[range]))
+    }
+
+    private func extractLatestInflationFromHomepage(html: String) -> Double? {
+        guard let chartStart = html.range(of: "Highcharts.chart('container'") else { return nil }
+        let suffix = String(html[chartStart.lowerBound...])
+        let chartSection: String
+        if let colorsStart = suffix.range(of: "colors:[") {
+            chartSection = String(suffix[..<colorsStart.lowerBound])
+        } else {
+            chartSection = suffix
+        }
+
+        guard let regex = try? NSRegularExpression(pattern: "y:\\s*([0-9]+(?:[\\.,][0-9]+)?)", options: []) else {
+            return nil
+        }
+
+        let nsRange = NSRange(chartSection.startIndex..<chartSection.endIndex, in: chartSection)
+        let matches = regex.matches(in: chartSection, options: [], range: nsRange)
+        guard let lastMatch = matches.last,
+              let range = Range(lastMatch.range(at: 1), in: chartSection) else {
+            return nil
+        }
+
+        return parseLocalizedDouble(String(chartSection[range]))
+    }
+
+    private func parseLocalizedDouble(_ value: String?) -> Double? {
+        guard let raw = value else { return nil }
+        let normalized = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
+
+        guard !normalized.isEmpty, normalized != "-", normalized != "null" else {
+            return nil
+        }
+        return Double(normalized)
+    }
+
+    private struct TCMBHomepageRatesResponse: Codable {
+        struct Item: Codable {
+            let name: String
+            let value: String
+        }
+        let rates: [Item]
+    }
     
     enum TCMBError: Error {
         case invalidURL
@@ -423,24 +625,40 @@ extension TCMBDataService {
     /// SirkiyeEngine icin input olusturur. Kritik veri (USD/TRY) yoksa nil doner.
     func getSirkiyeInput() async -> SirkiyeEngine.SirkiyeInput? {
         let snapshot = await getMacroSnapshot()
-        
+
+        async let usdTryQuote = fetchYahooPublicQuote(symbol: "TRY=X")
+        async let dxyValue = fetchYahooPublicPrice(symbol: "DX-Y.NYB")
+        async let vixValue = fetchYahooPublicPrice(symbol: "^VIX")
+        async let xu100Value = fetchYahooPublicPrice(symbol: "XU100.IS")
+        async let oilValue = fetchYahooPublicPrice(symbol: "CL=F")
+        async let goldValue = fetchYahooPublicPrice(symbol: "GC=F")
+
+        let usdQuote = await usdTryQuote
+        let dxy = await dxyValue
+        let vix = await vixValue
+        let xu100 = await xu100Value
+        let oil = await oilValue
+        let gold = await goldValue
+        let usdTry = snapshot.usdTry ?? usdQuote?.c
+
         // Kritik veriler yoksa analiz yapma (Clean Rice Protocol)
-        guard let usdTry = snapshot.usdTry, usdTry > 0 else { return nil }
-        
-        // Onceki gun tahmini (Veri varsa)
-        let previousUsdTry = usdTry * 0.99
-        
+        guard let usdTry, usdTry > 0 else { return nil }
+
+        // Onceki gun kapanisi: gercek quote'tan geliyorsa onu, yoksa mevcut degeri kullan.
+        let previousUsdTry = (usdQuote?.previousClose ?? snapshot.usdTry ?? usdTry)
+
         return SirkiyeEngine.SirkiyeInput(
             usdTry: usdTry,
             usdTryPrevious: previousUsdTry,
-            dxy: 104.0, // DXY icin ayri kaynak gerekli (Sabit deger - Bunu da temizlemek lazim ama TCMB disi)
-            brentOil: snapshot.brentOil,
-            globalVix: 15.0,
+            dxy: dxy,
+            brentOil: snapshot.brentOil ?? oil,
+            globalVix: vix,
             newsSnapshot: nil,
             currentInflation: snapshot.inflation,
             policyRate: snapshot.policyRate,
             xu100Change: nil,
-            goldPrice: snapshot.goldPrice
+            xu100Value: snapshot.bist100 ?? xu100,
+            goldPrice: snapshot.goldPrice ?? gold
         )
     }
 }
@@ -448,50 +666,33 @@ extension TCMBDataService {
 // MARK: - Oracle Engine Integration
 extension TCMBDataService {
     /// OracleEngine icin genisletilmis veri seti
-    /// EVDS'den çekilebilen veriler gerçek, diğerleri TÜİK/ODMD kaynaklarından manuel güncellenmeli
+    /// Veri yoksa alanlar nil kalir; sahte/fallback rakam uretilmez.
     func getOracleInput() async -> OracleDataInput {
         let snapshot = await getMacroSnapshot()
-
-        // EVDS'den gelen gerçek veriler
-        let kko = snapshot.capacityUsage ?? 76.5 // Kapasite Kullanım Oranı
-        let ccSpending = snapshot.creditCardSpendingBillionTL ?? 250.0 // Kredi Kartı Harcama
-
-        // Önceki dönem verileri (geçmiş veri çekilerek hesaplanmalı - şimdilik tahmini)
-        let prevKko = kko - 0.3 // Aylık değişim tahmini
-
-        // YoY değişim hesaplamaları (Gerçek hesaplama için 1 yıllık veri gerekli)
-        // Şimdilik enflasyon üzerinden nominal/reel ayırma yapıyoruz
-        let inflation = snapshot.inflation ?? 30.0
-        let ccSpendingChangeYoY = 45.0 // Nominal artış (EVDS'den 1 yıllık veri çekilmeli)
-
-        // TÜİK/ODMD verileri - EVDS'de YOK, manuel güncellenmeli veya ayrı servis eklenmeli
-        // Bu değerler fallback olarak kullanılıyor
-        let housingSalesTotal: Double = 125000      // TÜİK Konut Satış (Aylık)
-        let housingSalesChangeYoY: Double = 12.5    // TÜİK YoY
-        let housingSalesChangeMoM: Double = 2.1     // TÜİK MoM
-        let touristArrivalsTotal: Double = 2.1      // TÜİK Turist Girişi (Milyon)
-        let touristArrivalsChangeYoY: Double = 8.0  // TÜİK YoY
-        let autoSalesTotal: Double = 85000          // ODD/ODMD Otomotiv Satış
-        let autoSalesChangeYoY: Double = -5.0       // ODMD YoY
+        async let kkoHistory = fetchKKOWithHistory()
+        async let ccHistory = fetchCCSpendingWithHistory()
+        let kko = await kkoHistory
+        let cc = await ccHistory
 
         return OracleDataInput(
-            inflationYoY: inflation,
-            housingSalesTotal: housingSalesTotal,
-            housingSalesChangeYoY: housingSalesChangeYoY,
-            housingSalesChangeMoM: housingSalesChangeMoM,
-            creditCardSpendingTotal: ccSpending,
-            creditCardSpendingChangeYoY: ccSpendingChangeYoY,
-            capacityUsageRatio: kko,
-            prevCapacityUsageRatio: prevKko,
-            touristArrivalsTotal: touristArrivalsTotal,
-            touristArrivalsChangeYoY: touristArrivalsChangeYoY,
-            autoSalesTotal: autoSalesTotal,
-            autoSalesChangeYoY: autoSalesChangeYoY
+            inflationYoY: snapshot.inflation,
+            housingSalesTotal: nil,
+            housingSalesChangeYoY: nil,
+            housingSalesChangeMoM: nil,
+            creditCardSpendingTotal: cc?.current ?? snapshot.creditCardSpendingBillionTL,
+            creditCardSpendingChangeYoY: cc?.changeYoY,
+            capacityUsageRatio: kko?.current ?? snapshot.capacityUsage,
+            prevCapacityUsageRatio: kko?.prevYear,
+            touristArrivalsTotal: nil,
+            touristArrivalsChangeYoY: nil,
+            autoSalesTotal: nil,
+            autoSalesChangeYoY: nil
         )
     }
 
     /// KKO için YoY değişim hesapla (1 yıllık veri çekerek)
     func fetchKKOWithHistory() async -> (current: Double, prevYear: Double)? {
+        let apiKey = await currentAPIKey()
         guard !apiKey.isEmpty else { return nil }
 
         do {
@@ -509,6 +710,7 @@ extension TCMBDataService {
 
     /// Kredi kartı harcaması için YoY değişim hesapla
     func fetchCCSpendingWithHistory() async -> (current: Double, changeYoY: Double)? {
+        let apiKey = await currentAPIKey()
         guard !apiKey.isEmpty else { return nil }
 
         do {

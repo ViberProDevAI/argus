@@ -410,7 +410,10 @@ final class YahooFinanceProvider: HeimdallProvider {
     }
     
     private func _fetchFundamentalsInternal(symbol: String, isRetry: Bool) async throws -> FinancialsData {
-        let encoded = encodeYahooSymbolForPath(symbol)
+        // Keep fundamentals lookup consistent with quote/candle symbol mapping.
+        // This prevents Atlas failures for aliases and BIST symbols without `.IS`.
+        let ySymbol = SymbolResolver.shared.resolve(symbol, for: .yahoo)
+        let encoded = encodeYahooSymbolForPath(ySymbol)
         
         // 1. Authenticate (Get Crumb & Cookie) to Fix 401
         let (crumb, cookie) = try await YahooAuthenticationService.shared.getCrumb()

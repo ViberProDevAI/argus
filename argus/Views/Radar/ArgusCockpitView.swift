@@ -114,7 +114,7 @@ struct ArgusCockpitView: View {
                                     // MARK: - Chiron Widget
                                     ChironCockpitWidget()
                                         .padding(.vertical, 8)
-                                        .background(Color(hex: "080b14"))
+                                        .background(InstitutionalTheme.Colors.surface1)
                                     
                                     // MARK: - SYSTEM INTELLIGENCE FEED
                                     ChironTerminalFeed(events: systemLogs)
@@ -154,13 +154,13 @@ struct ArgusCockpitView: View {
                             }
                     }
                 }
-                .background(Color(hex: "080b14").ignoresSafeArea())
+                .background(InstitutionalTheme.Colors.background.ignoresSafeArea())
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                      ToolbarItem(placement: .navigationBarLeading) {
                          Button(action: { showDrawer = true }) {
                              Image(systemName: "line.3.horizontal")
-                                 .foregroundColor(.white.opacity(0.8))
+                                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                          }
                      }
                      ToolbarItem(placement: .principal) {
@@ -170,7 +170,7 @@ struct ArgusCockpitView: View {
                              Text(toolbarTitle)
                                  .font(.system(.headline, design: .monospaced))
                                  .bold()
-                                 .foregroundColor(.white)
+                                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                          }
                      }
                     
@@ -182,7 +182,7 @@ struct ArgusCockpitView: View {
                             }
                         }) {
                             Image(systemName: "arrow.clockwise")
-                                .foregroundColor(.gray)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                     }
                 }
@@ -343,8 +343,12 @@ struct ArgusCockpitView: View {
         Button(action: { withAnimation { selectedMarket = tab } }) {
             VStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(selectedMarket == tab ? .white : .gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(
+                        selectedMarket == tab
+                            ? InstitutionalTheme.Colors.textPrimary
+                            : InstitutionalTheme.Colors.textSecondary
+                    )
                     .frame(maxWidth: .infinity)
                     .padding(.top, 12)
                 
@@ -362,15 +366,18 @@ struct ArgusCockpitView: View {
             tabButton(title: "Sirkiye", tab: .bist)
             tabButton(title: "Fonlar", tab: .fonlar)
         }
-        .background(Color(hex: "10141f"))
+        .background(InstitutionalTheme.Colors.surface1)
+        .overlay(alignment: .bottom) {
+            Divider().background(InstitutionalTheme.Colors.borderSubtle)
+        }
     }
     
     // Tab color helper
     private func tabColor(for tab: MarketTab) -> Color {
         switch tab {
-        case .global: return .cyan
-        case .bist: return .red
-        case .fonlar: return .green
+        case .global: return InstitutionalTheme.Colors.primary
+        case .bist: return InstitutionalTheme.Colors.warning
+        case .fonlar: return InstitutionalTheme.Colors.positive
         }
     }
     
@@ -410,8 +417,8 @@ struct TerminalControlBar: View {
         VStack(spacing: 12) {
             HStack {
                 Text("\(count) \(selectedMarket == .bist ? "HİSSE" : "TICKER")")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 
                 Spacer()
                 
@@ -431,9 +438,9 @@ struct TerminalControlBar: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(Color.white.opacity(0.05))
+                    .background(InstitutionalTheme.Colors.surface2)
                     .cornerRadius(8)
-                    .foregroundColor(selectedMarket == .bist ? .red : .cyan)
+                    .foregroundColor(selectedMarket == .bist ? InstitutionalTheme.Colors.warning : InstitutionalTheme.Colors.primary)
                 }
             }
             
@@ -441,19 +448,19 @@ struct TerminalControlBar: View {
                 Toggle(isOn: $hideLowQualityData) {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle")
-                            .foregroundColor(hideLowQualityData ? .orange : .gray)
+                            .foregroundColor(hideLowQualityData ? InstitutionalTheme.Colors.warning : InstitutionalTheme.Colors.textTertiary)
                         Text("Düşük Kaliteyi Gizle")
-                            .font(.caption)
-                            .foregroundColor(.white)
+                            .font(InstitutionalTheme.Typography.caption)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     }
                 }
-                .toggleStyle(SwitchToggleStyle(tint: .orange))
+                .toggleStyle(SwitchToggleStyle(tint: InstitutionalTheme.Colors.warning))
                 .scaleEffect(0.8)
             }
         }
         .padding()
-        .background(Color(hex: "10141f"))
-        .overlay(Rectangle().frame(height: 1).foregroundColor(.white.opacity(0.05)), alignment: .bottom)
+        .background(InstitutionalTheme.Colors.surface1)
+        .overlay(Rectangle().frame(height: 1).foregroundColor(InstitutionalTheme.Colors.borderSubtle), alignment: .bottom)
     }
     
     func sortLabel(for option: ArgusCockpitView.TerminalSortOption) -> String {
@@ -475,113 +482,168 @@ struct TerminalStockRow: View {
     var onAtlasTap: () -> Void
     
     var body: some View {
-        HStack(spacing: 12) {
-            // Ticker & Price
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Text(item.symbol.replacingOccurrences(of: ".IS", with: ""))
-                        .font(.system(size: 16, weight: .bold, design: .monospaced))
-                        .foregroundColor(.white)
+        VStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                // Ticker & Price
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Text(item.symbol.replacingOccurrences(of: ".IS", with: ""))
+                            .font(InstitutionalTheme.Typography.data)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                            .lineLimit(1)
+                        
+                        if item.market == .bist {
+                            Text("TR")
+                                .font(InstitutionalTheme.Typography.micro)
+                                .foregroundColor(InstitutionalTheme.Colors.warning)
+                                .padding(2)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(InstitutionalTheme.Colors.warning, lineWidth: 1)
+                                )
+                        }
+                    }
                     
-                    if item.market == .bist {
-                        Text("TR")
-                            .font(.system(size: 8, weight: .bold))
-                            .foregroundColor(.red)
-                            .padding(2)
-                            .overlay(RoundedRectangle(cornerRadius: 2).stroke(Color.red, lineWidth: 1))
+                    Text(item.price > 0
+                         ? String(format: item.currency == .TRY ? "₺%.2f" : "$%.2f", item.price)
+                         : "---")
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+                
+                Spacer(minLength: 6)
+                
+                // Council Decision + Chimera
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(councilLabel(item.action))
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(actionColor(item.action).opacity(0.2))
+                        .foregroundColor(actionColor(item.action))
+                        .cornerRadius(6)
+                    
+                    Text("GUVEN %\(Int((item.councilScore ?? 0) * 100))")
+                        .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .lineLimit(1)
+                    
+                    if let signal = item.chimeraSignal {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(signal.severity > 0.7 ? Color.red : Color.orange)
+                                .frame(width: 6, height: 6)
+                            Text(signal.title)
+                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                .foregroundColor(signal.severity > 0.7 ? .red : .orange)
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(InstitutionalTheme.Colors.surface2)
+                        .cornerRadius(6)
                     }
                 }
-                
-                Text(item.price > 0 
-                     ? String(format: item.currency == .TRY ? "₺%.2f" : "$%.2f", item.price)
-                     : "---")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-            }
-            .frame(width: 80, alignment: .leading)
-            
-            // Scores
-            let isBist = (item.market == .bist)
-            HStack(spacing: 12) {
-                Button(action: onOrionTap) {
-                    TerminalScoreBadge(label: isBist ? "T" : "O", score: item.orionScore ?? 0, color: .cyan)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Button(action: onAtlasTap) {
-                    TerminalScoreBadge(label: isBist ? "K" : "A", score: item.atlasScore ?? 0, color: .yellow)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                // Council (Confidence) -> 0.75 -> 75
-                TerminalScoreBadge(label: "★", score: (item.councilScore ?? 0) * 100, color: .green)
             }
             
-            Spacer()
-            
-            // Prometheus
-            PrometheusBadge(forecast: item.forecast)
-            
-            Spacer()
-            
-            // Action Signal + Chimera Badge
-            VStack(alignment: .trailing, spacing: 4) {
-                Text(actionLocalizedString(item.action))
-                    .font(.system(size: 11, weight: .black))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(actionColor(item.action).opacity(0.2))
-                    .foregroundColor(actionColor(item.action))
-                    .cornerRadius(4)
-                
-                // Chimera Signal Badge (Deep Value, Bull Trap, etc.)
-                if let signal = item.chimeraSignal {
-                    HStack(spacing: 3) {
-                        Circle()
-                            .fill(signal.severity > 0.7 ? Color.red : Color.orange)
-                            .frame(width: 5, height: 5)
-                        Text(signal.title)
-                            .font(.system(size: 8, weight: .bold, design: .monospaced))
-                            .foregroundColor(signal.severity > 0.7 ? .red : .orange)
+            HStack(spacing: 10) {
+                let isBist = (item.market == .bist)
+                HStack(spacing: 12) {
+                    Button(action: onOrionTap) {
+                        TerminalScoreBadge(label: isBist ? "T" : "O", score: item.orionScore ?? 0, color: InstitutionalTheme.Colors.primary)
                     }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.black.opacity(0.3))
-                    .cornerRadius(4)
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    Button(action: onAtlasTap) {
+                        TerminalScoreBadge(label: isBist ? "K" : "A", score: item.atlasScore ?? 0, color: InstitutionalTheme.Colors.warning)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    TerminalScoreBadge(label: "★", score: (item.councilScore ?? 0) * 100, color: InstitutionalTheme.Colors.positive)
                 }
+                
+                Spacer(minLength: 4)
+                
+                PrometheusBadge(forecast: item.forecast)
                 
                 if item.dataQuality < 100 {
-                    HStack(spacing: 2) {
+                    HStack(spacing: 3) {
                         Image(systemName: "wifi.exclamationmark")
                         Text("%\(item.dataQuality)")
                     }
-                    .font(.system(size: 8))
+                    .font(.system(size: 8, weight: .semibold))
                     .foregroundColor(.orange)
                 }
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .background(InstitutionalTheme.Colors.surface1.opacity(0.35))
+        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+        )
         .contentShape(Rectangle())
     }
     
     func actionColor(_ action: ArgusAction) -> Color {
         switch action {
-        case .aggressiveBuy: return .green
-        case .accumulate: return .mint
-        case .neutral: return .gray
-        case .trim: return .orange
-        case .liquidate: return .red
+        case .aggressiveBuy: return InstitutionalTheme.Colors.positive
+        case .accumulate: return InstitutionalTheme.Colors.primary
+        case .neutral: return InstitutionalTheme.Colors.textSecondary
+        case .trim: return InstitutionalTheme.Colors.warning
+        case .liquidate: return InstitutionalTheme.Colors.negative
+        }
+    }
+
+    func councilLabel(_ action: ArgusAction) -> String {
+        switch action {
+        case .aggressiveBuy: return "KONSEY HUCUM"
+        case .accumulate: return "KONSEY TOPLA"
+        case .neutral: return "KONSEY GOZLE"
+        case .trim: return "KONSEY AZALT"
+        case .liquidate: return "KONSEY CIK"
         }
     }
     
-    func actionLocalizedString(_ action: ArgusAction) -> String {
-        switch action {
-        case .aggressiveBuy: return "HÜCUM"
-        case .accumulate: return "TOPLA"
-        case .neutral: return "GÖZLE"
-        case .trim: return "AZALT"
-        case .liquidate: return "ÇIK"
+    func educationLevel(_ item: TerminalItem) -> Int {
+        let confidence = max(0, min(item.councilScore ?? 0, 1))
+        var level: Int
+
+        switch confidence {
+        case ..<0.20: level = 1
+        case ..<0.40: level = 2
+        case ..<0.60: level = 3
+        case ..<0.80: level = 4
+        default: level = 5
+        }
+
+        if item.action == .neutral {
+            level = min(level, 3)
+        }
+        return level
+    }
+
+    func educationTitle(_ level: Int) -> String {
+        switch level {
+        case 1: return "VERI ZAYIF"
+        case 2: return "ERKEN SINYAL"
+        case 3: return "KARISIK"
+        case 4: return "GUCLU"
+        default: return "TEYITLI"
+        }
+    }
+
+    func educationColor(_ level: Int) -> Color {
+        switch level {
+        case 1: return InstitutionalTheme.Colors.negative
+        case 2: return InstitutionalTheme.Colors.warning
+        case 3: return InstitutionalTheme.Colors.textSecondary
+        case 4: return InstitutionalTheme.Colors.primary
+        default: return InstitutionalTheme.Colors.positive
         }
     }
 }
@@ -595,8 +657,8 @@ struct TerminalScoreBadge: View {
     var body: some View {
         VStack(spacing: 2) {
             Text(label)
-                .font(.system(size: 8, weight: .bold))
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
             
             ZStack {
                 Circle()
@@ -604,8 +666,8 @@ struct TerminalScoreBadge: View {
                     .frame(width: 24, height: 24)
                 
                 Text(score > 0 ? "\(Int(score))" : "-")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(score > 0 ? .white : .gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(score > 0 ? InstitutionalTheme.Colors.textPrimary : InstitutionalTheme.Colors.textTertiary)
             }
         }
     }

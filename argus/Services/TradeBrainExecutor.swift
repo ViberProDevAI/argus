@@ -55,12 +55,14 @@ class TradeBrainExecutor: ObservableObject {
             if let lastTime = lastExecutionTime[symbol],
                Date().timeIntervalSince(lastTime) < cooldownSeconds {
                 skippedCooldown += 1
+                debugSkip(symbol: symbol, reason: "cooldown aktif")
                 continue
             }
             
-            let currentPrice = quotes[symbol]?.currentPrice ?? 0
+            let currentPrice = quotes[symbol]?.currentPrice ?? candles[symbol]?.last?.close ?? 0
             guard currentPrice > 0 else { 
                 skippedNoPrice += 1
+                debugSkip(symbol: symbol, reason: "fiyat yok (quote/candle)")
                 continue 
             }
             
@@ -85,9 +87,11 @@ class TradeBrainExecutor: ObservableObject {
                     )
                 } else {
                     print("⚠️ TradeBrainExecutor: \(symbol) - Action \(decision.action.rawValue) alım için değil")
+                    debugSkip(symbol: symbol, reason: "aksiyon alım değil (\(decision.action.rawValue))")
                 }
             } else {
                 print("⚠️ TradeBrainExecutor: \(symbol) - Zaten açık pozisyon var, alım yapılmayacak")
+                debugSkip(symbol: symbol, reason: "zaten açık pozisyon var")
             }
             
             // SATIM KARARLARI (Plan bazlı - Trade Brain)
@@ -123,7 +127,7 @@ class TradeBrainExecutor: ObservableObject {
     ) async {
         print("💰 executeBuy: \(symbol) - Fiyat: \(currentPrice)")
         
-        let isBist = symbol.hasSuffix(".IS")
+        let isBist = SymbolResolver.shared.isBistSymbol(symbol)
         let availableBalance = isBist ? bistBalance : balance
         
         print("💰 executeBuy: Available Balance = \(availableBalance), isBist = \(isBist)")
@@ -152,19 +156,21 @@ class TradeBrainExecutor: ObservableObject {
         
         // 2. RİSK KONTROLÜ
         // FIX: portfolioValue sadece aynı pazar trade'lerini içermeli (BIST veya Global ayrı)
-        let marketFilteredPortfolio = portfolio.filter { $0.isOpen && $0.symbol.hasSuffix(".IS") == isBist }
+        let marketFilteredPortfolio = portfolio.filter { $0.isOpen && SymbolResolver.shared.isBistSymbol($0.symbol) == isBist }
         let portfolioValue = marketFilteredPortfolio.reduce(0) { sum, trade in
             let price = quotes[trade.symbol]?.currentPrice ?? trade.entryPrice
             return sum + (trade.quantity * price)
         }
         
         let totalEquity = availableBalance + portfolioValue
+        let marketOpenCount = marketFilteredPortfolio.count
+        print("🛡️ executeBuy: \(isBist ? "BIST" : "GLOBAL") açık pozisyon sayısı = \(marketOpenCount)")
         
         let riskCheck = PortfolioRiskManager.shared.checkBuyRisk(
             symbol: symbol,
             proposedAmount: allocation,
             currentPrice: currentPrice,
-            portfolio: portfolio,
+            portfolio: marketFilteredPortfolio,
             cashBalance: availableBalance,
             totalEquity: totalEquity
         )
@@ -264,10 +270,12 @@ class TradeBrainExecutor: ObservableObject {
             signal: signal,
             symbol: symbol,
             quantity: proposedQuantity,
-            portfolio: portfolio,
-            equity: availableBalance,
+            portfolio: marketFilteredPortfolio,
+            equity: totalEquity,
             scores: (scores.atlas, scores.orion, scores.aether, nil)
         )
+        
+        print("🛡️ executeBuy: Governor input - Market: \(isBist ? "BIST" : "GLOBAL"), Equity: \(String(format: "%.2f", totalEquity)), OpenPos: \(marketFilteredPortfolio.count)")
         
         print("🛡️ executeBuy: ExecutionGovernor karar bekleniyor...")
         
@@ -348,6 +356,10 @@ class TradeBrainExecutor: ObservableObject {
         }
         
         print("🧠 Trade Brain: \(message)")
+    }
+
+    private func debugSkip(symbol: String, reason: String) {
+        print("🟡 AUTOPILOT-SKIP: \(symbol) -> \(reason)")
     }
     
     // MARK: - Public API

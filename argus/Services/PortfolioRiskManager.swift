@@ -16,7 +16,8 @@ class PortfolioRiskManager {
         // Pozisyon Limitleri
         var maxOpenPositions: Int = 15           // Maksimum açık pozisyon
         var maxPositionWeight: Double = 0.15     // Tek pozisyon maksimum %15
-        var minPositionSize: Double = 1000       // Minimum pozisyon TL
+        var minPositionSizeBist: Double = 1000   // BIST minimum pozisyon (TRY)
+        var minPositionSizeGlobal: Double = 50   // Global minimum pozisyon (USD)
         
         // Sektör Limitleri
         var maxSectorConcentration: Double = 0.40 // Tek sektörde maksimum %40
@@ -135,9 +136,12 @@ class PortfolioRiskManager {
             }
         }
         
-        // 4. Minimum Pozisyon Boyutu
-        if adjustedAmount < limits.minPositionSize {
-            blockers.append("Minimum pozisyon boyutu: \(formatCurrency(limits.minPositionSize))")
+        // 4. Minimum Pozisyon Boyutu (pazar bazlı)
+        let isBist = SymbolResolver.shared.isBistSymbol(symbol)
+        let minPositionSize = isBist ? limits.minPositionSizeBist : limits.minPositionSizeGlobal
+
+        if adjustedAmount < minPositionSize {
+            blockers.append("Minimum pozisyon boyutu: \(formatCurrency(minPositionSize, isBist: isBist))")
             return RiskCheckResult(canTrade: false, warnings: warnings, blockers: blockers, adjustedQuantity: nil, reason: "Minimum boyut")
         }
         
@@ -357,7 +361,14 @@ class PortfolioRiskManager {
     }
     
     private func formatCurrency(_ value: Double) -> String {
-        return String(format: "%.0f TL", value)
+        return formatCurrency(value, isBist: true)
+    }
+
+    private func formatCurrency(_ value: Double, isBist: Bool) -> String {
+        if isBist {
+            return String(format: "%.0f TL", value)
+        }
+        return String(format: "$%.0f", value)
     }
     
     // MARK: - Debug

@@ -257,6 +257,7 @@
 				DEVELOPMENT_TEAM = REDACTED_TEAM_ID;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_ALPHA_VANTAGE_KEY = "$(ALPHA_VANTAGE_KEY)";
 				INFOPLIST_KEY_BORSAPY_KEY = "$(BORSAPY_KEY)";
 				INFOPLIST_KEY_DEEPSEEK_KEY = "$(DEEPSEEK_KEY)";
@@ -266,8 +267,11 @@
 				INFOPLIST_KEY_FMP_KEY = "$(FMP_KEY)";
 				INFOPLIST_KEY_FRED_KEY = "$(FRED_KEY)";
 				INFOPLIST_KEY_GEMINI_KEY = "$(GEMINI_KEY)";
+				INFOPLIST_KEY_GLM_KEY = "$(GLM_KEY)";
 				INFOPLIST_KEY_GROQ_KEY = "$(GROQ_KEY)";
 				INFOPLIST_KEY_MARKETSTACK_KEY = "$(MARKETSTACK_KEY)";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Argus Voice ile sesli komut vermek için mikrofon erişimi gereklidir.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Argus Voice ile sesli komutlarınızı anlamak için konuşma tanıma erişimi gereklidir.";
 				INFOPLIST_KEY_PINECONE_KEY = "$(PINECONE_KEY)";
 				INFOPLIST_KEY_SIMFIN_KEY = "$(SIMFIN_KEY)";
 				INFOPLIST_KEY_TIINGO_KEY = "$(TIINGO_KEY)";
@@ -309,6 +313,7 @@
 				DEVELOPMENT_TEAM = REDACTED_TEAM_ID;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_ALPHA_VANTAGE_KEY = "$(ALPHA_VANTAGE_KEY)";
 				INFOPLIST_KEY_BORSAPY_KEY = "$(BORSAPY_KEY)";
 				INFOPLIST_KEY_DEEPSEEK_KEY = "$(DEEPSEEK_KEY)";
@@ -318,8 +323,11 @@
 				INFOPLIST_KEY_FMP_KEY = "$(FMP_KEY)";
 				INFOPLIST_KEY_FRED_KEY = "$(FRED_KEY)";
 				INFOPLIST_KEY_GEMINI_KEY = "$(GEMINI_KEY)";
+				INFOPLIST_KEY_GLM_KEY = "$(GLM_KEY)";
 				INFOPLIST_KEY_GROQ_KEY = "$(GROQ_KEY)";
 				INFOPLIST_KEY_MARKETSTACK_KEY = "$(MARKETSTACK_KEY)";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Argus Voice ile sesli komut vermek için mikrofon erişimi gereklidir.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Argus Voice ile sesli komutlarınızı anlamak için konuşma tanıma erişimi gereklidir.";
 				INFOPLIST_KEY_PINECONE_KEY = "$(PINECONE_KEY)";
 				INFOPLIST_KEY_SIMFIN_KEY = "$(SIMFIN_KEY)";
 				INFOPLIST_KEY_TIINGO_KEY = "$(TIINGO_KEY)";

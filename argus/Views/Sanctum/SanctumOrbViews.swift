@@ -10,15 +10,16 @@ struct OrbView: View {
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
-                // Background (Deep Navy)
                 Circle()
-                    .fill(Color(hex: "1E293B")) // Slate 800
+                    .fill(InstitutionalTheme.Colors.surface2)
                     .frame(width: 52, height: 52)
                     .shadow(color: Color.black.opacity(0.4), radius: 4, x: 0, y: 2)
-                
-                // Tech Ring (Cleaner V2)
                 Circle()
-                    .stroke(module.color.opacity(0.8), lineWidth: 1.5)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                    .frame(width: 52, height: 52)
+                
+                Circle()
+                    .stroke(module.color.opacity(0.65), lineWidth: 1.5)
                     .frame(width: 52, height: 52)
                 
                 // Icon
@@ -58,15 +59,16 @@ struct BistOrbView: View {
     var body: some View {
         VStack(spacing: 8) {
             ZStack {
-                // Background
                 Circle()
-                    .fill(Color(hex: "1E293B"))
+                    .fill(InstitutionalTheme.Colors.surface2)
                     .frame(width: 52, height: 52)
                     .shadow(color: Color.black.opacity(0.4), radius: 4, x: 0, y: 2)
-                
-                // Tech Ring
                 Circle()
-                    .stroke(module.color.opacity(0.8), lineWidth: 1.5)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                    .frame(width: 52, height: 52)
+                
+                Circle()
+                    .stroke(module.color.opacity(0.65), lineWidth: 1.5)
                     .frame(width: 52, height: 52)
                     
                 // Icon

@@ -187,7 +187,10 @@ class KeychainManager {
         for keyType in APIKey.allCases {
             if let currentValue = read(key: keyType) {
                 // Rotasyon logic'i buraya gelecek
-                print("ℹ️ \(keyType.rawValue): Rotasyon kontrol ediliyor - \(currentValue.prefix(8))...")
+                if currentValue.isEmpty {
+                    continue
+                }
+                print("ℹ️ \(keyType.rawValue): Rotasyon kontrol ediliyor.")
             }
         }
         

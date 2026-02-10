@@ -62,12 +62,6 @@ struct EngineHealthCard: View {
 struct ArgusDataHealthView: View {
     @EnvironmentObject var viewModel: TradingViewModel
     
-    // API Key States (Preserved)
-    @AppStorage("apiKey") private var finnhubKey: String = ""
-    @AppStorage("fmpKey") private var fmpKey: String = ""
-    @AppStorage("twelveKey") private var twelveDataKey: String = ""
-    @AppStorage("tiingoKey") private var tiingoKey: String = ""
-    
     // Heimdall State
     @State private var systemHealth: HeimdallOrchestrator.SystemHealthStatus = .operational
     @State private var providerScores: [String: ProviderScore] = [:]
@@ -351,30 +345,6 @@ struct ArgusDataHealthView: View {
                         .padding(.horizontal)
                     }
                     
-                    // 4. API Key Management (Legacy Support)
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack {
-                            Image(systemName: "key.fill")
-                                .foregroundColor(Theme.tint)
-                            Text("API Anahtarları")
-                                .font(.headline)
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal)
-                        
-                        VStack(spacing: 12) {
-                            ApiKeyRow(provider: "Financial Modeling Prep", key: $fmpKey)
-                            Divider().background(Theme.background)
-                            ApiKeyRow(provider: "Twelve Data", key: $twelveDataKey)
-                            Divider().background(Theme.background)
-                            ApiKeyRow(provider: "Tiingo", key: $tiingoKey)
-                        }
-                        .padding()
-                        .background(Theme.secondaryBackground)
-                        .cornerRadius(16)
-                    }
-                    .padding(.horizontal)
-                    
                     Spacer(minLength: 50)
                 }
                 .padding(.vertical)
@@ -511,53 +481,6 @@ struct ProviderScoreRow: View {
             }
         }
         .padding()
-    }
-}
-
-struct ApiKeyRow: View {
-    let provider: String
-    @Binding var key: String
-    var onUpdate: (() -> Void)? = nil
-    @State private var isVisible = false
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(provider)
-                .font(.caption)
-                .foregroundColor(.gray)
-            
-            HStack {
-                if isVisible {
-                    TextField("API Key", text: $key)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .foregroundColor(.white)
-                } else {
-                    SecureField("API Key", text: $key)
-                        .textFieldStyle(PlainTextFieldStyle())
-                        .foregroundColor(.white)
-                }
-                
-                Button(action: { isVisible.toggle() }) {
-                    Image(systemName: isVisible ? "eye.slash.fill" : "eye.fill")
-                        .foregroundColor(.gray)
-                }
-                
-                if let onUpdate = onUpdate {
-                    Button(action: onUpdate) {
-                        Text("Güncelle")
-                            .font(.caption)
-                            .bold()
-                            .foregroundColor(Theme.tint)
-                            .padding(4)
-                            .background(Theme.tint.opacity(0.1))
-                            .cornerRadius(4)
-                    }
-                }
-            }
-            .padding(8)
-            .background(Theme.background)
-            .cornerRadius(8)
-        }
     }
 }
 

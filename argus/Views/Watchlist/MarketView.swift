@@ -33,7 +33,7 @@ struct MarketView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                InstitutionalTheme.Colors.background.ignoresSafeArea()
                 
                 VStack(spacing: 0) {
                     // 1. CUSTOM HEADER (Premium Toggle)
@@ -41,36 +41,38 @@ struct MarketView: View {
                         marketTabButton(title: "GLOBAL", mode: .global)
                         marketTabButton(title: "SİRKİYE", mode: .bist)
                     }
-                    .padding()
-                    .background(Theme.secondaryBackground.opacity(0.5))
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
+                    .background(InstitutionalTheme.Colors.surface1)
+
                     // Custom Header
                     HStack {
                         VStack(alignment: .leading) {
                             Text("Piyasa")
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                                .foregroundColor(.white)
+                                .font(InstitutionalTheme.Typography.title)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             
                             // Tarih
                             Text(Date().formatted(date: .abbreviated, time: .omitted))
-                                .font(.caption)
-                                .foregroundColor(Theme.textSecondary)
+                                .font(InstitutionalTheme.Typography.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                         
                         Spacer()
                         
                         // Action Buttons
-                        HStack(spacing: 16) {
+                        HStack(spacing: 14) {
                             Button(action: { showDrawer = true }) {
                                 Image(systemName: "line.3.horizontal")
                                     .font(.title3)
-                                    .foregroundColor(Theme.textSecondary)
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             }
 
                             Button(action: { showDiscover = true }) {
                                 Image(systemName: "globe")
                                     .font(.title3)
-                                    .foregroundColor(Theme.tint)
+                                    .foregroundColor(InstitutionalTheme.Colors.primary)
                             }
                             
                             Button(action: { showSearch = true }) {
@@ -78,20 +80,26 @@ struct MarketView: View {
                                     Image(systemName: "plus.circle.fill")
                                         .font(.title2)
                                     Text("Hisse Ekle")
-                                        .font(.caption)
+                                        .font(InstitutionalTheme.Typography.micro)
                                         .fontWeight(.medium)
                                 }
-                                .foregroundColor(Theme.tint)
+                                .foregroundColor(InstitutionalTheme.Colors.primary)
                             }
                             
                             Button(action: { showNotifications = true }) {
                                 Image(systemName: "bell.fill")
                                     .font(.title3)
-                                    .foregroundColor(Theme.textSecondary)
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             }
                         }
                     }
-                    .padding()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(InstitutionalTheme.Colors.surface1)
+                    .overlay(alignment: .bottom) {
+                        Divider()
+                            .background(InstitutionalTheme.Colors.borderSubtle)
+                    }
                     
                     // Main Content
                     ScrollView {
@@ -162,7 +170,41 @@ struct MarketView: View {
             .sheet(isPresented: $showNotifications) {
                 NotificationsView(viewModel: viewModel)
             }
+            .onAppear {
+                applyLaunchOverrideIfNeeded()
+            }
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    private func applyLaunchOverrideIfNeeded() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let openArgument = arguments.first(where: { $0.hasPrefix("--argus-open=") }) else {
+            return
+        }
+
+        let openValue = openArgument.replacingOccurrences(of: "--argus-open=", with: "")
+        switch openValue {
+        case "discover":
+            showDiscover = true
+        case "sanctum":
+            guard let symbolArgument = arguments.first(where: { $0.hasPrefix("--argus-symbol=") }) else {
+                return
+            }
+            let symbol = symbolArgument
+                .replacingOccurrences(of: "--argus-symbol=", with: "")
+                .uppercased()
+            guard !symbol.isEmpty else {
+                return
+            }
+            if symbol.hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol) {
+                selectedMarket = .bist
+            } else {
+                selectedMarket = .global
+            }
+            deepLinkManager.selectedStockSymbol = symbol
+        default:
+            break
         }
     }
     
@@ -180,13 +222,13 @@ struct MarketView: View {
         Button(action: { withAnimation { selectedMarket = mode } }) {
             VStack(spacing: 4) {
                 Text(title)
-                    .font(.headline)
+                    .font(InstitutionalTheme.Typography.caption)
                     .fontWeight(selectedMarket == mode ? .bold : .regular)
-                    .foregroundColor(selectedMarket == mode ? .white : .gray)
+                    .foregroundColor(selectedMarket == mode ? InstitutionalTheme.Colors.textPrimary : InstitutionalTheme.Colors.textSecondary)
                 
                 if selectedMarket == mode {
                     Rectangle()
-                        .fill(mode == .global ? Theme.primary : Color.cyan)
+                        .fill(mode == .global ? InstitutionalTheme.Colors.primary : InstitutionalTheme.Colors.warning)
                         .frame(height: 2)
                         .matchedGeometryEffect(id: "TabUnderline", in: animation)
                 } else {
@@ -248,9 +290,8 @@ struct MarketView: View {
                         showAetherDetail = true
                         showDrawer = false
                     },
-                    ArgusDrawerView.DrawerItem(title: "Egitim", subtitle: "Rejim ozeti", icon: "book") {
-                        showEducation = true
-                        showDrawer = false
+                    ArgusDrawerView.DrawerItem(title: "Egitim", subtitle: "Argus akademi", icon: "book") {
+                        openSheet(.academyHub)
                     },
                     ArgusDrawerView.DrawerItem(title: "Global Piyasa", subtitle: "Market degistir", icon: "globe.asia.australia") {
                         selectedMarket = .global
@@ -313,8 +354,8 @@ struct GlobalCockpitView: View {
             // Sadece cache boşsa lazy load yap
             .onAppear { 
                 if viewModel.macroRating == nil { 
-                    Task.detached(priority: .background) {
-                        await MainActor.run { viewModel.loadMacroEnvironment() }
+                    Task(priority: .background) {
+                        viewModel.loadMacroEnvironment(forceRefresh: false)
                     }
                 } 
             }

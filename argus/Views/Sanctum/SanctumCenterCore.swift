@@ -5,7 +5,7 @@ import SwiftUI
 /// Konsey kararlni ve modul secimlerini gosterir.
 struct CenterCoreView: View {
     let symbol: String
-    @ObservedObject var viewModel: TradingViewModel
+    let decision: ArgusGrandDecision?
     @Binding var showDecision: Bool
     
     // Dial Interaction State
@@ -21,13 +21,13 @@ struct CenterCoreView: View {
             // 1. Base Compass Ring (Static)
             ZStack {
                 Circle()
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
                     .frame(width: 220, height: 220)
                 
                 // Ticks (Static)
                 ForEach(0..<12) { i in
                     Rectangle()
-                        .fill(Color.white.opacity(0.1))
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
                         .frame(width: 1, height: 8)
                         .offset(y: -110)
                         .rotationEffect(.degrees(Double(i) * 30))
@@ -38,15 +38,15 @@ struct CenterCoreView: View {
             ZStack {
                 // Ring
                 Circle()
-                    .stroke(Color(hex: "4A90E2").opacity(isDragging ? 0.8 : 0.4), style: StrokeStyle(lineWidth: isDragging ? 3 : 1, dash: []))
+                    .stroke(SanctumTheme.hologramBlue.opacity(isDragging ? 0.8 : 0.4), style: StrokeStyle(lineWidth: isDragging ? 3 : 1, dash: []))
                     .frame(width: 180, height: 180)
                 
                 // The Handle / Notch
                 Circle()
-                    .fill(Color(hex: "4A90E2"))
+                    .fill(SanctumTheme.hologramBlue)
                     .frame(width: 12, height: 12)
                     .offset(y: -90)
-                    .shadow(color: Color(hex: "4A90E2").opacity(0.5), radius: 5)
+                    .shadow(color: SanctumTheme.hologramBlue.opacity(0.5), radius: 5)
                 
                 // Active Sector Indicator (Cone)
                 if isDragging {
@@ -54,7 +54,7 @@ struct CenterCoreView: View {
                         path.move(to: CGPoint(x: 90, y: 90))
                         path.addArc(center: CGPoint(x: 90, y: 90), radius: 90, startAngle: .degrees(-15), endAngle: .degrees(15), clockwise: false)
                     }
-                    .fill(Color(hex: "4A90E2").opacity(0.1))
+                    .fill(SanctumTheme.hologramBlue.opacity(0.1))
                     .frame(width: 180, height: 180)
                     .rotationEffect(.degrees(-90))
                 }
@@ -97,10 +97,10 @@ struct CenterCoreView: View {
             
             // 3. Inner Data Display
             Circle()
-                .fill(Color(hex: "1C1C1E").opacity(0.95))
+                .fill(SanctumTheme.terminalBg.opacity(0.95))
                 .frame(width: 120, height: 120)
                 .overlay(
-                    Circle().stroke(Color.white.opacity(0.1), lineWidth: 1)
+                    Circle().stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
                 )
                 .onTapGesture {
                     if focusedModuleName != nil {
@@ -109,7 +109,9 @@ struct CenterCoreView: View {
                         }
                         impactFeedback.impactOccurred(intensity: 0.5)
                     } else {
-                        showDecision = true
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.84)) {
+                            showDecision.toggle()
+                        }
                         impactFeedback.impactOccurred(intensity: 0.7)
                     }
                 }
@@ -132,9 +134,9 @@ struct CenterCoreView: View {
         VStack(spacing: 4) {
             Text(moduleName)
                 .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(Color(hex: "4A90E2"))
+                .foregroundColor(SanctumTheme.hologramBlue)
             
-            if let decision = viewModel.grandDecisions[symbol] {
+            if let decision {
                 if let bist = decision.bistDetails {
                     viewForBistModule(moduleName: moduleName, bist: bist)
                 } else {
@@ -143,11 +145,11 @@ struct CenterCoreView: View {
             } else {
                 Text("VERI YOK")
                     .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.gray)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
         }
         .padding(8)
-        .background(Color.black.opacity(0.8).cornerRadius(8))
+        .background(SanctumTheme.surface.opacity(0.95).cornerRadius(8))
         .transition(.scale.combined(with: .opacity))
     }
     
@@ -157,35 +159,43 @@ struct CenterCoreView: View {
             Text("KONSEY")
                 .font(.system(size: 8, design: .monospaced))
                 .tracking(2)
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             
-            if let decision = viewModel.grandDecisions[symbol] {
-                Text(decision.action.rawValue)
+            if let decision {
+                let education = decision.educationStage
+                
+                Text(education.badgeText)
                     .font(.system(size: 16, weight: .bold, design: .monospaced))
-                    .foregroundColor(
-                        decision.action == .aggressiveBuy || decision.action == .accumulate ? .green :
-                        (decision.action == .liquidate || decision.action == .trim ? .red : .yellow)
-                    )
+                    .foregroundColor(education.color)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 4)
                     .minimumScaleFactor(0.8)
                 
+                Text(education.title.uppercased())
+                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .minimumScaleFactor(0.8)
+
                 Text("\(Int(decision.confidence * 100))% GUVEN")
                     .font(.system(size: 9, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.8))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
                 
                 if !decision.vetoes.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "xmark.shield")
                             .font(.system(size: 8))
-                        Text(decision.vetoes.first?.module ?? "")
+                        Text("CEKINCE")
                             .font(.system(size: 8, weight: .bold, design: .monospaced))
                     }
-                    .foregroundColor(.red.opacity(0.8))
+                    .foregroundColor(SanctumTheme.crimsonRed.opacity(0.8))
                     .padding(.top, 2)
                 }
             } else {
-                ProgressView().scaleEffect(0.8).tint(.white)
+                Text("KARAR BEKLENIYOR")
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
             }
         }
         .transition(.scale.combined(with: .opacity))
@@ -230,18 +240,26 @@ struct CenterCoreView: View {
     @ViewBuilder
     private func viewForBistModule(moduleName: String, bist: BistDecisionResult) -> some View {
         if let mod = getBistModuleResult(moduleName: moduleName, bist: bist) {
-            Text(mod.action.rawValue)
+            Text(moduleSignalLabel(mod.action))
                  .font(.system(size: 14, weight: .bold, design: .monospaced))
                  .foregroundColor(
-                     mod.action == .buy ? .green :
-                     (mod.action == .sell ? .red : .yellow)
+                     mod.action == .buy  ? SanctumTheme.auroraGreen :
+                     (mod.action == .sell  ? SanctumTheme.crimsonRed : SanctumTheme.titanGold)
                  )
             Text(String(format: "%.0f PUAN", mod.score))
                 .font(.system(size: 8, design: .monospaced))
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         } else {
             Text("--")
                 .font(.system(size: 14, design: .monospaced))
+        }
+    }
+
+    private func moduleSignalLabel(_ action: ProposedAction) -> String {
+        switch action {
+        case .buy: return "OLUMLU"
+        case .sell: return "RISKLI"
+        case .hold: return "NOTR"
         }
     }
     
@@ -269,7 +287,7 @@ struct CenterCoreView: View {
                  .foregroundColor(data.color)
             Text(String(format: "%.0f%% GUVEN", data.confidence * 100))
                 .font(.system(size: 8, design: .monospaced))
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         } else {
             Text("--")
                 .font(.system(size: 14, design: .monospaced))
@@ -278,18 +296,18 @@ struct CenterCoreView: View {
     
     private func getGlobalData(module: String, decision: ArgusGrandDecision) -> (action: String, confidence: Double, color: Color) {
         if module == "ORION" {
-            let col: Color = decision.orionDecision.action == .buy ? .green : (decision.orionDecision.action == .sell ? .red : .yellow)
+            let col: Color = decision.orionDecision.action == .buy  ? SanctumTheme.auroraGreen : (decision.orionDecision.action == .sell  ? SanctumTheme.crimsonRed : SanctumTheme.titanGold)
             return (decision.orionDecision.action.rawValue, decision.orionDecision.netSupport, col)
         } else if module == "ATLAS", let atlas = decision.atlasDecision {
-            let col: Color = atlas.action == .buy ? .green : (atlas.action == .sell ? .red : .yellow)
+            let col: Color = atlas.action == .buy  ? SanctumTheme.auroraGreen : (atlas.action == .sell  ? SanctumTheme.crimsonRed : SanctumTheme.titanGold)
             return (atlas.action.rawValue, atlas.netSupport, col)
         } else if module == "AETHER" {
-            let col: Color = decision.aetherDecision.stance == .riskOn ? .green : (decision.aetherDecision.stance == .riskOff ? .red : .yellow)
+            let col: Color = decision.aetherDecision.stance == .riskOn  ? SanctumTheme.auroraGreen : (decision.aetherDecision.stance == .riskOff  ? SanctumTheme.crimsonRed : SanctumTheme.titanGold)
             return (decision.aetherDecision.stance.rawValue, decision.aetherDecision.netSupport, col)
         } else if module == "HERMES", let hermes = decision.hermesDecision {
-             return (hermes.sentiment.rawValue, hermes.netSupport, .white)
+             return (hermes.sentiment.rawValue, hermes.netSupport, InstitutionalTheme.Colors.textPrimary)
         }
-        return ("--", 0, .gray)
+        return ("--", 0, InstitutionalTheme.Colors.textSecondary)
     }
 
     struct Style {

@@ -81,7 +81,7 @@ extension TradingViewModel {
                 // Start Auto-Pilot Loop (Delayed 3s to reduce network burst)
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
-                    self.startAutoPilotLoop()
+                    AutoPilotStore.shared.startAutoPilotLoop()
                 }
             }
         }

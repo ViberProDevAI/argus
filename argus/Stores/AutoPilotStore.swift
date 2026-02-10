@@ -143,6 +143,20 @@ final class AutoPilotStore: ObservableObject {
                 // Process Buy Signals -> Grand Council -> Executor
                 self.processSignals(signals)
             }
+            let skipLogs = logs.filter { $0.status == "ATLA" || $0.status == "RED" || $0.status == "COOLDOWN" }
+            if !skipLogs.isEmpty {
+                let grouped = Dictionary(grouping: skipLogs, by: { $0.reason })
+                let topReasons = grouped
+                    .map { "\($0.value.count)x \($0.key)" }
+                    .sorted()
+                    .prefix(5)
+                    .joined(separator: " | ")
+                print("🟡 AUTOPILOT-SKIP-SUMMARY: \(topReasons)")
+                
+                for item in skipLogs.prefix(12) {
+                    print("🟡 AUTOPILOT-SKIP-DETAIL: \(item.symbol) -> [\(item.status)] \(item.reason)")
+                }
+            }
         } else {
             print("⚠️ AutoPilotStore: Hiç sinyal veya log yok!")
         }
@@ -170,19 +184,14 @@ final class AutoPilotStore: ObservableObject {
         print("📊 Sinyal detayları: \(signals.map { "\($0.symbol): \($0.action)" })")
         
         Task {
+            var decisionsForExecution: [String: ArgusGrandDecision] = [:]
             var buyCount = 0
             for signal in signals where signal.action == .buy {
                 buyCount += 1
                 ArgusLogger.info(.autopilot, "💡 BUY sinyali bulundu: \(signal.symbol) - \(signal.reason)")
                 
-                // Skip if decision exists
-                if SignalStateViewModel.shared.grandDecisions[signal.symbol] != nil { 
-                    print("⏭️ Mevcut karar var, atlanıyor: \(signal.symbol)")
-                    continue 
-                }
-                
                 // BIST Check
-                if signal.symbol.uppercased().hasSuffix(".IS") {
+                if SymbolResolver.shared.isBistSymbol(signal.symbol) {
                     if !isBistMarketOpen() { continue }
                 }
                 
@@ -196,7 +205,7 @@ final class AutoPilotStore: ObservableObject {
                 
                 // Prepare BIST Input if needed
                 var sirkiyeInput: SirkiyeEngine.SirkiyeInput? = nil
-                if signal.symbol.uppercased().hasSuffix(".IS") {
+                if SymbolResolver.shared.isBistSymbol(signal.symbol) {
                      sirkiyeInput = await prepareSirkiyeInput(macro: macro)
                 }
                 
@@ -215,7 +224,24 @@ final class AutoPilotStore: ObservableObject {
                 )
                 
                 SignalStateViewModel.shared.grandDecisions[signal.symbol] = decision
+                decisionsForExecution[signal.symbol] = decision
                 print("🏛️ AutoPilotStore: Grand Council Decision for \(signal.symbol): \(decision.action.rawValue)")
+            }
+
+            if buyCount == 0 {
+                print("🟡 AutoPilotStore: Bu turda BUY sinyali çıkmadı.")
+            }
+
+            // Açık pozisyonlardaki acil likidasyon kararlarını da yürütücüye taşı
+            let openSymbols = Set(self.portfolioStore.trades.filter { $0.isOpen }.map { $0.symbol })
+            for symbol in openSymbols {
+                if let cachedDecision = SignalStateViewModel.shared.grandDecisions[symbol] {
+                    decisionsForExecution[symbol] = cachedDecision
+                }
+            }
+
+            if decisionsForExecution.isEmpty {
+                print("⚠️ AutoPilotStore: Yürütülecek güncel karar yok (signals/open positions).")
             }
             
              // Execute Decisions (Trade Brain)
@@ -226,7 +252,7 @@ final class AutoPilotStore: ObservableObject {
               var orionScoresMap: [String: OrionScoreResult] = [:]
               var candlesMap: [String: [Candle]] = [:]
               
-              for (symbol, _) in SignalStateViewModel.shared.grandDecisions {
+              for (symbol, _) in decisionsForExecution {
                   if let score = SignalStateViewModel.shared.orionScores[symbol] {
                       orionScoresMap[symbol] = score
                   } else {
@@ -240,7 +266,7 @@ final class AutoPilotStore: ObservableObject {
               }
               
               await TradeBrainExecutor.shared.evaluateDecisions(
-                  decisions: SignalStateViewModel.shared.grandDecisions,
+                  decisions: decisionsForExecution,
                   portfolio: self.portfolioStore.trades,
                   quotes: simpleQuotes,
                   balance: self.portfolioStore.globalBalance,
@@ -278,18 +304,102 @@ final class AutoPilotStore: ObservableObject {
     }
     
     private func isBistMarketOpen() -> Bool {
-        let calendar = Calendar.current
-        let now = Date()
-        let hour = calendar.component(.hour, from: now)
-        // Simple Check: 10:00 - 18:00 TRT (UTC+3) -> 07:00 - 15:00 UTC approximately
-        // Adjust for system time assuming timezone is correct
-        return hour >= 10 && hour < 18
+        MarketStatusService.shared.isBistOpen()
     }
     
     private func checkPlanTriggers() async {
-        // Plan Monitoring Logic (Simplified)
-        // Access TradingViewModel+PlanExecution equivalent
-        // Ideally PlanExecutor should be a service.
+        let openTrades = portfolioStore.trades.filter { $0.isOpen }
+        guard !openTrades.isEmpty else { return }
+
+        let quotes = MarketDataStore.shared.liveQuotes
+        var triggeredCount = 0
+
+        for trade in openTrades {
+            guard let currentPrice = quotes[trade.symbol]?.currentPrice, currentPrice > 0 else {
+                continue
+            }
+
+            let grandDecision = SignalStateViewModel.shared.grandDecisions[trade.symbol]
+            guard let action = PositionPlanStore.shared.checkTriggers(
+                trade: trade,
+                currentPrice: currentPrice,
+                grandDecision: grandDecision
+            ) else {
+                continue
+            }
+
+            triggeredCount += 1
+            PositionPlanStore.shared.markStepCompleted(tradeId: trade.id, stepId: action.id)
+
+            switch action.action {
+            case .sellAll:
+                _ = portfolioStore.sell(
+                    tradeId: trade.id,
+                    currentPrice: currentPrice,
+                    reason: "PLAN_SELL_ALL: \(action.description)"
+                )
+                PositionPlanStore.shared.completePlan(tradeId: trade.id)
+
+            case .sellPercent(let percent):
+                let clampedPercent = max(1, min(percent, 100))
+                if clampedPercent >= 100 {
+                    _ = portfolioStore.sell(
+                        tradeId: trade.id,
+                        currentPrice: currentPrice,
+                        reason: "PLAN_SELL_100: \(action.description)"
+                    )
+                    PositionPlanStore.shared.completePlan(tradeId: trade.id)
+                } else {
+                    _ = portfolioStore.trim(
+                        tradeId: trade.id,
+                        percentage: clampedPercent,
+                        currentPrice: currentPrice,
+                        reason: "PLAN_TRIM_\(Int(clampedPercent)): \(action.description)"
+                    )
+                }
+
+            case .reduceAndHold(let percent):
+                let clampedPercent = max(1, min(percent, 100))
+                if clampedPercent >= 100 {
+                    _ = portfolioStore.sell(
+                        tradeId: trade.id,
+                        currentPrice: currentPrice,
+                        reason: "PLAN_REDUCE_100: \(action.description)"
+                    )
+                    PositionPlanStore.shared.completePlan(tradeId: trade.id)
+                } else {
+                    _ = portfolioStore.trim(
+                        tradeId: trade.id,
+                        percentage: clampedPercent,
+                        currentPrice: currentPrice,
+                        reason: "PLAN_REDUCE_\(Int(clampedPercent)): \(action.description)"
+                    )
+                }
+
+            case .alert(let message):
+                let alert = TradeBrainAlert(
+                    type: .planTriggered,
+                    symbol: trade.symbol,
+                    message: message,
+                    actionDescription: action.description,
+                    priority: .medium
+                )
+                NotificationCenter.default.post(
+                    name: .tradeBrainAlert,
+                    object: nil,
+                    userInfo: ["alert": alert]
+                )
+
+            case .moveStopTo(_), .moveStopByPercent(_), .activateTrailingStop(_), .setBreakeven, .addPercent(_), .addFixed(_), .reevaluate, .doNothing:
+                // Bu aksiyonlar için Store tarafında güvenli mutasyon API'si eksik.
+                // Şimdilik adım işaretlenir, yalnızca bilgilendirme logu bırakılır.
+                print("ℹ️ AutoPilotStore: Plan aksiyonu loglandı, icra edilmedi -> \(trade.symbol): \(action.description)")
+            }
+        }
+
+        if triggeredCount > 0 {
+            print("🧠 AutoPilotStore: \(triggeredCount) plan tetikleyicisi işlendi.")
+        }
     }
     
     // MARK: - Passive Scanner

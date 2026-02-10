@@ -20,9 +20,9 @@ struct SirkiyeDashboardView: View {
     
     var statusIndicator: (color: Color, text: String) {
         if viewModel.bistAtmosphere != nil {
-            return (.green, "Canlı Veri")
+            return (InstitutionalTheme.Colors.positive, "Canlı Veri")
         } else {
-            return (.orange, "Güncelleniyor...")
+            return (InstitutionalTheme.Colors.warning, "Güncelleniyor...")
         }
     }
     
@@ -42,7 +42,7 @@ struct SirkiyeDashboardView: View {
     }
     
     var xu100ChangeColor: Color {
-        return xu100Change >= 0 ? Theme.positive : Theme.negative
+        return xu100Change >= 0 ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative
     }
     
     var body: some View {
@@ -114,8 +114,12 @@ struct SirkiyeDashboardView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(Theme.secondaryBackground)
-                    .shadow(color: Color.black.opacity(0.2), radius: 5, x: 0, y: 2)
+                    .fill(InstitutionalTheme.Colors.surface2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.18), radius: 6, x: 0, y: 3)
             )
             .padding(.horizontal, 16)
         }
@@ -130,7 +134,9 @@ struct SirkiyeDashboardView: View {
             }
         }
         .sheet(isPresented: $showDetails) {
-            SirkiyeDetailsSheet(viewModel: viewModel)
+            NavigationStack {
+                SirkiyeAetherView()
+            }
         }
     }
     
@@ -151,21 +157,21 @@ struct SirkiyeDashboardView: View {
     
     private var modeColors: [Color] {
         switch atmosphere.mode {
-        case .panic: return [.red, .orange]
-        case .extremeFear: return [.red, .pink]
-        case .fear: return [.orange, .yellow]
-        case .neutral: return [.cyan, .purple]
-        case .greed: return [.green, .cyan]
-        case .extremeGreed: return [.green, .yellow]
-        case .complacency: return [.purple, .gray]
+        case .panic: return [InstitutionalTheme.Colors.negative, InstitutionalTheme.Colors.warning]
+        case .extremeFear: return [InstitutionalTheme.Colors.negative, InstitutionalTheme.Colors.textSecondary]
+        case .fear: return [InstitutionalTheme.Colors.warning, InstitutionalTheme.Colors.textSecondary]
+        case .neutral: return [InstitutionalTheme.Colors.primary, InstitutionalTheme.Colors.textSecondary]
+        case .greed: return [InstitutionalTheme.Colors.positive, InstitutionalTheme.Colors.primary]
+        case .extremeGreed: return [InstitutionalTheme.Colors.positive, InstitutionalTheme.Colors.warning]
+        case .complacency: return [InstitutionalTheme.Colors.textSecondary, InstitutionalTheme.Colors.textTertiary]
         }
     }
     
     private var scoreColor: Color {
-        if atmosphere.score >= 70 { return .green }
-        else if atmosphere.score >= 50 { return .cyan }
-        else if atmosphere.score >= 30 { return .orange }
-        else { return .red }
+        if atmosphere.score >= 70 { return InstitutionalTheme.Colors.positive }
+        else if atmosphere.score >= 50 { return InstitutionalTheme.Colors.primary }
+        else if atmosphere.score >= 30 { return InstitutionalTheme.Colors.warning }
+        else { return InstitutionalTheme.Colors.negative }
     }
     
     private var modeDisplayText: String {

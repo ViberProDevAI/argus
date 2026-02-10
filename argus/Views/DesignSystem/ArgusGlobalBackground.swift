@@ -8,7 +8,7 @@ struct ArgusGlobalBackground: View {
     var body: some View {
         ZStack {
             // 1. Void Base
-            Theme.background
+            InstitutionalTheme.Colors.background
                 .ignoresSafeArea()
             
             // 2. Deep Nebula (Slow Spinning)
@@ -18,7 +18,7 @@ struct ArgusGlobalBackground: View {
                 ZStack {
                     // Blue Nebula
                     Circle()
-                        .fill(Theme.accent.opacity(0.1))
+                        .fill(InstitutionalTheme.Colors.primary.opacity(0.1))
                         .frame(width: size.width * 1.5, height: size.width * 1.5)
                         .blur(radius: 80)
                         .offset(x: -size.width * 0.4, y: -size.height * 0.3)
@@ -26,7 +26,7 @@ struct ArgusGlobalBackground: View {
                     
                     // Gold Nebula (Argus Eye)
                     Circle()
-                        .fill(Theme.primary.opacity(0.05))
+                        .fill(InstitutionalTheme.Colors.warning.opacity(0.05))
                         .frame(width: size.width * 1.2, height: size.width * 1.2)
                         .blur(radius: 60)
                         .offset(x: size.width * 0.4, y: size.height * 0.4)

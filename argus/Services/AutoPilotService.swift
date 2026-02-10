@@ -91,7 +91,7 @@ final class AutoPilotService: Sendable {
                 for symbol in batch {
                     group.addTask {
                         // 1. Determine Correct Context
-                        let isBist = symbol.uppercased().hasSuffix(".IS")
+                        let isBist = SymbolResolver.shared.isBistSymbol(symbol)
                         let effectiveBuyingPower = isBist ? bistBuyingPower : buyingPower
                         let effectiveEquity = isBist ? bistEquity : equity
                         

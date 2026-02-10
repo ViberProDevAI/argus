@@ -81,31 +81,31 @@ struct TradeValidator {
         isBistMarketOpen: Bool,
         isGlobalMarketOpen: Bool
     ) -> TradeValidationResult {
-        
+
         // 1. Symbol validation
         if let error = validateSymbol(symbol) {
             return .failure(error)
         }
-        
+
         // 2. Quantity validation
         if let error = validateQuantity(quantity) {
             return .failure(error)
         }
-        
+
         // 3. Price validation
         if let p = price, p <= 0 {
             return .failure(.invalidPrice(p))
         }
-        
+
         // 4. Market status check
-        let isBist = symbol.uppercased().hasSuffix(".IS")
+        let isBist = SymbolResolver.shared.isBistSymbol(symbol)
         if isBist && !isBistMarketOpen {
             return .failure(.marketClosed("BIST"))
         }
         if !isBist && !isGlobalMarketOpen {
             return .failure(.marketClosed("Global"))
         }
-        
+
         // 5. Balance check
         if let actualPrice = price {
             let totalCost = quantity * actualPrice * 1.002 // Include estimated fees
@@ -113,7 +113,7 @@ struct TradeValidator {
                 return .failure(.insufficientBalance(required: totalCost, available: availableBalance))
             }
         }
-        
+
         return .success
     }
     
@@ -125,31 +125,31 @@ struct TradeValidator {
         isBistMarketOpen: Bool,
         isGlobalMarketOpen: Bool
     ) -> TradeValidationResult {
-        
+
         // 1. Symbol validation
         if let error = validateSymbol(symbol) {
             return .failure(error)
         }
-        
+
         // 2. Quantity validation
         if let error = validateQuantity(quantity) {
             return .failure(error)
         }
-        
+
         // 3. Market status check
-        let isBist = symbol.uppercased().hasSuffix(".IS")
+        let isBist = SymbolResolver.shared.isBistSymbol(symbol)
         if isBist && !isBistMarketOpen {
             return .failure(.marketClosed("BIST"))
         }
         if !isBist && !isGlobalMarketOpen {
             return .failure(.marketClosed("Global"))
         }
-        
+
         // 4. Position check
         if quantity > ownedQuantity {
             return .failure(.insufficientPosition(owned: ownedQuantity, requested: quantity))
         }
-        
+
         return .success
     }
     

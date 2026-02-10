@@ -269,6 +269,8 @@ enum RadarModule: String, CaseIterable {
         case .atlas: return "AtlasIcon"
         case .aether: return "AetherIcon"
         case .hermes: return "HermesIcon"
+        case .athena: return "AthenaIcon"
+        case .demeter: return "DemeterIcon"
         default: return nil
         }
     }
