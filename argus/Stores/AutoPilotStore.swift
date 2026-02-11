@@ -287,19 +287,37 @@ final class AutoPilotStore: ObservableObject {
     private func prepareSirkiyeInput(macro: MacroSnapshot) async -> SirkiyeEngine.SirkiyeInput? {
         let quotes = MarketDataStore.shared.liveQuotes
         guard let usdQuote = quotes["USD/TRY"] else { return nil }
-        
+
+        // BorsaPy'den canlı makro verileri paralel çek
+        async let brentTask = { try? await BorsaPyProvider.shared.getBrentPrice() }()
+        async let inflationTask = { try? await BorsaPyProvider.shared.getInflationData() }()
+        async let policyRateTask = { try? await BorsaPyProvider.shared.getPolicyRate() }()
+        async let xu100Task = { try? await BorsaPyProvider.shared.getXU100() }()
+        async let goldTask = { try? await BorsaPyProvider.shared.getGoldPrice() }()
+
+        let (brent, inflation, policyRate, xu100, gold) = await (brentTask, inflationTask, policyRateTask, xu100Task, goldTask)
+
+        var xu100Change: Double? = nil
+        var xu100Value: Double? = nil
+        if let xu = xu100 {
+            xu100Value = xu.last
+            if xu.open > 0 {
+                xu100Change = ((xu.last - xu.open) / xu.open) * 100
+            }
+        }
+
         return SirkiyeEngine.SirkiyeInput(
             usdTry: usdQuote.currentPrice,
             usdTryPrevious: usdQuote.previousClose ?? usdQuote.currentPrice,
-            dxy: 104.0,
-            brentOil: 80.0,
+            dxy: macro.dxy,
+            brentOil: brent?.last ?? macro.brent,
             globalVix: macro.vix,
             newsSnapshot: nil,
-            currentInflation: 45.0,
-            policyRate: 50.0,
-            xu100Change: nil,
-            xu100Value: nil,
-            goldPrice: nil
+            currentInflation: inflation?.yearlyInflation ?? 45.0,
+            policyRate: policyRate ?? 50.0,
+            xu100Change: xu100Change,
+            xu100Value: xu100Value,
+            goldPrice: gold?.last
         )
     }
     

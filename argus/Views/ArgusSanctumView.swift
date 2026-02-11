@@ -819,9 +819,8 @@ struct HoloPanelView: View {
             
         case .aether:
             if symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol) {
-                // SİRKİYE (BIST)
-                SirkiyeDashboardView(viewModel: viewModel)
-                    .padding(.vertical, 8)
+                // REJİM MERKEZİ (BIST) - Piyasa Rejimi + Makro + Teknik + Sektör
+                RejimView(symbol: symbol)
             } else {
                 // AETHER (Global)
                 VStack(alignment: .leading, spacing: 16) {
@@ -890,208 +889,174 @@ struct HoloPanelView: View {
             }
             
         case .hermes:
-            VStack(alignment: .leading, spacing: 16) {
-                let isBist = symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol)
-                if isBist {
-                    BISTSentimentPulseCard(symbol: symbol)
-                } else {
-                    SentimentPulseCard(symbol: symbol)
-                }
-                
-                // BIST: Analist Konsensüsü
-                if isBist {
-                    HermesAnalystCard(symbol: symbol, currentPrice: viewModel.quotes[symbol]?.currentPrice ?? 0)
-                }
-                
-                // NEW: Global Module Detail Card
-                if let grandDecision = viewModel.grandDecisions[symbol],
-                   let hermesDecision = grandDecision.hermesDecision {
-                    // Convert HermesDecision to CouncilDecision
-                    let councilDecision = CouncilDecision(
-                        symbol: symbol,
-                        action: .hold, // Hermes is sentiment based
-                        netSupport: hermesDecision.netSupport,
-                        approveWeight: 0,
-                        vetoWeight: 0,
-                        isStrongSignal: hermesDecision.isHighImpact,
-                        isWeakSignal: !hermesDecision.isHighImpact && hermesDecision.netSupport > 0.3,
-                        winningProposal: CouncilProposal(
-                            proposer: "Hermes",
-                            proposerName: "Hermes Habercisi",
-                            action: .hold,
-                            confidence: 1.0,
-                            reasoning: "Duygu Durumu: \(hermesDecision.sentiment.displayTitle)\nEtki: \(hermesDecision.isHighImpact ? "YÜKSEK" : "Normal")",
-                            entryPrice: nil,
-                            stopLoss: nil,
-                            target: nil
-                        ),
-                        allProposals: [],
-                        votes: [],
-                        vetoReasons: [],
-                        timestamp: Date()
-                    )
-                    
-                    GlobalModuleDetailCard(
-                        moduleName: "Hermes",
-                        decision: councilDecision,
-                        moduleColor: SanctumTheme.hermesColor,
-                        moduleIcon: "gavel.fill"
-                    )
-                } else {
-                    // No Decision Yet - Show Hermes Intro Card
-                    VStack(alignment: .leading, spacing: 12) {
-                        // Header
+            if symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol) {
+                // KULİS MERKEZİ (BIST) - Duygu Barometresi + Analist + KAP + Temettü
+                VStack(spacing: 16) {
+                    // 1. Piyasa Duygu Barometresi
+                    DuyguBarometresiCard(symbol: symbol)
+
+                    // 2. Analist Konsensüsü (eğitim notlu)
+                    AnalistEgitimWrapper(symbol: symbol)
+
+                    // 3. KAP Bildirimleri (eğitim notlu)
+                    KAPEgitimWrapper(symbol: symbol)
+
+                    // 4. Temettü & Sermaye (eğitim notlu)
+                    TemettuEgitimWrapper(symbol: symbol)
+
+                    // Haberleri Tara Butonu
+                    Button(action: {
+                        Task { await vm.analyzeOnDemand() }
+                    }) {
                         HStack {
-                            Image(systemName: "bubble.left.and.bubble.right.fill")
-                                .foregroundColor(SanctumTheme.hermesColor)
-                            Text("Hermes Kulak Kesidi")
-                                .font(.headline)
-                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                            if vm.isLoadingNews {
+                                ProgressView()
+                                    .tint(InstitutionalTheme.Colors.textPrimary)
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "sparkles")
+                            }
+                            Text(vm.isLoadingNews ? "Analiz Ediliyor..." : "Haberleri Tara")
+                                .font(.caption)
+                                .bold()
                         }
-                        
-                        // Description
-                        Text("Hermes, finansal haberleri ve piyasa dedikodularını analiz ederek hisse senedinin medyadaki algısını değerlendirir.")
-                            .font(.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        
-                        Divider().background(InstitutionalTheme.Colors.borderSubtle)
-                        
-                        // Dynamic Tips
-                        VStack(alignment: .leading, spacing: 8) {
-                            HermesInfoRow(icon: "newspaper.fill", text: "Haberleri taramak için aşağıdaki butonu kullanın")
-                            HermesInfoRow(icon: "chart.line.uptrend.xyaxis", text: "Olumlu haberler fiyat yükselişini destekleyebilir")
-                            HermesInfoRow(icon: "exclamationmark.triangle", text: "Olumsuz haberler risk oluşturabilir")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(SanctumTheme.titanGold.opacity(0.3))
+                        .cornerRadius(10)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    }
+                    .disabled(vm.isLoadingNews)
+
+                    // Disclaimer
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 10))
+                            .foregroundColor(InstitutionalTheme.Colors.warning)
+                        Text("Eğitim amaçlıdır, yatırım tavsiyesi değildir.")
+                            .font(.system(size: 10))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    }
+                    .padding(.vertical, 8)
+                }
+            } else {
+                // GLOBAL Hermes - eski görünüm koru
+                VStack(alignment: .leading, spacing: 16) {
+                    SentimentPulseCard(symbol: symbol)
+
+                    // Global Module Detail Card
+                    if let grandDecision = viewModel.grandDecisions[symbol],
+                       let hermesDecision = grandDecision.hermesDecision {
+                        let councilDecision = CouncilDecision(
+                            symbol: symbol,
+                            action: .hold,
+                            netSupport: hermesDecision.netSupport,
+                            approveWeight: 0,
+                            vetoWeight: 0,
+                            isStrongSignal: hermesDecision.isHighImpact,
+                            isWeakSignal: !hermesDecision.isHighImpact && hermesDecision.netSupport > 0.3,
+                            winningProposal: CouncilProposal(
+                                proposer: "Hermes",
+                                proposerName: "Hermes Habercisi",
+                                action: .hold,
+                                confidence: 1.0,
+                                reasoning: "Duygu Durumu: \(hermesDecision.sentiment.displayTitle)\nEtki: \(hermesDecision.isHighImpact ? "YÜKSEK" : "Normal")",
+                                entryPrice: nil,
+                                stopLoss: nil,
+                                target: nil
+                            ),
+                            allProposals: [],
+                            votes: [],
+                            vetoReasons: [],
+                            timestamp: Date()
+                        )
+
+                        GlobalModuleDetailCard(
+                            moduleName: "Hermes",
+                            decision: councilDecision,
+                            moduleColor: SanctumTheme.hermesColor,
+                            moduleIcon: "gavel.fill"
+                        )
+                    }
+
+                    // Manual Analysis Button
+                    Button(action: {
+                        Task { await vm.analyzeOnDemand() }
+                    }) {
+                        HStack {
+                            if vm.isLoadingNews {
+                                ProgressView()
+                                    .tint(InstitutionalTheme.Colors.textPrimary)
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "sparkles")
+                            }
+                            Text(vm.isLoadingNews ? "Analiz Ediliyor..." : "Haberleri Tara")
+                                .font(.caption)
+                                .bold()
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(SanctumTheme.titanGold.opacity(0.3))
+                        .cornerRadius(10)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     }
-                    .padding()
-                    .background(SanctumTheme.hermesColor.opacity(0.1))
-                    .cornerRadius(12)
-                }
-                
-                // Manual Analysis Button (Uses SanctumViewModel)
-                Button(action: {
-                    Task {
-                        await vm.analyzeOnDemand()
+                    .disabled(vm.isLoadingNews)
+
+                    if let error = vm.newsErrorMessage {
+                        Text(error)
+                            .font(.caption2)
+                            .foregroundColor(SanctumTheme.crimsonRed)
+                            .padding(.horizontal)
                     }
-                }) {
-                    HStack {
-                        if vm.isLoadingNews {
-                            ProgressView()
-                                .tint(InstitutionalTheme.Colors.textPrimary)
-                                .scaleEffect(0.8)
-                        } else {
-                            Image(systemName: "sparkles")
-                        }
-                        Text(vm.isLoadingNews ? "Analiz Ediliyor..." : "Haberleri Tara")
-                            .font(.caption)
-                            .bold()
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(SanctumTheme.titanGold.opacity(0.3))
-                    .cornerRadius(10)
-                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                }
-                .disabled(vm.isLoadingNews)
 
-                // Error Message
-                if let error = vm.newsErrorMessage {
-                    Text(error)
-                        .font(.caption2)
-                        .foregroundColor(SanctumTheme.crimsonRed)
-                        .padding(.horizontal)
-                }
-
-                // News Insights (From SanctumViewModel - reactive binding)
-                if !vm.newsInsights.isEmpty {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Haber Analizi")
-                            .font(.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-
-                        ForEach(Array(vm.newsInsights.prefix(5))) { insight in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(insight.headline)
-                                    .font(.caption)
-                                    .bold()
-                                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                                    .lineLimit(2)
-
-                                Text(insight.impactSentenceTR)
-                                    .font(.caption2)
-                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                                    .lineLimit(3)
-
-                                HStack {
-                                    // Sentiment Badge
-                                    Text(insight.sentiment.rawValue)
-                                        .font(.caption2)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(
-                                            (insight.sentiment == .strongPositive || insight.sentiment == .weakPositive) ? SanctumTheme.auroraGreen.opacity(0.3) :
-                                            ((insight.sentiment == .strongNegative || insight.sentiment == .weakNegative) ? SanctumTheme.crimsonRed.opacity(0.3) : InstitutionalTheme.Colors.textSecondary.opacity(0.3))
-                                        )
-                                        .cornerRadius(4)
+                    if !vm.newsInsights.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Haber Analizi")
+                                .font(.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            ForEach(Array(vm.newsInsights.prefix(5))) { insight in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(insight.headline)
+                                        .font(.caption).bold()
                                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-
-                                    // Impact Score
-                                    Text("Etki: \(Int(insight.impactScore))")
-                                        .font(.caption2)
-                                        .foregroundColor(
-                                            insight.impactScore > 60 ? SanctumTheme.auroraGreen :
-                                            (insight.impactScore < 40 ? SanctumTheme.crimsonRed : InstitutionalTheme.Colors.textSecondary)
-                                        )
-
-                                    Spacer()
-
-                                    // Time
-                                    Text(insight.createdAt, style: .relative)
+                                        .lineLimit(2)
+                                    Text(insight.impactSentenceTR)
                                         .font(.caption2)
                                         .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                                        .lineLimit(3)
                                 }
+                                .padding()
+                                .background(InstitutionalTheme.Colors.surface2)
+                                .cornerRadius(10)
                             }
-                            .padding()
-                            .background(InstitutionalTheme.Colors.surface2)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
-                            )
-                            .cornerRadius(10)
                         }
-                    }
-                } else if !vm.hermesEvents.isEmpty || !vm.kulisEvents.isEmpty {
-                    // Show Hermes Events if available
-                    let events = isBist ? vm.kulisEvents : vm.hermesEvents
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(isBist ? "Kulis Analizleri" : "Hermes Analizleri")
-                            .font(.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-
-                        ForEach(Array(events.prefix(5))) { event in
-                            HermesEventTeachingCard(
-                                viewModel: viewModel,
-                                symbol: symbol,
-                                scope: isBist ? .bist : .global,
-                                injectedEvent: event
-                            )
+                    } else if !vm.hermesEvents.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Hermes Analizleri")
+                                .font(.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            ForEach(Array(vm.hermesEvents.prefix(5))) { event in
+                                HermesEventTeachingCard(
+                                    viewModel: viewModel,
+                                    symbol: symbol,
+                                    scope: .global,
+                                    injectedEvent: event
+                                )
+                            }
                         }
+                    } else {
+                        VStack(spacing: 12) {
+                            Image(systemName: "newspaper")
+                                .font(.title)
+                                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                            Text("Henüz haber analizi yok")
+                                .font(.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
                     }
-                } else {
-                    VStack(spacing: 12) {
-                        Image(systemName: "newspaper")
-                            .font(.title)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                        Text("Henüz haber analizi yok")
-                            .font(.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        Text("Yukarıdaki butona tıklayarak haber taraması başlatın")
-                            .font(.caption2)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                            .multilineTextAlignment(.center)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
                 }
             }
             
@@ -1853,21 +1818,39 @@ struct BistHoloPanelView: View {
         // TCMB'den gerçek makro veriler
         let tcmbSnapshot = await TCMBDataService.shared.getMacroSnapshot()
         
+        // BorsaPy'den canlı makro verileri paralel çek
+        async let brentTask = { try? await BorsaPyProvider.shared.getBrentPrice() }()
+        async let inflationTask = { try? await BorsaPyProvider.shared.getInflationData() }()
+        async let policyRateTask = { try? await BorsaPyProvider.shared.getPolicyRate() }()
+        async let xu100Task = { try? await BorsaPyProvider.shared.getXU100() }()
+        async let goldTask = { try? await BorsaPyProvider.shared.getGoldPrice() }()
+
+        let (bpBrent, bpInflation, bpPolicyRate, bpXu100, bpGold) = await (brentTask, inflationTask, policyRateTask, xu100Task, goldTask)
+
+        var xu100Change: Double? = nil
+        var xu100Value: Double? = nil
+        if let xu = bpXu100 {
+            xu100Value = xu.last
+            if xu.open > 0 {
+                xu100Change = ((xu.last - xu.open) / xu.open) * 100
+            }
+        }
+
+        let macro = await MacroSnapshotService.shared.getSnapshot()
         let sirkiyeInput = SirkiyeEngine.SirkiyeInput(
             usdTry: usdTry,
             usdTryPrevious: usdTryPrev,
-            dxy: 104.0, // DXY için ayrı kaynak gerekli
-            brentOil: tcmbSnapshot.brentOil ?? 80.0,
-            globalVix: 15.0, // VIX için ayrı kaynak gerekli
+            dxy: macro.dxy,
+            brentOil: bpBrent?.last ?? tcmbSnapshot.brentOil ?? 80.0,
+            globalVix: macro.vix ?? 15.0,
             newsSnapshot: nil,
-            currentInflation: tcmbSnapshot.inflation ?? 45.0,
-            policyRate: tcmbSnapshot.policyRate ?? 50.0,
-            xu100Change: nil,
-            xu100Value: nil,
-            goldPrice: tcmbSnapshot.goldPrice
+            currentInflation: bpInflation?.yearlyInflation ?? tcmbSnapshot.inflation ?? 45.0,
+            policyRate: bpPolicyRate ?? tcmbSnapshot.policyRate ?? 50.0,
+            xu100Change: xu100Change,
+            xu100Value: xu100Value,
+            goldPrice: bpGold?.last ?? tcmbSnapshot.goldPrice
         )
-        
-        let macro = await MacroSnapshotService.shared.getSnapshot()
+
         let decision = await ArgusGrandCouncil.shared.convene(
             symbol: symbol,
             candles: candleList,
@@ -1920,44 +1903,51 @@ struct BistHoloPanelView: View {
             }
 
         case .rejim:
-            // REJİM MERKEZİ: Makro Pano + Sirkiye + Oracle + Sektör
-            VStack(spacing: 24) {
-                // DEBUGl
-                Text("V4 BIST INTEGRATION ACTIVE")
-                    .font(.caption.bold())
-                    .foregroundColor(.red)
-                    .padding(4)
-                    .background(Color.white)
-                
-                // 1. Türkiye Makro Özet Panosu (TCMB + borsapy fallback)
-                BistMacroSummaryCard()
-                
-                Divider().background(SanctumTheme.hologramBlue.opacity(0.3))
-                
-                // 2. Sirkiye (Makro Rüzgar)
-                SirkiyeDashboardView(viewModel: viewModel)
-                
-                Divider().background(SanctumTheme.hologramBlue.opacity(0.3))
-                
-                // 3. Oracle (Gelecek Sinyalleri)
-                OracleChamberEmbeddedView()
-                    .frame(height: 300)
-                
-                Divider().background(SanctumTheme.hologramBlue.opacity(0.3))
-                
-                // 4. Sektör
-                BistSektorCard()
-            }
+            // REJİM MERKEZİ: Piyasa Rejimi + Makro Göstergeler + Teknik Konsensüs + Sektör
+            RejimView(symbol: symbol)
             
         case .kulis:
-            // KULİS MERKEZİ: Haberler, Sentiment ve KAP
-             VStack(spacing: 16) {
-                // 1. Piyasa Duygu Analizi
-                BISTSentimentPulseCard(symbol: symbol)
-                // 2. Analist Görüşleri
-                HermesAnalystCard(symbol: symbol, currentPrice: viewModel.quotes[symbol]?.currentPrice ?? 0)
-                // 3. KAP Bildirimleri (borsapy)
-                KulisKAPCard(symbol: symbol)
+            // KULİS MERKEZİ: Duygu Barometresi + Analist + KAP + Temettü
+            VStack(spacing: 16) {
+                // Section Header
+                HStack(spacing: 10) {
+                    Image(systemName: "newspaper.fill")
+                        .font(.system(size: 14))
+                        .foregroundColor(SanctumTheme.hermesColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("KULİS MERKEZİ")
+                            .font(InstitutionalTheme.Typography.micro)
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                        Text("Haber, Analist & Duygu Analizi")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+
+                // 1. Piyasa Duygu Barometresi
+                DuyguBarometresiCard(symbol: symbol)
+
+                // 2. Analist Konsensüsü (eğitim notlu)
+                AnalistEgitimWrapper(symbol: symbol)
+
+                // 3. KAP Bildirimleri (eğitim notlu)
+                KAPEgitimWrapper(symbol: symbol)
+
+                // 4. Temettü & Sermaye (eğitim notlu)
+                TemettuEgitimWrapper(symbol: symbol)
+
+                // Disclaimer
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 10))
+                        .foregroundColor(InstitutionalTheme.Colors.warning)
+                    Text("Eğitim amaçlıdır, yatırım tavsiyesi değildir.")
+                        .font(.system(size: 10))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                }
+                .padding(.vertical, 8)
             }
 
         case .oracle:

@@ -163,7 +163,7 @@ enum BorsaPyError: Error, LocalizedError {
         case .invalidResponse: return "Geçersiz yanıt"
         case .missingApiKey: return "API anahtarı eksik"
         case .dataUnavailable: return "Veri bulunamadı"
-        case .backendUnavailable: return "Borsapy backend erişilemez"
+        case .backendUnavailable: return "BorsaPy backend erişilemez"
         default: return "Bir hata oluştu"
         }
     }
@@ -181,16 +181,25 @@ actor BorsaPyProvider {
     static let shared = BorsaPyProvider()
     
     // MARK: - Backend Config
-    private let backendBaseURL: String
+    nonisolated private static let infoPlistBackendURLKey = "BORSAPY_URL"
+    nonisolated private static let fallbackBaseURLs: [String] = [
+        "http://localhost:8899",
+        "http://127.0.0.1:8899",
+        "http://localhost:8899",
+        "http://localhost:8899"
+    ]
     
     // Cache
     private var quoteCache: [String: (quote: BistQuote, timestamp: Date)] = [:]
     private let cacheTTL: TimeInterval = 120
     
+    private var preferredBackendBaseURL: String?
+    private var blockedBackendsUntil: [String: Date] = [:]
+    private let backendCooldownSeconds: TimeInterval = 30
+    private let requestTimeoutSeconds: TimeInterval = 8
+    
     private init() {
-        // Configurable via environment or default
-        self.backendBaseURL = ProcessInfo.processInfo.environment["BORSAPY_URL"]
-            ?? "http://localhost:8899"
+        // no-op
     }
     
     // MARK: - Public API: Quote
@@ -401,14 +410,82 @@ actor BorsaPyProvider {
         )
     }
     
-    // MARK: - NEW: Inflation
-    
+    // MARK: - Enflasyon (Typed)
+
+    /// Güncel TÜFE enflasyon verisi (yıllık + aylık)
+    func getInflationData() async throws -> BistInflationData {
+        let json = try await fetchJSON(path: "/inflation")
+        guard let yearly = json["yearly_inflation"] as? Double,
+              let monthly = json["monthly_inflation"] as? Double else {
+            throw BorsaPyError.decodingError
+        }
+        return BistInflationData(
+            date: json["date"] as? String ?? "",
+            yearlyInflation: yearly,
+            monthlyInflation: monthly,
+            type: json["type"] as? String ?? "TUFE"
+        )
+    }
+
+    /// Eski untyped versiyon (geriye uyumluluk)
     func getInflation() async throws -> [String: Any] {
         return try await fetchJSON(path: "/inflation")
     }
-    
-    // MARK: - NEW: Bond Yields
-    
+
+    // MARK: - TCMB Politika Faizi
+
+    /// Merkez Bankası güncel politika faiz oranı
+    func getPolicyRate() async throws -> Double {
+        let json = try await fetchJSON(path: "/tcmb/policy-rate")
+        guard let rate = json["rate"] as? Double else {
+            throw BorsaPyError.decodingError
+        }
+        return rate
+    }
+
+    // MARK: - Teknik Sinyaller (TradingView)
+
+    /// 28 teknik göstergenin toplu sinyal analizi
+    func getTechnicalSignals(symbol: String, timeframe: String = "1d") async throws -> BistTechnicalSignals {
+        let clean = cleanSymbol(symbol)
+        let json = try await fetchJSON(path: "/ticker/\(clean)/ta-signals?timeframe=\(timeframe)")
+
+        // Summary
+        let summaryDict = json["summary"] as? [String: Any] ?? [:]
+        let summary = TASummary(
+            recommendation: summaryDict["recommendation"] as? String ?? "NEUTRAL",
+            buy: summaryDict["buy"] as? Int ?? 0,
+            sell: summaryDict["sell"] as? Int ?? 0,
+            neutral: summaryDict["neutral"] as? Int ?? 0
+        )
+
+        // Oscillators & Moving Averages
+        func parseGroup(_ key: String) -> TAIndicatorGroup {
+            let groupDict = json[key] as? [String: Any] ?? [:]
+            let rec = groupDict["recommendation"] as? String ?? "NEUTRAL"
+            let valuesDict = groupDict["values"] as? [String: [String: Any]] ?? [:]
+            var values: [String: TAIndicatorValue] = [:]
+            for (name, vDict) in valuesDict {
+                values[name] = TAIndicatorValue(
+                    value: vDict["value"] as? Double,
+                    signal: vDict["signal"] as? String ?? "NEUTRAL"
+                )
+            }
+            return TAIndicatorGroup(recommendation: rec, values: values)
+        }
+
+        return BistTechnicalSignals(
+            symbol: clean,
+            timeframe: timeframe,
+            summary: summary,
+            oscillators: parseGroup("oscillators"),
+            movingAverages: parseGroup("movingAverages"),
+            timestamp: json["timestamp"] as? String ?? ""
+        )
+    }
+
+    // MARK: - Tahvil Faizleri
+
     func getBondYields() async throws -> [[String: Any]] {
         let json = try await fetchJSON(path: "/bond")
         return json["yields"] as? [[String: Any]] ?? []
@@ -451,13 +528,42 @@ actor BorsaPyProvider {
     // MARK: - Internal: HTTP Client
     
     private func fetchJSON(path: String) async throws -> [String: Any] {
-        let urlString = backendBaseURL + path
+        let candidates = await activeBackendCandidates()
+        guard !candidates.isEmpty else {
+            throw BorsaPyError.backendUnavailable
+        }
+        
+        var lastError: Error = BorsaPyError.backendUnavailable
+        for baseURL in candidates {
+            do {
+                let json = try await requestJSON(baseURL: baseURL, path: path)
+                preferredBackendBaseURL = baseURL
+                blockedBackendsUntil.removeValue(forKey: baseURL)
+                return json
+            } catch {
+                lastError = error
+                if shouldTryNextBackend(for: error) {
+                    blockedBackendsUntil[baseURL] = Date().addingTimeInterval(backendCooldownSeconds)
+                    continue
+                }
+                throw error
+            }
+        }
+        
+        if let borsaError = lastError as? BorsaPyError {
+            throw borsaError
+        }
+        throw BorsaPyError.backendUnavailable
+    }
+    
+    private func requestJSON(baseURL: String, path: String) async throws -> [String: Any] {
+        let urlString = baseURL + path
         guard let url = URL(string: urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? urlString) else {
             throw BorsaPyError.invalidURL
         }
         
         var request = URLRequest(url: url)
-        request.timeoutInterval = 15
+        request.timeoutInterval = requestTimeoutSeconds
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         
         let data: Data
@@ -466,7 +572,7 @@ actor BorsaPyProvider {
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
-            print("BorsaPyProvider: Backend erişilemez — \(error.localizedDescription)")
+            print("BorsaPyProvider: Backend erişilemez — \(baseURL) — \(error.localizedDescription)")
             throw BorsaPyError.backendUnavailable
         }
         
@@ -475,6 +581,9 @@ actor BorsaPyProvider {
         }
         
         guard (200...299).contains(httpResponse.statusCode) else {
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
+                throw BorsaPyError.missingApiKey
+            }
             print("BorsaPyProvider: HTTP \(httpResponse.statusCode) — \(urlString)")
             throw BorsaPyError.requestFailed
         }
@@ -484,6 +593,102 @@ actor BorsaPyProvider {
         }
         
         return json
+    }
+    
+    private func shouldTryNextBackend(for error: Error) -> Bool {
+        guard let borsaError = error as? BorsaPyError else {
+            return true
+        }
+        
+        switch borsaError {
+        case .backendUnavailable, .requestFailed, .invalidResponse:
+            return true
+        case .missingApiKey:
+            return false
+        default:
+            return false
+        }
+    }
+    
+    private func activeBackendCandidates() async -> [String] {
+        let now = Date()
+        var candidates = await configuredBackendCandidates()
+        
+        candidates = candidates.filter { baseURL in
+            guard let blockedUntil = blockedBackendsUntil[baseURL] else { return true }
+            return blockedUntil <= now
+        }
+        
+        if let preferred = preferredBackendBaseURL, let idx = candidates.firstIndex(of: preferred), idx != 0 {
+            candidates.remove(at: idx)
+            candidates.insert(preferred, at: 0)
+        }
+        
+        if candidates.isEmpty,
+           let preferred = preferredBackendBaseURL,
+           (blockedBackendsUntil[preferred] ?? .distantPast) <= now {
+            candidates = [preferred]
+        }
+        
+        return candidates
+    }
+    
+    private func configuredBackendCandidates() async -> [String] {
+        var candidates: [String] = []
+        appendBackendCandidate(from: Bundle.main.object(forInfoDictionaryKey: Self.infoPlistBackendURLKey) as? String, to: &candidates)
+        appendBackendCandidate(from: ProcessInfo.processInfo.environment[Self.infoPlistBackendURLKey], to: &candidates)
+        
+        for fallback in Self.fallbackBaseURLs {
+            appendBackendCandidate(from: fallback, to: &candidates)
+        }
+        
+        if let preferred = preferredBackendBaseURL, !candidates.contains(preferred) {
+            candidates.insert(preferred, at: 0)
+        }
+        
+        return candidates
+    }
+    
+    private func appendBackendCandidate(from rawValue: String?, to candidates: inout [String]) {
+        guard let normalized = Self.normalizeBaseURL(rawValue), !candidates.contains(normalized) else {
+            return
+        }
+        candidates.append(normalized)
+    }
+    
+    nonisolated private static func normalizeBaseURL(_ rawValue: String?) -> String? {
+        guard var value = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+        
+        if !value.contains("://") {
+            value = "https://\(value)"
+        }
+        
+        guard var components = URLComponents(string: value),
+              let scheme = components.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"),
+              let host = components.host,
+              !host.isEmpty else {
+            return nil
+        }
+        
+        components.query = nil
+        components.fragment = nil
+        var path = components.path
+        while path.hasSuffix("/") && path.count > 1 {
+            path.removeLast()
+        }
+        if path == "/" { path = "" }
+        components.path = path
+        
+        guard let normalized = components.string?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !normalized.isEmpty else {
+            return nil
+        }
+        
+        return normalized
     }
     
     // MARK: - Internal: Helpers

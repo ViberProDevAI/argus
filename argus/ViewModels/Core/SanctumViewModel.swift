@@ -155,23 +155,42 @@ final class SanctumViewModel: ObservableObject {
         let isBist = symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol)
         let macro = await MacroSnapshotService.shared.getSnapshot()
 
-        // BIST: Sirkiye input hazırla
+        // BIST: Sirkiye input hazırla (BorsaPy canlı verilerle)
         var sirkiyeInput: SirkiyeEngine.SirkiyeInput? = nil
         if isBist {
             let quotes = MarketDataStore.shared.liveQuotes
             if let usdQuote = quotes["USD/TRY"] ?? quotes["USDTRY=X"] {
+                // BorsaPy'den canlı makro verileri paralel çek
+                async let brentTask = { try? await BorsaPyProvider.shared.getBrentPrice() }()
+                async let inflationTask = { try? await BorsaPyProvider.shared.getInflationData() }()
+                async let policyRateTask = { try? await BorsaPyProvider.shared.getPolicyRate() }()
+                async let xu100Task = { try? await BorsaPyProvider.shared.getXU100() }()
+                async let goldTask = { try? await BorsaPyProvider.shared.getGoldPrice() }()
+
+                let (brent, inflation, policyRate, xu100, gold) = await (brentTask, inflationTask, policyRateTask, xu100Task, goldTask)
+
+                // XU100 günlük değişim hesapla
+                var xu100Change: Double? = nil
+                var xu100Value: Double? = nil
+                if let xu = xu100 {
+                    xu100Value = xu.last
+                    if xu.open > 0 {
+                        xu100Change = ((xu.last - xu.open) / xu.open) * 100
+                    }
+                }
+
                 sirkiyeInput = SirkiyeEngine.SirkiyeInput(
                     usdTry: usdQuote.currentPrice,
                     usdTryPrevious: usdQuote.previousClose ?? usdQuote.currentPrice,
-                    dxy: 104.0,
-                    brentOil: 80.0,
+                    dxy: nil,
+                    brentOil: brent?.last,
                     globalVix: macro.vix,
                     newsSnapshot: nil,
-                    currentInflation: 45.0,
-                    policyRate: 50.0,
-                    xu100Change: nil,
-                    xu100Value: nil,
-                    goldPrice: nil
+                    currentInflation: inflation?.yearlyInflation ?? 45.0,
+                    policyRate: policyRate ?? 50.0,
+                    xu100Change: xu100Change,
+                    xu100Value: xu100Value,
+                    goldPrice: gold?.last
                 )
             }
         }
@@ -328,3 +347,4 @@ final class SanctumViewModel: ObservableObject {
         }
     }
 }
+

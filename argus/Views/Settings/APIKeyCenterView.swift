@@ -541,7 +541,6 @@ struct APIKeyCenterView: View {
                     success: success,
                     message: success ? "TCMB baglantisi basarili." : "TCMB baglantisi basarisiz."
                 )
-
             case .unsupported:
                 result = TestState(
                     success: false,
@@ -555,4 +554,5 @@ struct APIKeyCenterView: View {
             }
         }
     }
+    
 }

@@ -144,6 +144,8 @@ class PositionPlanStore: ObservableObject {
         decision: ArgusGrandDecision,
         thesis: String? = nil
     ) -> PositionPlan {
+        let symbolCandles = candleStore[trade.symbol] ?? []
+
         // 1. Create Snapshot from Decision
         // OrionScoreResult uses 'score' (0-100)
         let orionScore = decision.orionDecision.netSupport * 100 // Use netSupport (0-1) and convert to 0-100
@@ -168,13 +170,23 @@ class PositionPlanStore: ObservableObject {
             mappedTrend = nil
         }
         
+        let atr = estimateATR(from: symbolCandles)
+        let sma20 = movingAverage(from: symbolCandles, period: 20)
+        let sma50 = movingAverage(from: symbolCandles, period: 50)
+        let sma200 = movingAverage(from: symbolCandles, period: 200)
+        let supportResistance = estimateSupportResistance(from: symbolCandles)
+        let trendFromCandles = estimateTrend(from: symbolCandles, sma20: sma20, sma50: sma50)
+
         let techData = TechnicalSnapshotData(
             rsi: decision.orionDetails?.components.rsi,
-            atr: nil, // Orion'da yok, ayrı ATR service'inden çekilmeli (ileride)
-            sma20: nil, sma50: nil, sma200: nil,
+            atr: atr,
+            sma20: sma20,
+            sma50: sma50,
+            sma200: sma200,
             distanceFromATH: nil, distanceFrom52WeekLow: nil,
-            nearestSupport: nil, nearestResistance: nil,
-            trend: mappedTrend
+            nearestSupport: supportResistance.support,
+            nearestResistance: supportResistance.resistance,
+            trend: mappedTrend ?? trendFromCandles
         )
         
         let snapshot = EntrySnapshot(
@@ -190,8 +202,14 @@ class PositionPlanStore: ObservableObject {
         )
         
         // 2. Delegate to Vortex Engine
-        let candles = candleStore[trade.symbol]
-        let plan = VortexEngine.shared.createPlan(for: trade, snapshot: snapshot, decision: decision, thesis: finalThesis, invalidation: defaultInvalidation, candles: candles)
+        let plan = VortexEngine.shared.createPlan(
+            for: trade,
+            snapshot: snapshot,
+            decision: decision,
+            thesis: finalThesis,
+            invalidation: defaultInvalidation,
+            candles: symbolCandles
+        )
         
         plans[trade.id] = plan
         savePlans()
@@ -551,6 +569,52 @@ class PositionPlanStore: ObservableObject {
         default:
             return "Beklenmedik negatif gelişme"
         }
+    }
+
+    private func movingAverage(from candles: [Candle], period: Int) -> Double? {
+        guard candles.count >= period else { return nil }
+        let slice = candles.suffix(period)
+        let sum = slice.reduce(0.0) { $0 + $1.close }
+        return sum / Double(period)
+    }
+
+    private func estimateATR(from candles: [Candle], period: Int = 14) -> Double? {
+        guard candles.count >= (period + 1) else { return nil }
+        let sample = Array(candles.suffix(period + 1))
+
+        var trueRanges: [Double] = []
+        for index in 1..<sample.count {
+            let current = sample[index]
+            let previousClose = sample[index - 1].close
+            let trueRange = max(
+                current.high - current.low,
+                abs(current.high - previousClose),
+                abs(current.low - previousClose)
+            )
+            trueRanges.append(trueRange)
+        }
+
+        guard !trueRanges.isEmpty else { return nil }
+        return trueRanges.reduce(0, +) / Double(trueRanges.count)
+    }
+
+    private func estimateSupportResistance(from candles: [Candle], lookback: Int = 40) -> (support: Double?, resistance: Double?) {
+        guard !candles.isEmpty else { return (nil, nil) }
+        let slice = candles.suffix(lookback)
+        let support = slice.map(\.low).min()
+        let resistance = slice.map(\.high).max()
+        return (support, resistance)
+    }
+
+    private func estimateTrend(from candles: [Candle], sma20: Double?, sma50: Double?) -> TrendDirection? {
+        guard let lastClose = candles.last?.close else { return nil }
+        guard let sma20, let sma50 else { return nil }
+
+        if lastClose > sma20 && sma20 > sma50 { return .strongUp }
+        if lastClose > sma20 { return .up }
+        if lastClose < sma20 && sma20 < sma50 { return .strongDown }
+        if lastClose < sma20 { return .down }
+        return .sideways
     }
     
     // MARK: - Persistence

@@ -28,6 +28,10 @@ struct MacroSnapshot: Sendable, Codable {
     let inflationRate: Double?
     let consumerConfidence: Double?
     
+    // MARK: - Global Commodities & FX (for Sirkiye Engine)
+    let dxy: Double?                    // US Dollar Index
+    let brent: Double?                  // Brent Oil Price
+    
     // Sector
     let sectorRotation: SectorRotationPhase?
     let leadingSectors: [String]
@@ -53,6 +57,7 @@ struct MacroSnapshot: Sendable, Codable {
         fedFundsRate: nil, tenYearYield: nil, twoYearYield: nil, yieldCurveInverted: false,
         advanceDeclineRatio: nil, percentAbove200MA: nil, newHighsNewLows: nil,
         gdpGrowth: nil, unemploymentRate: nil, inflationRate: nil, consumerConfidence: nil,
+        dxy: nil, brent: nil,
         sectorRotation: nil, leadingSectors: [], laggingSectors: []
     )
 }

@@ -304,6 +304,8 @@ struct StockDetailContent: View {
             unemploymentRate: nil,
             inflationRate: nil,
             consumerConfidence: nil,
+            dxy: nil,
+            brent: nil,
             sectorRotation: nil,
             leadingSectors: [],
             laggingSectors: []

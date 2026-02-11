@@ -75,6 +75,68 @@ struct PositionPlan: Codable, Identifiable {
     }
 }
 
+extension PositionPlan {
+    /// Tüm senaryoları aktif önceliğe göre döner.
+    var orderedScenarios: [Scenario] {
+        [bullishScenario, bearishScenario, neutralScenario]
+            .compactMap { $0 }
+            .sorted { lhs, rhs in
+                if lhs.isActive != rhs.isActive {
+                    return lhs.isActive && !rhs.isActive
+                }
+                return lhs.type.sortOrder < rhs.type.sortOrder
+            }
+    }
+
+    var activeScenario: Scenario? {
+        orderedScenarios.first(where: { $0.isActive })
+    }
+
+    var totalStepCount: Int {
+        orderedScenarios.reduce(0) { $0 + $1.steps.count }
+    }
+
+    var completedStepCount: Int {
+        guard totalStepCount > 0 else { return 0 }
+        let validStepIDs = Set(orderedScenarios.flatMap { $0.steps.map(\.id) })
+        return executedSteps.filter { validStepIDs.contains($0) }.count
+    }
+
+    var completionRatio: Double {
+        guard totalStepCount > 0 else { return 0 }
+        return Double(completedStepCount) / Double(totalStepCount)
+    }
+
+    var nextPendingStep: PlannedAction? {
+        for scenario in orderedScenarios {
+            for step in scenario.steps.sorted(by: { lhs, rhs in
+                if lhs.priority != rhs.priority {
+                    return lhs.priority < rhs.priority
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            }) where !executedSteps.contains(step.id) {
+                return step
+            }
+        }
+        return nil
+    }
+
+    var primaryRiskStep: PlannedAction? {
+        bearishScenario.steps
+            .sorted(by: { lhs, rhs in
+                if lhs.priority != rhs.priority {
+                    return lhs.priority < rhs.priority
+                }
+                return lhs.id.uuidString < rhs.id.uuidString
+            })
+            .first(where: { !executedSteps.contains($0.id) })
+    }
+
+    var ageInDays: Int {
+        Calendar.current.dateComponents([.day], from: dateCreated, to: Date()).day ?? 0
+    }
+}
+
 
 
 enum PlanStatus: String, Codable {
@@ -142,6 +204,14 @@ enum ScenarioType: String, Codable {
     case bullish = "BOĞA"           // Fiyat yükseliyor
     case neutral = "NÖTR"           // Fiyat yatay
     case bearish = "AYI"            // Fiyat düşüyor
+
+    var sortOrder: Int {
+        switch self {
+        case .bullish: return 0
+        case .neutral: return 1
+        case .bearish: return 2
+        }
+    }
 }
 
 // MARK: - Planned Action

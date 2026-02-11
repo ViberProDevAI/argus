@@ -19,9 +19,26 @@ class TradeBrainExecutor: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var lastExecutionTime: [String: Date] = [:]  // Cooldown tracking
     
-    private let cooldownSeconds: TimeInterval = 300  // 5 dakika
+    private let baseCooldownSeconds: TimeInterval = 300  // 5 dakika
     
     private init() {}
+
+    // MARK: - Symbol Profile
+
+    private struct SymbolExecutionProfile {
+        enum RiskTier: String {
+            case defensive = "DEFANSİF"
+            case balanced = "DENGELİ"
+            case offensive = "ATAK"
+        }
+
+        let symbol: String
+        let tier: RiskTier
+        let allocationMultiplier: Double
+        let cooldownMultiplier: Double
+        let minDecisionConfidence: Double
+        let notes: [String]
+    }
     
     // MARK: - Main Execution Loop
     
@@ -46,10 +63,27 @@ class TradeBrainExecutor: ObservableObject {
         
         var processedCount = 0
         var skippedCooldown = 0
+        var skippedLowConfidence = 0
         var skippedNoPrice = 0
         
         for (symbol, decision) in decisions {
             processedCount += 1
+
+            let symbolCandles = candles[symbol] ?? []
+            let profile = await buildExecutionProfile(
+                symbol: symbol,
+                decision: decision,
+                portfolio: portfolio,
+                quote: quotes[symbol],
+                candles: symbolCandles
+            )
+            let cooldownSeconds = baseCooldownSeconds * profile.cooldownMultiplier
+            print(
+                "🧬 TradeBrainProfile[\(symbol)] tier=\(profile.tier.rawValue) " +
+                "alloc×\(String(format: "%.2f", profile.allocationMultiplier)) " +
+                "cooldown×\(String(format: "%.2f", profile.cooldownMultiplier)) " +
+                "minConf=\(String(format: "%.2f", profile.minDecisionConfidence))"
+            )
             
             // Cooldown kontrolü
             if let lastTime = lastExecutionTime[symbol],
@@ -59,7 +93,7 @@ class TradeBrainExecutor: ObservableObject {
                 continue
             }
             
-            let currentPrice = quotes[symbol]?.currentPrice ?? candles[symbol]?.last?.close ?? 0
+            let currentPrice = quotes[symbol]?.currentPrice ?? symbolCandles.last?.close ?? 0
             guard currentPrice > 0 else { 
                 skippedNoPrice += 1
                 debugSkip(symbol: symbol, reason: "fiyat yok (quote/candle)")
@@ -73,6 +107,14 @@ class TradeBrainExecutor: ObservableObject {
             // ALIM KARARLARI
             if !hasOpenPosition {
                 if decision.action == .aggressiveBuy || decision.action == .accumulate {
+                    if decision.confidence < profile.minDecisionConfidence {
+                        skippedLowConfidence += 1
+                        debugSkip(
+                            symbol: symbol,
+                            reason: "güven düşük (\(String(format: "%.2f", decision.confidence)) < \(String(format: "%.2f", profile.minDecisionConfidence)))"
+                        )
+                        continue
+                    }
                     print("✅ TradeBrainExecutor: ALIM yapılıyor: \(symbol)")
                     await executeBuy(
                         symbol: symbol,
@@ -83,7 +125,8 @@ class TradeBrainExecutor: ObservableObject {
                         portfolio: portfolio,
                         quotes: quotes,
                         orionScore: orionScores[symbol]?.score ?? 50,
-                        candles: candles[symbol] ?? []
+                        candles: symbolCandles,
+                        profile: profile
                     )
                 } else {
                     print("⚠️ TradeBrainExecutor: \(symbol) - Action \(decision.action.rawValue) alım için değil")
@@ -109,7 +152,10 @@ class TradeBrainExecutor: ObservableObject {
             }
         }
         
-        print("📊 TradeBrainExecutor: Özet - İşlenen: \(processedCount), Cooldown: \(skippedCooldown), Fiyat Yok: \(skippedNoPrice)")
+        print(
+            "📊 TradeBrainExecutor: Özet - İşlenen: \(processedCount), " +
+            "Cooldown: \(skippedCooldown), Güven: \(skippedLowConfidence), Fiyat Yok: \(skippedNoPrice)"
+        )
     }
     
     // MARK: - Buy Execution
@@ -123,7 +169,8 @@ class TradeBrainExecutor: ObservableObject {
         portfolio: [Trade],
         quotes: [String: Quote],
         orionScore: Double,
-        candles: [Candle]
+        candles: [Candle],
+        profile: SymbolExecutionProfile
     ) async {
         print("💰 executeBuy: \(symbol) - Fiyat: \(currentPrice)")
         
@@ -137,13 +184,23 @@ class TradeBrainExecutor: ObservableObject {
         let minTradeAmount: Double
         
         if isBist {
-            allocation = availableBalance * 0.05  // %5
+            let basePercent = 0.05
+            let adjustedPercent = basePercent * profile.allocationMultiplier
+            allocation = availableBalance * adjustedPercent
             minTradeAmount = 1000.0
-            print("💰 executeBuy: BIST Allocation = %5 of ₺\(availableBalance) = ₺\(allocation)")
+            print(
+                "💰 executeBuy: BIST Allocation = %\(Int(adjustedPercent * 100)) " +
+                "(\(String(format: "%.2f", profile.allocationMultiplier))x) of ₺\(availableBalance) = ₺\(allocation)"
+            )
         } else {
-            allocation = availableBalance * 0.10  // %10
+            let basePercent = 0.10
+            let adjustedPercent = basePercent * profile.allocationMultiplier
+            allocation = availableBalance * adjustedPercent
             minTradeAmount = 50.0
-            print("💰 executeBuy: Global Allocation = %10 of $\(availableBalance) = $\(allocation)")
+            print(
+                "💰 executeBuy: Global Allocation = %\(Int(adjustedPercent * 100)) " +
+                "(\(String(format: "%.2f", profile.allocationMultiplier))x) of $\(availableBalance) = $\(allocation)"
+            )
         }
         
         guard allocation >= minTradeAmount else {
@@ -360,6 +417,121 @@ class TradeBrainExecutor: ObservableObject {
 
     private func debugSkip(symbol: String, reason: String) {
         print("🟡 AUTOPILOT-SKIP: \(symbol) -> \(reason)")
+    }
+
+    private func buildExecutionProfile(
+        symbol: String,
+        decision: ArgusGrandDecision,
+        portfolio: [Trade],
+        quote: Quote?,
+        candles: [Candle]
+    ) async -> SymbolExecutionProfile {
+        var allocationMultiplier = 1.0
+        var cooldownMultiplier = 1.0
+        var minConfidence = 0.55
+        var notes: [String] = []
+
+        let referencePrice = quote?.currentPrice ?? candles.last?.close ?? 0
+        let volatility = estimateVolatility(candles: candles, referencePrice: referencePrice)
+        if volatility > 0.05 {
+            allocationMultiplier *= 0.68
+            cooldownMultiplier *= 1.45
+            minConfidence += 0.10
+            notes.append("yüksek volatilite")
+        } else if volatility < 0.02 {
+            allocationMultiplier *= 1.10
+            cooldownMultiplier *= 0.92
+            notes.append("düşük volatilite")
+        }
+
+        let eventRisk = EventCalendarService.shared.assessPositionRisk(symbol: symbol)
+        if eventRisk.shouldAvoidNewPosition {
+            allocationMultiplier *= 0.45
+            cooldownMultiplier *= 1.8
+            minConfidence += 0.12
+            notes.append("yakın kritik olay")
+        } else if eventRisk.shouldReducePosition {
+            allocationMultiplier *= 0.72
+            cooldownMultiplier *= 1.25
+            minConfidence += 0.06
+            notes.append("olay riski")
+        }
+
+        let closedTrades = portfolio.filter { !$0.isOpen && $0.symbol == symbol && $0.exitPrice != nil }
+        if !closedTrades.isEmpty {
+            let winCount = closedTrades.filter { $0.profit > 0 }.count
+            let winRate = Double(winCount) / Double(closedTrades.count)
+            let avgPnL = closedTrades.map(\.profitPercentage).reduce(0, +) / Double(closedTrades.count)
+
+            if winRate < 0.40 || avgPnL < -1.0 {
+                allocationMultiplier *= 0.72
+                cooldownMultiplier *= 1.20
+                minConfidence += 0.08
+                notes.append("zayıf sembol geçmişi")
+            } else if winRate > 0.65 && avgPnL > 1.5 {
+                allocationMultiplier *= 1.10
+                cooldownMultiplier *= 0.90
+                minConfidence -= 0.03
+                notes.append("güçlü sembol geçmişi")
+            }
+        }
+
+        let hasCustomWeights = await MainActor.run {
+            ChironWeightStore.shared.hasCustomWeights(symbol: symbol)
+        }
+        if hasCustomWeights {
+            allocationMultiplier *= 1.10
+            cooldownMultiplier *= 0.90
+            minConfidence -= 0.02
+            notes.append("custom chiron ağırlığı")
+        }
+
+        if decision.action == .aggressiveBuy && decision.confidence > 0.78 {
+            allocationMultiplier *= 1.06
+            notes.append("hücum güveni yüksek")
+        }
+
+        allocationMultiplier = min(max(allocationMultiplier, 0.35), 1.45)
+        cooldownMultiplier = min(max(cooldownMultiplier, 0.75), 2.5)
+        minConfidence = min(max(minConfidence, 0.45), 0.85)
+
+        let tier: SymbolExecutionProfile.RiskTier
+        if allocationMultiplier <= 0.72 || minConfidence >= 0.72 {
+            tier = .defensive
+        } else if allocationMultiplier >= 1.15 && minConfidence <= 0.55 {
+            tier = .offensive
+        } else {
+            tier = .balanced
+        }
+
+        return SymbolExecutionProfile(
+            symbol: symbol,
+            tier: tier,
+            allocationMultiplier: allocationMultiplier,
+            cooldownMultiplier: cooldownMultiplier,
+            minDecisionConfidence: minConfidence,
+            notes: notes
+        )
+    }
+
+    private func estimateVolatility(candles: [Candle], referencePrice: Double) -> Double {
+        guard candles.count >= 8, referencePrice > 0 else { return 0.03 }
+
+        let sample = Array(candles.suffix(24))
+        guard sample.count >= 2 else { return 0.03 }
+
+        var ranges: [Double] = []
+        for index in 1..<sample.count {
+            let high = sample[index].high
+            let low = sample[index].low
+            let previousClose = sample[index - 1].close
+            let trueRange = max(high - low, abs(high - previousClose), abs(low - previousClose))
+            ranges.append(trueRange)
+        }
+
+        guard !ranges.isEmpty else { return 0.03 }
+        let atr = ranges.reduce(0, +) / Double(ranges.count)
+        return atr / referencePrice
     }
     
     // MARK: - Public API

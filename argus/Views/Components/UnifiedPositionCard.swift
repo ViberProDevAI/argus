@@ -1,8 +1,7 @@
 import SwiftUI
 
 // MARK: - Unified Position Card
-/// BIST ve Global piyasalar için tek, birleşik pozisyon kartı.
-/// Görsel dili kurumsal tema ile sabitlenmiş ve Trade Brain karar katmanı ile zenginleştirilmiştir.
+/// Portföy kartı: konsey kararı, plan adımları ve chimera sinyalini tek akışta gösterir.
 
 struct UnifiedPositionCard: View {
     let trade: Trade
@@ -14,6 +13,7 @@ struct UnifiedPositionCard: View {
     @State private var plan: PositionPlan?
     @State private var delta: PositionDeltaTracker.PositionDelta?
     @State private var decision: ArgusGrandDecision?
+    @State private var chimeraSignal: ChimeraSignal?
 
     private var isBist: Bool { market == .bist }
 
@@ -42,6 +42,10 @@ struct UnifiedPositionCard: View {
         pnlPercent >= 0 ? positiveColor : negativeColor
     }
 
+    private var holdingDays: Int {
+        Calendar.current.dateComponents([.day], from: trade.entryDate, to: Date()).day ?? 0
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             headerSection
@@ -49,9 +53,9 @@ struct UnifiedPositionCard: View {
             Divider().overlay(InstitutionalTheme.Colors.borderSubtle)
             priceProgressSection
 
-            if let decision {
+            if decision != nil || chimeraSignal != nil {
                 Divider().overlay(InstitutionalTheme.Colors.borderSubtle)
-                decisionSection(decision)
+                decisionAndSignalSection
             }
 
             Divider().overlay(InstitutionalTheme.Colors.borderSubtle)
@@ -70,7 +74,7 @@ struct UnifiedPositionCard: View {
         }
         .institutionalCard(scale: .insight, elevated: false)
         .onAppear(perform: refreshCardData)
-        .onChange(of: currentPrice) { _ in
+        .onChange(of: currentPrice) { _, _ in
             refreshCardData()
         }
     }
@@ -87,31 +91,47 @@ struct UnifiedPositionCard: View {
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             }
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 6) {
                     Text(displaySymbol)
                         .font(.system(size: 18, weight: .heavy, design: .monospaced))
                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
-                    Text(isBist ? "BIST" : "GLOBAL")
-                        .font(InstitutionalTheme.Typography.micro)
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(
-                            Capsule()
-                                .fill(InstitutionalTheme.Colors.surface3)
-                        )
+                    tagPill(
+                        text: isBist ? "BIST" : "GLOBAL",
+                        color: accentColor
+                    )
                 }
 
-                Text("\(String(format: "%.2f", trade.quantity)) adet @ \(formatPrice(trade.entryPrice))")
-                    .font(InstitutionalTheme.Typography.caption)
-                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                HStack(spacing: 6) {
+                    Text("\(String(format: "%.2f", trade.quantity)) adet")
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+
+                    Text("•")
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+
+                    Text("\(holdingDays) gün")
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                }
+
+                if let intent = plan?.intent, intent != .undefined {
+                    tagPill(
+                        text: intent.rawValue,
+                        color: Color(intent.colorName)
+                    )
+                }
             }
 
             Spacer()
 
             VStack(alignment: .trailing, spacing: 3) {
+                Text(formatPrice(currentPrice))
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+
                 Text("\(pnlPercent >= 0 ? "+" : "")\(String(format: "%.1f", pnlPercent))%")
                     .font(.system(size: 20, weight: .bold, design: .rounded))
                     .foregroundColor(pnlColor)
@@ -125,78 +145,107 @@ struct UnifiedPositionCard: View {
     }
 
     private var priceProgressSection: some View {
-        VStack(spacing: 8) {
+        let stop = stopPrice(from: plan) ?? (trade.entryPrice * 0.90)
+        let target = targetPrice(from: plan) ?? (trade.entryPrice * 1.12)
+        let span = max(target - stop, 0.0001)
+        let entryPosition = max(0, min(1, (trade.entryPrice - stop) / span))
+        let currentPosition = max(0, min(1, (currentPrice - stop) / span))
+
+        return VStack(spacing: 10) {
             GeometryReader { geo in
                 let width = geo.size.width
-                let entryX = width / 2
-                let offset = max(-width / 2 + 12, min(width / 2 - 12, CGFloat(pnlPercent) * 2.1))
 
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
                         .fill(InstitutionalTheme.Colors.surface3)
-                        .frame(height: 7)
+                        .frame(height: 8)
+
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(pnlColor.opacity(0.45))
+                        .frame(width: width * currentPosition, height: 8)
 
                     Circle()
                         .fill(InstitutionalTheme.Colors.textSecondary)
-                        .frame(width: 7, height: 7)
-                        .position(x: entryX, y: 3.5)
+                        .frame(width: 8, height: 8)
+                        .position(x: width * entryPosition, y: 4)
 
                     Circle()
                         .fill(pnlColor)
-                        .frame(width: 11, height: 11)
+                        .frame(width: 12, height: 12)
                         .overlay(Circle().stroke(InstitutionalTheme.Colors.textPrimary, lineWidth: 1))
-                        .position(x: entryX + offset, y: 3.5)
+                        .position(x: width * currentPosition, y: 4)
                 }
             }
-            .frame(height: 11)
+            .frame(height: 12)
 
             HStack {
+                Text("Stop \(formatPrice(stop))")
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.negative.opacity(0.9))
+                Spacer()
                 Text("Giriş \(formatPrice(trade.entryPrice))")
                     .font(InstitutionalTheme.Typography.micro)
                     .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 Spacer()
-                Text("Anlık \(formatPrice(currentPrice))")
-                    .font(InstitutionalTheme.Typography.caption)
-                    .foregroundColor(pnlColor)
+                Text("Hedef \(formatPrice(target))")
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.positive.opacity(0.9))
             }
         }
         .padding(.horizontal, InstitutionalTheme.Spacing.md)
         .padding(.vertical, InstitutionalTheme.Spacing.sm)
     }
 
-    private func decisionSection(_ decision: ArgusGrandDecision) -> some View {
-        let education = decision.educationStage
+    private var decisionAndSignalSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let decision {
+                let education = decision.educationStage
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Konsey Kararı")
-                    .font(InstitutionalTheme.Typography.micro)
-                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                Spacer()
-                Text(education.badgeText)
-                    .font(InstitutionalTheme.Typography.caption)
-                    .foregroundColor(education.color)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(education.color.opacity(0.17))
+                HStack {
+                    Text("Konsey")
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    Spacer()
+                    tagPill(text: education.badgeText, color: education.color)
+                    tagPill(text: decision.action.rawValue, color: actionColor(decision.action))
+                }
+
+                HStack(spacing: 8) {
+                    metricTag(title: "Güven", value: "%\(Int(decision.confidence * 100))")
+                    metricTag(
+                        title: "Aether",
+                        value: decision.aetherDecision.stance.rawValue,
+                        valueColor: aetherColor(decision.aetherDecision.stance)
                     )
-            }
-            
-            Text(education.title)
-                .font(InstitutionalTheme.Typography.caption)
-                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-
-            HStack {
-                metricTag(title: "Güven", value: "%\(Int(decision.confidence * 100))")
-                metricTag(title: "Aether", value: decision.aetherDecision.stance.rawValue, valueColor: aetherColor(decision.aetherDecision.stance))
+                }
             }
 
-            Text(education.disclaimer)
-                .font(InstitutionalTheme.Typography.micro)
-                .foregroundColor(InstitutionalTheme.Colors.warning)
-                .lineLimit(1)
+            if let chimeraSignal {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(chimeraColor(chimeraSignal.type))
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(chimeraSignal.title)
+                            .font(InstitutionalTheme.Typography.caption)
+                            .foregroundColor(chimeraColor(chimeraSignal.type))
+                        Text(chimeraSignal.description)
+                            .font(InstitutionalTheme.Typography.micro)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    Text("%\(Int(chimeraSignal.severity * 100))")
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(chimeraColor(chimeraSignal.type))
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
+                        .fill(chimeraColor(chimeraSignal.type).opacity(0.12))
+                )
+            }
         }
         .padding(.horizontal, InstitutionalTheme.Spacing.md)
         .padding(.vertical, InstitutionalTheme.Spacing.sm)
@@ -206,11 +255,11 @@ struct UnifiedPositionCard: View {
         HStack {
             Image(systemName: "doc.badge.plus")
                 .foregroundColor(accentColor)
-            Text("Akıllı plan oluşturulmadı")
+            Text("Bu pozisyon için plan henüz oluşturulmadı")
                 .font(InstitutionalTheme.Typography.caption)
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             Spacer()
-            Button("Oluştur") { onEdit?() }
+            Button("Plan Oluştur") { onEdit?() }
                 .font(InstitutionalTheme.Typography.caption)
                 .foregroundColor(accentColor)
         }
@@ -219,35 +268,67 @@ struct UnifiedPositionCard: View {
     }
 
     private func planStatusSection(_ plan: PositionPlan) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Image(systemName: "checklist")
+                Image(systemName: "list.bullet.clipboard.fill")
                     .foregroundColor(accentColor)
-                Text("Plan: \(plan.intent.rawValue)")
+                Text("Plan")
                     .font(InstitutionalTheme.Typography.caption)
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 Spacer()
-                let executed = plan.executedSteps.count
-                let total = [plan.bullishScenario, plan.bearishScenario, plan.neutralScenario].compactMap { $0 }.reduce(0) { $0 + $1.steps.count }
-                Text("\(executed)/\(total)")
+                Text("\(plan.completedStepCount)/\(plan.totalStepCount)")
                     .font(InstitutionalTheme.Typography.micro)
-                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
-            if let activeScenario = [plan.bullishScenario, plan.bearishScenario, plan.neutralScenario]
-                .compactMap({ $0 })
-                .first(where: { $0.isActive }) {
-                ForEach(activeScenario.steps.prefix(2)) { step in
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: plan.executedSteps.contains(step.id) ? "checkmark.circle.fill" : "circle")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(plan.executedSteps.contains(step.id) ? positiveColor : InstitutionalTheme.Colors.textTertiary)
-                            .padding(.top, 3)
-                        Text(step.description)
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(InstitutionalTheme.Colors.surface2)
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(accentColor.opacity(0.85))
+                        .frame(width: geo.size.width * plan.completionRatio)
+                }
+            }
+            .frame(height: 8)
+
+            if let nextStep = plan.nextPendingStep {
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(accentColor)
+                        .padding(.top, 2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(nextStep.trigger.displayText)
+                            .font(InstitutionalTheme.Typography.caption)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        Text(nextStep.action.displayText)
                             .font(InstitutionalTheme.Typography.micro)
                             .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        Spacer()
                     }
+                    Spacer()
+                    if let distance = triggerDistanceText(nextStep.trigger, plan: plan) {
+                        Text(distance)
+                            .font(InstitutionalTheme.Typography.micro)
+                            .foregroundColor(accentColor)
+                    }
+                }
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
+                        .fill(accentColor.opacity(0.10))
+                )
+            }
+
+            if let riskStep = plan.primaryRiskStep {
+                HStack(spacing: 6) {
+                    Image(systemName: "shield.lefthalf.filled")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(InstitutionalTheme.Colors.warning)
+                    Text("Risk adımı: \(riskStep.trigger.displayText)")
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .lineLimit(1)
                 }
             }
         }
@@ -281,8 +362,8 @@ struct UnifiedPositionCard: View {
         HStack(spacing: 10) {
             Button(action: { onEdit?() }) {
                 HStack(spacing: 6) {
-                    Image(systemName: "pencil")
-                    Text("Yönet")
+                    Image(systemName: "slider.horizontal.3")
+                    Text("Planla")
                 }
                 .font(InstitutionalTheme.Typography.caption)
                 .foregroundColor(accentColor)
@@ -329,6 +410,19 @@ struct UnifiedPositionCard: View {
         )
     }
 
+    private func tagPill(text: String, color: Color) -> some View {
+        Text(text)
+            .font(InstitutionalTheme.Typography.micro)
+            .foregroundColor(color)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(color.opacity(0.16))
+            )
+            .lineLimit(1)
+    }
+
     private var displaySymbol: String {
         isBist ? trade.symbol.replacingOccurrences(of: ".IS", with: "") : trade.symbol
     }
@@ -368,9 +462,64 @@ struct UnifiedPositionCard: View {
         }
     }
 
+    private func chimeraColor(_ type: ChimeraSignalType) -> Color {
+        switch type {
+        case .deepValueBuy: return Color.purple
+        case .bullTrap: return InstitutionalTheme.Colors.warning
+        case .momentumBreakout: return InstitutionalTheme.Colors.positive
+        case .fallingKnife: return InstitutionalTheme.Colors.negative
+        case .sentimentDivergence: return InstitutionalTheme.Colors.primary
+        case .perfectStorm: return InstitutionalTheme.Colors.warning
+        }
+    }
+
+    private func stopPrice(from plan: PositionPlan?) -> Double? {
+        guard let plan else { return nil }
+        for step in plan.bearishScenario.steps.sorted(by: { $0.priority < $1.priority }) where !plan.executedSteps.contains(step.id) {
+            if case .priceBelow(let price) = step.trigger {
+                return price
+            }
+        }
+        return nil
+    }
+
+    private func targetPrice(from plan: PositionPlan?) -> Double? {
+        guard let plan else { return nil }
+        for step in plan.bullishScenario.steps.sorted(by: { $0.priority < $1.priority }) where !plan.executedSteps.contains(step.id) {
+            if case .priceAbove(let price) = step.trigger {
+                return price
+            }
+        }
+        return nil
+    }
+
+    private func triggerDistanceText(_ trigger: ActionTrigger, plan: PositionPlan) -> String? {
+        switch trigger {
+        case .priceAbove(let target):
+            let remaining = ((target - currentPrice) / max(currentPrice, 0.0001)) * 100
+            return remaining <= 0 ? "Tetikte" : String(format: "+%.1f%%", remaining)
+        case .priceBelow(let stop):
+            let remaining = ((currentPrice - stop) / max(currentPrice, 0.0001)) * 100
+            return remaining <= 0 ? "Tetikte" : String(format: "-%.1f%%", remaining)
+        case .gainPercent(let targetPct):
+            let remaining = targetPct - pnlPercent
+            return remaining <= 0 ? "Tetikte" : String(format: "+%.1f%%", remaining)
+        case .lossPercent(let targetPct):
+            let triggerLevel = -targetPct
+            let remaining = pnlPercent - triggerLevel
+            return remaining <= 0 ? "Tetikte" : String(format: "-%.1f%%", remaining)
+        case .daysElapsed(let days):
+            let remainingDays = max(days - plan.ageInDays, 0)
+            return remainingDays == 0 ? "Bugün" : "\(remainingDays) gün"
+        default:
+            return nil
+        }
+    }
+
     private func refreshCardData() {
         plan = PositionPlanStore.shared.getPlan(for: trade.id)
         decision = SignalStateViewModel.shared.grandDecisions[trade.symbol]
+        chimeraSignal = SignalStateViewModel.shared.chimeraSignals[trade.symbol]
 
         guard let plan else {
             delta = nil

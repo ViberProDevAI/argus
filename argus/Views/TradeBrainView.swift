@@ -8,6 +8,10 @@ struct TradeBrainView: View {
 
     @State private var selectedTab: TradeBrainTab = .positions
     @State private var selectedPlan: PositionPlan?
+    @State private var selectedPlanCurrentPrice: Double = 0
+    @State private var selectedPlanDecision: ArgusGrandDecision?
+    @State private var selectedPlanCandles: [Candle] = []
+    @State private var selectedPlanEventRisk: EventCalendarService.EventRiskAssessment?
     @State private var showPlanDetail = false
     @State private var marketMode: MarketFilter = .all
     @State private var showDrawer = false
@@ -166,7 +170,13 @@ struct TradeBrainView: View {
             }
             .sheet(isPresented: $showPlanDetail) {
                 if let plan = selectedPlan {
-                    PositionPlanDetailView(plan: plan)
+                    PositionPlanDetailView(
+                        plan: plan,
+                        currentPrice: selectedPlanCurrentPrice,
+                        decision: selectedPlanDecision,
+                        candles: selectedPlanCandles,
+                        eventRisk: selectedPlanEventRisk
+                    )
                 }
             }
         }
@@ -451,6 +461,10 @@ struct TradeBrainView: View {
                     ) {
                         if let plan = planStore.getPlan(for: trade.id) {
                             selectedPlan = plan
+                            selectedPlanCurrentPrice = viewModel.quotes[trade.symbol]?.currentPrice ?? trade.entryPrice
+                            selectedPlanDecision = viewModel.grandDecisions[trade.symbol]
+                            selectedPlanCandles = viewModel.candles[trade.symbol] ?? []
+                            selectedPlanEventRisk = EventCalendarService.shared.assessPositionRisk(symbol: trade.symbol)
                             showPlanDetail = true
                         }
                     }
@@ -1353,37 +1367,197 @@ struct PositionPlanCard: View {
 
 struct PositionPlanDetailView: View {
     let plan: PositionPlan
+    let currentPrice: Double
+    let decision: ArgusGrandDecision?
+    let candles: [Candle]
+    let eventRisk: EventCalendarService.EventRiskAssessment?
+
     @Environment(\.dismiss) private var dismiss
+
+    private var pnlPercent: Double {
+        guard plan.originalSnapshot.entryPrice > 0 else { return 0 }
+        return ((currentPrice - plan.originalSnapshot.entryPrice) / plan.originalSnapshot.entryPrice) * 100
+    }
+
+    private var pnlValue: Double {
+        (currentPrice - plan.originalSnapshot.entryPrice) * plan.initialQuantity
+    }
+
+    private var pnlColor: Color {
+        pnlPercent >= 0 ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative
+    }
+
+    private var nextStep: PlannedAction? {
+        plan.nextPendingStep
+    }
+
+    private var profileColor: Color {
+        if (eventRisk?.shouldAvoidNewPosition ?? false) || estimatedVolatility > 0.05 {
+            return InstitutionalTheme.Colors.negative
+        }
+        if estimatedVolatility < 0.02 {
+            return InstitutionalTheme.Colors.positive
+        }
+        return InstitutionalTheme.Colors.warning
+    }
+
+    private var profileTitle: String {
+        if (eventRisk?.shouldAvoidNewPosition ?? false) || estimatedVolatility > 0.05 {
+            return "Savunmacı Mod"
+        }
+        if estimatedVolatility < 0.02 {
+            return "Atak Mod"
+        }
+        return "Dengeli Mod"
+    }
+
+    private var estimatedVolatility: Double {
+        guard candles.count >= 8, currentPrice > 0 else { return 0.03 }
+        let sample = Array(candles.suffix(24))
+        guard sample.count >= 2 else { return 0.03 }
+
+        var ranges: [Double] = []
+        for index in 1..<sample.count {
+            let current = sample[index]
+            let prev = sample[index - 1]
+            let tr = max(current.high - current.low, abs(current.high - prev.close), abs(current.low - prev.close))
+            ranges.append(tr)
+        }
+        guard !ranges.isEmpty else { return 0.03 }
+        let atr = ranges.reduce(0, +) / Double(ranges.count)
+        return atr / currentPrice
+    }
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     sectionCard {
-                        SectionHeader(title: "Giriş Tezi", icon: "lightbulb.fill", color: InstitutionalTheme.Colors.warning)
-                        Text(plan.thesis)
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        Divider().overlay(InstitutionalTheme.Colors.borderSubtle)
-                        HStack {
-                            detailMetric("Giriş", String(format: "%.2f", plan.originalSnapshot.entryPrice))
+                        HStack(alignment: .top) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(plan.originalSnapshot.symbol)
+                                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+
+                                HStack(spacing: 8) {
+                                    Text(plan.originalSnapshot.councilAction.rawValue)
+                                        .font(InstitutionalTheme.Typography.micro)
+                                        .foregroundColor(colorForAction(plan.originalSnapshot.councilAction))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            Capsule()
+                                                .fill(colorForAction(plan.originalSnapshot.councilAction).opacity(0.18))
+                                        )
+                                    Text("Kalite \(plan.originalSnapshot.entryQualityScore)/100")
+                                        .font(InstitutionalTheme.Typography.micro)
+                                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                                }
+                            }
                             Spacer()
-                            detailMetric("Miktar", String(format: "%.2f", plan.initialQuantity))
-                            Spacer()
-                            detailMetric("Tarih", plan.originalSnapshot.capturedAt.formatted(.dateTime.day().month()))
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text(String(format: "%.2f", currentPrice))
+                                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                                Text("\(pnlPercent >= 0 ? "+" : "")\(String(format: "%.2f", pnlPercent))%")
+                                    .font(InstitutionalTheme.Typography.bodyStrong)
+                                    .foregroundColor(pnlColor)
+                                Text("\(pnlValue >= 0 ? "+" : "")\(String(format: "%.2f", pnlValue))")
+                                    .font(InstitutionalTheme.Typography.micro)
+                                    .foregroundColor(pnlColor)
+                            }
                         }
                     }
 
                     sectionCard {
-                        SectionHeader(title: "Tez Geçersizliği", icon: "xmark.circle.fill", color: InstitutionalTheme.Colors.negative)
-                        Text(plan.invalidation)
+                        SectionHeader(title: "Plan Özeti", icon: "list.bullet.clipboard.fill", color: InstitutionalTheme.Colors.primary)
+
+                        HStack {
+                            detailMetric("İlerleme", "\(plan.completedStepCount)/\(plan.totalStepCount)")
+                            Spacer()
+                            detailMetric("Miktar", String(format: "%.2f", plan.initialQuantity))
+                            Spacer()
+                            detailMetric("Yaş", "\(plan.ageInDays) gün")
+                        }
+
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(InstitutionalTheme.Colors.surface3)
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .fill(InstitutionalTheme.Colors.primary)
+                                    .frame(width: geo.size.width * plan.completionRatio)
+                            }
+                        }
+                        .frame(height: 8)
+
+                        if let nextStep {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Sıradaki adım")
+                                    .font(InstitutionalTheme.Typography.micro)
+                                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                                Text(nextStep.trigger.displayText)
+                                    .font(InstitutionalTheme.Typography.caption)
+                                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                                Text(nextStep.action.displayText)
+                                    .font(InstitutionalTheme.Typography.micro)
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            }
+                            .padding(10)
+                            .background(
+                                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
+                                    .fill(InstitutionalTheme.Colors.surface3.opacity(0.6))
+                            )
+                        }
+
+                        Divider().overlay(InstitutionalTheme.Colors.borderSubtle)
+                        Text(plan.thesis)
                             .font(InstitutionalTheme.Typography.caption)
                             .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        Text("Geçersizlik: \(plan.invalidation)")
+                            .font(InstitutionalTheme.Typography.micro)
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     }
 
-                    let scenarios = [plan.bullishScenario, plan.bearishScenario, plan.neutralScenario].compactMap { $0 }
+                    sectionCard {
+                        SectionHeader(title: "Sembol Profili", icon: "shield.lefthalf.filled", color: profileColor)
+                        HStack {
+                            Text(profileTitle)
+                                .font(InstitutionalTheme.Typography.bodyStrong)
+                                .foregroundColor(profileColor)
+                            Spacer()
+                            Text("Volatilite \(Int(estimatedVolatility * 100))%")
+                                .font(InstitutionalTheme.Typography.micro)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        }
+
+                        if let decision {
+                            HStack {
+                                detailMetric("Konsey", decision.action.rawValue)
+                                Spacer()
+                                detailMetric("Güven", "%\(Int(decision.confidence * 100))")
+                                Spacer()
+                                detailMetric("Aether", decision.aetherDecision.stance.rawValue)
+                            }
+                        }
+
+                        if let warnings = eventRisk?.warnings, !warnings.isEmpty {
+                            Divider().overlay(InstitutionalTheme.Colors.borderSubtle)
+                            ForEach(warnings.prefix(3), id: \.self) { warning in
+                                Text("• \(warning)")
+                                    .font(InstitutionalTheme.Typography.micro)
+                                    .foregroundColor(InstitutionalTheme.Colors.warning)
+                            }
+                        }
+                    }
+
+                    let scenarios = plan.orderedScenarios
                     ForEach(scenarios) { scenario in
-                        ScenarioCard(scenario: scenario, executedSteps: plan.executedSteps)
+                        ScenarioCard(
+                            scenario: scenario,
+                            executedSteps: plan.executedSteps,
+                            nextStepID: nextStep?.id
+                        )
                     }
                 }
                 .padding(InstitutionalTheme.Spacing.md)
@@ -1414,6 +1588,17 @@ struct PositionPlanDetailView: View {
             Text(value)
                 .font(InstitutionalTheme.Typography.caption)
                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .lineLimit(1)
+        }
+    }
+
+    private func colorForAction(_ action: ArgusAction) -> Color {
+        switch action {
+        case .aggressiveBuy: return InstitutionalTheme.Colors.positive
+        case .accumulate: return InstitutionalTheme.Colors.primary
+        case .neutral: return InstitutionalTheme.Colors.textSecondary
+        case .trim: return InstitutionalTheme.Colors.warning
+        case .liquidate: return InstitutionalTheme.Colors.negative
         }
     }
 }
@@ -1421,6 +1606,7 @@ struct PositionPlanDetailView: View {
 struct ScenarioCard: View {
     let scenario: Scenario
     let executedSteps: [UUID]
+    let nextStepID: UUID?
 
     private var scenarioColor: Color {
         switch scenario.type {
@@ -1454,10 +1640,23 @@ struct ScenarioCard: View {
                         .frame(width: 8, height: 8)
                         .padding(.top, 5)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(step.trigger.displayText)
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                            .strikethrough(executedSteps.contains(step.id))
+                        HStack {
+                            Text(step.trigger.displayText)
+                                .font(InstitutionalTheme.Typography.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                                .strikethrough(executedSteps.contains(step.id))
+                            if step.id == nextStepID {
+                                Text("SONRAKİ")
+                                    .font(InstitutionalTheme.Typography.micro)
+                                    .foregroundColor(InstitutionalTheme.Colors.primary)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(
+                                        Capsule()
+                                            .fill(InstitutionalTheme.Colors.primary.opacity(0.18))
+                                    )
+                            }
+                        }
                         Text(step.action.displayText)
                             .font(InstitutionalTheme.Typography.micro)
                             .foregroundColor(InstitutionalTheme.Colors.textSecondary)

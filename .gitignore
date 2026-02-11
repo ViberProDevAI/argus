@@ -85,7 +85,13 @@ archive/
 # ===========================
 # Scripts (internal tooling)
 # ===========================
-Scripts/
+Scripts/*
+!Scripts/borsapy_server/
+Scripts/borsapy_server/venv/
+Scripts/borsapy_server/__pycache__/
+!Scripts/borsapy_server/main.py
+!Scripts/borsapy_server/requirements.txt
+!Scripts/borsapy_server/start.sh
 
 # ===========================
 # Environment

@@ -23,6 +23,7 @@ enum Secrets {
     static var pineconeKey: String { value(for: "PINECONE_KEY") }
     static var dovizComKey: String { value(for: "DOVIZCOM_KEY") }
     static var borsaPyKey: String { value(for: "BORSAPY_KEY") }
+    static var borsaPyURL: String { value(for: "BORSAPY_URL") }
 
     // MARK: - Legacy Support (Singleton Adapter)
     static let shared = SecretsLegacyAdapter()
@@ -42,6 +43,7 @@ enum Secrets {
         var fred: String { Secrets.fredKey }
         var dovizCom: String { Secrets.dovizComKey }
         var borsaPy: String { Secrets.borsaPyKey }
+        var borsaPyURL: String { Secrets.borsaPyURL }
     }
 
     private static func value(for key: String) -> String {

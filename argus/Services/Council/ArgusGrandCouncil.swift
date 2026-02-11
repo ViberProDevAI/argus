@@ -201,7 +201,13 @@ actor ArgusGrandCouncil {
             // Re-fetch True Macro (Rejim) because 'aetherDecision' holds Sirkiye (Flow) result for BIST currently
             let trueMacroDecision = await AetherCouncil.shared.convene(macro: macro)
             let flowDecision = aetherDecision // Currently SirkiyeEngine output
-            
+
+            // Analist konsensüsünü BorsaPy'den çek (BIST sembolü için)
+            let analystConsensus = try? await BorsaPyProvider.shared.getAnalystRecommendations(symbol: symbol)
+            if let ac = analystConsensus {
+                print("🎯 Council: Analist konsensüsü alındı - \(ac.recommendation) (\(ac.totalAnalysts) analist)")
+            }
+
             let bistRes = await BistGrandCouncil.shared.convene(
                 symbol: symbol,
                 faktorScore: athena,
@@ -210,7 +216,8 @@ actor ArgusGrandCouncil {
                 kulisData: hermesDecision,
                 grafikData: orionDecision,
                 bilancoData: atlasDecision,
-                rejimData: trueMacroDecision
+                rejimData: trueMacroDecision,
+                analystConsensus: analystConsensus
             )
             
             let finalDecision = ArgusGrandDecision(
@@ -793,7 +800,8 @@ actor BistGrandCouncil {
         kulisData: HermesDecision? = nil, // News/Analyst
         grafikData: CouncilDecision, // Orion
         bilancoData: AtlasDecision?, // Atlas
-        rejimData: AetherDecision // Macro (Global Aether)
+        rejimData: AetherDecision, // Macro (Global Aether)
+        analystConsensus: BistAnalystConsensus? = nil // Analist konsensüsü (BorsaPy)
     ) async -> BistDecisionResult {
         
         print("🇹🇷 BIST KONSEYİ TOPLANIYOR: \(symbol) 🇹🇷")
@@ -818,8 +826,8 @@ actor BistGrandCouncil {
         // --- AKIŞ (MoneyFlow/Sirkiye) ---
         let akisRes = analyzeAkis(akisResult)
         
-        // --- KULİS (Hermes) ---
-        let kulisRes = analyzeKulis(kulisData)
+        // --- KULİS (Hermes + Analist) ---
+        let kulisRes = analyzeKulis(kulisData, analystConsensus: analystConsensus)
         
         // --- SİRKÜLASYON (Placeholder for now) ---
         let sirkulasyonRes = BistModuleResult(name: "Sirkülasyon", score: 50, action: .hold, commentary: "Takas verisi nötr.", supportLevel: 0)
@@ -991,56 +999,101 @@ actor BistGrandCouncil {
         return BistModuleResult(name: "Akış", score: score, action: action, commentary: comm, supportLevel: support)
     }
     
-    private func analyzeKulis(_ data: HermesDecision?) -> BistModuleResult {
-        guard let data = data else { return .neutral(name: "Kulis") }
-        // Hermes netSupport teorik olarak >1 olabilir; normalize ediyoruz.
-        let normalizedNet = max(-1.0, min(1.0, data.netSupport / 1.2))
-        
-        let winningConfidence = data.winningProposal?.confidence ?? 0.5
-        let approveWeight = data.votes
-            .filter { $0.decision == .approve }
-            .reduce(0.0) { $0 + max(0, $1.weight) }
-        let vetoWeight = data.votes
-            .filter { $0.decision == .veto }
-            .reduce(0.0) { $0 + max(0, $1.weight) }
-        let weightedConsensus = (approveWeight - vetoWeight) / max(approveWeight + vetoWeight, 0.01) // -1..1
-        
-        // Kalite kapısı: düşük uzlaşı + düşük güven durumunda support küçültülür.
-        let consensusQuality = max(0.0, weightedConsensus) // yalnız pozitif uzlaşı kaliteyi arttırsın
-        let catalystBoost = min(Double(data.catalysts.count) * 0.08, 0.18)
-        let impactGate = data.isHighImpact ? 1.0 : 0.78
-        
-        var qualityGate = 0.35 + (winningConfidence * 0.35) + (consensusQuality * 0.30) + catalystBoost
-        qualityGate = min(max(qualityGate, 0.35), 1.15)
-        
-        var support = normalizedNet * qualityGate * impactGate
-        support = max(-1.0, min(1.0, support))
-        
+    private func analyzeKulis(_ data: HermesDecision?, analystConsensus: BistAnalystConsensus? = nil) -> BistModuleResult {
+        // Haber ve analist verilerini birleştirerek Kulis skoru hesapla
+        var hermesSupport: Double = 0
+        var hermesCommentary = ""
+
+        if let data = data {
+            // Hermes netSupport teorik olarak >1 olabilir; normalize ediyoruz.
+            let normalizedNet = max(-1.0, min(1.0, data.netSupport / 1.2))
+
+            let winningConfidence = data.winningProposal?.confidence ?? 0.5
+            let approveWeight = data.votes
+                .filter { $0.decision == .approve }
+                .reduce(0.0) { $0 + max(0, $1.weight) }
+            let vetoWeight = data.votes
+                .filter { $0.decision == .veto }
+                .reduce(0.0) { $0 + max(0, $1.weight) }
+            let weightedConsensus = (approveWeight - vetoWeight) / max(approveWeight + vetoWeight, 0.01)
+
+            let consensusQuality = max(0.0, weightedConsensus)
+            let catalystBoost = min(Double(data.catalysts.count) * 0.08, 0.18)
+            let impactGate = data.isHighImpact ? 1.0 : 0.78
+
+            var qualityGate = 0.35 + (winningConfidence * 0.35) + (consensusQuality * 0.30) + catalystBoost
+            qualityGate = min(max(qualityGate, 0.35), 1.15)
+
+            hermesSupport = normalizedNet * qualityGate * impactGate
+            hermesSupport = max(-1.0, min(1.0, hermesSupport))
+
+            let sentimentText = data.sentiment.displayTitle
+            hermesCommentary = "Haber: \(sentimentText)."
+            if !data.catalysts.isEmpty {
+                hermesCommentary += " Katalizör: \(data.catalysts.prefix(2).joined(separator: ", "))."
+            }
+        }
+
+        // Analist konsensüsü desteği (%30 ağırlık)
+        var analystSupport: Double = 0
+        var analystCommentary = ""
+
+        if let ac = analystConsensus, ac.totalAnalysts > 0 {
+            // Analist oranını -1..1 aralığına dönüştür
+            let buyRatio = Double(ac.buyCount) / Double(ac.totalAnalysts)
+            let sellRatio = Double(ac.sellCount) / Double(ac.totalAnalysts)
+            analystSupport = (buyRatio - sellRatio) * 2.0 // -2..2 → clamp to -1..1
+            analystSupport = max(-1.0, min(1.0, analystSupport))
+
+            // Potansiyel getiri katkısı
+            if ac.potentialReturn > 15 {
+                analystSupport = min(1.0, analystSupport + 0.2)
+            } else if ac.potentialReturn < -10 {
+                analystSupport = max(-1.0, analystSupport - 0.2)
+            }
+
+            analystCommentary = "Analist: \(ac.buyCount)AL/\(ac.holdCount)TUT/\(ac.sellCount)SAT"
+            if let target = ac.averageTargetPrice {
+                analystCommentary += " (Hedef: ₺\(String(format: "%.0f", target)), %\(String(format: "%.1f", ac.potentialReturn)))"
+            }
+            analystCommentary += "."
+        }
+
+        // Birleştirilmiş destek: Haber %70 + Analist %30
+        let hasHermes = data != nil
+        let hasAnalyst = analystConsensus != nil && (analystConsensus?.totalAnalysts ?? 0) > 0
+
+        let support: Double
+        if hasHermes && hasAnalyst {
+            support = hermesSupport * 0.70 + analystSupport * 0.30
+        } else if hasAnalyst {
+            support = analystSupport
+        } else if hasHermes {
+            support = hermesSupport
+        } else {
+            return .neutral(name: "Kulis")
+        }
+
+        let clampedSupport = max(-1.0, min(1.0, support))
+
         let action: ProposedAction
-        if support >= 0.22 {
+        if clampedSupport >= 0.22 {
             action = .buy
-        } else if support <= -0.22 {
+        } else if clampedSupport <= -0.22 {
             action = .sell
         } else {
             action = .hold
         }
-        
-        let sentimentText = data.sentiment.displayTitle
-        var commentary = "Haber akışı: \(sentimentText). Uzlaşı: %\(Int(weightedConsensus * 100)). Kalite kapısı: %\(Int(qualityGate * 100))."
-        if !data.catalysts.isEmpty {
-            commentary += " Katalizör: \(data.catalysts.prefix(2).joined(separator: ", "))."
-        }
-        if data.winningProposal == nil {
-            commentary += " Belirgin öneri yok; kulis etkisi temkinli işlendi."
-        }
-        
-        let score = max(0.0, min(100.0, 50.0 + (support * 45.0)))
+
+        let commentary = [hermesCommentary, analystCommentary].filter { !$0.isEmpty }.joined(separator: " ")
+        let score = max(0.0, min(100.0, 50.0 + (clampedSupport * 45.0)))
+
         return BistModuleResult(
             name: "Kulis",
             score: score,
             action: action,
             commentary: commentary,
-            supportLevel: support
+            supportLevel: clampedSupport
         )
     }
 }

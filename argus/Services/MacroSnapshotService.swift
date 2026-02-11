@@ -19,7 +19,7 @@ final class MacroSnapshotService: Sendable {
         async let marketData = fetchMarketData()
         
         let (econ, rates) = await fredData
-        let (sentiment, breadth) = await marketData
+        let (sentiment, breadth, commodities) = await marketData
         
         // 2. Synthesize Mode
         let mode = determineMarketMode(vix: sentiment.vix, fearGreed: sentiment.fearGreed)
@@ -51,6 +51,10 @@ final class MacroSnapshotService: Sendable {
             unemploymentRate: econ.unemployment,
             inflationRate: econ.cpi,
             consumerConfidence: nil, // Michigan Sentiment not yet implemented
+            
+            // Commodities & FX
+            dxy: commodities.dxy,
+            brent: commodities.brent,
             
             // Sector
             sectorRotation: rotation.phase,
@@ -131,7 +135,12 @@ final class MacroSnapshotService: Sendable {
         let nhNl: Double?
     }
     
-    private func fetchMarketData() async -> (SentimentData, BreadthData) {
+    private struct CommodityData {
+        let dxy: Double?
+        let brent: Double?
+    }
+    
+    private func fetchMarketData() async -> (SentimentData, BreadthData, CommodityData) {
         // Yahoo for VIX
         // Fear Greed is CNN (scraped?) or synthesized.
         // Let's use VIX and maybe simple synthesize.
@@ -141,6 +150,13 @@ final class MacroSnapshotService: Sendable {
         // Use Yahoo Macro
         let vixData = try? await yahoo.fetchMacro(symbol: "^VIX")
         let vix = vixData?.value
+        
+        // Fetch DXY and Brent Oil
+        let dxyData = try? await yahoo.fetchMacro(symbol: "DX-Y.NYB")
+        let dxy = dxyData?.value
+        
+        let brentData = try? await yahoo.fetchMacro(symbol: "BZ=F")
+        let brent = brentData?.value
         
         // Synthesize Fear/Greed from VIX and Momentum
         // 0-100. VIX 20 -> 50. VIX 10 -> 80 (Greed). VIX 40 -> 20 (Fear).
@@ -168,7 +184,8 @@ final class MacroSnapshotService: Sendable {
         
         return (
             SentimentData(vix: vix, fearGreed: fg, putCallRatio: nil),
-            BreadthData(adRatio: nil, above200: nil, nhNl: nil)
+            BreadthData(adRatio: nil, above200: nil, nhNl: nil),
+            CommodityData(dxy: dxy, brent: brent)
         )
     }
     

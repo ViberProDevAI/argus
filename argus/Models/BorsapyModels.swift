@@ -1,6 +1,93 @@
 
 import Foundation
 
+// MARK: - Teknik Sinyal Modelleri (TradingView ta_signals)
+
+/// 28 teknik göstergenin toplu sinyal sonucu
+struct BistTechnicalSignals: Codable {
+    let symbol: String
+    let timeframe: String
+    let summary: TASummary
+    let oscillators: TAIndicatorGroup
+    let movingAverages: TAIndicatorGroup
+    let timestamp: String
+
+    /// Özet sinyali Türkçe'ye çevirir
+    var sinyalTurkce: String {
+        switch summary.recommendation {
+        case "STRONG_BUY": return "Güçlü Al"
+        case "BUY": return "Al"
+        case "NEUTRAL": return "Nötr"
+        case "SELL": return "Sat"
+        case "STRONG_SELL": return "Güçlü Sat"
+        default: return summary.recommendation
+        }
+    }
+
+    var totalIndicators: Int { summary.buy + summary.sell + summary.neutral }
+}
+
+struct TASummary: Codable {
+    let recommendation: String
+    let buy: Int
+    let sell: Int
+    let neutral: Int
+}
+
+struct TAIndicatorGroup: Codable {
+    let recommendation: String
+    let values: [String: TAIndicatorValue]
+
+    var sinyalTurkce: String {
+        switch recommendation {
+        case "STRONG_BUY": return "Güçlü Al"
+        case "BUY": return "Al"
+        case "NEUTRAL": return "Nötr"
+        case "SELL": return "Sat"
+        case "STRONG_SELL": return "Güçlü Sat"
+        default: return recommendation
+        }
+    }
+}
+
+struct TAIndicatorValue: Codable {
+    let value: Double?
+    let signal: String
+
+    var sinyalTurkce: String {
+        switch signal {
+        case "BUY": return "Al"
+        case "SELL": return "Sat"
+        case "NEUTRAL": return "Nötr"
+        default: return signal
+        }
+    }
+}
+
+// MARK: - Enflasyon Modeli
+
+/// TÜFE/ÜFE enflasyon verisi (BorsaPy /inflation endpoint'i)
+struct BistInflationData: Codable {
+    let date: String
+    let yearlyInflation: Double
+    let monthlyInflation: Double
+    let type: String  // "TUFE" veya "UFE"
+
+    enum CodingKeys: String, CodingKey {
+        case date
+        case yearlyInflation = "yearly_inflation"
+        case monthlyInflation = "monthly_inflation"
+        case type
+    }
+}
+
+// MARK: - TCMB Politika Faizi
+
+struct TCMBPolicyRateResponse: Codable {
+    let rate: Double
+    let timestamp: String
+}
+
 // MARK: - Institution Rates (Doviz.com)
 
 /// Bir kurumun (banka veya kuyumcu) döviz/altın alış-satış fiyatları
