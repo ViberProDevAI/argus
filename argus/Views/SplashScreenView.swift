@@ -5,403 +5,231 @@ struct SplashScreenView: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    @State private var sceneOpacity: Double = 0
-    @State private var sceneScale: CGFloat = 0.97
-    @State private var gridShift: CGFloat = 0
-    @State private var starPulse: Double = 0
+    // Faz 1: Karanlıktan doğuş
+    @State private var glowOpacity: Double = 0
+    @State private var glowScale: CGFloat = 0.3
 
-    @State private var coreOpacity: Double = 0
-    @State private var coreScale: CGFloat = 0.86
-    @State private var coreRotation: Double = -22
-    @State private var ringProgress: CGFloat = 0
+    // Faz 2: Amblem
+    @State private var logoOpacity: Double = 0
+    @State private var logoScale: CGFloat = 0.88
     @State private var ringRotation: Double = 0
-    @State private var scanPosition: CGFloat = -150
-    @State private var lensPulse: CGFloat = 0.84
+    @State private var ringOpacity: Double = 0
+    @State private var titleRevealCount: Int = 0
+    @State private var subtitleOpacity: Double = 0
+    @State private var lineWidth: CGFloat = 0
 
-    @State private var visibleBootLines: Int = 0
-    @State private var progressValue: Double = 0
-    @State private var moduleStates: [Bool] = [false, false, false, false, false, false]
-    @State private var statusText = "SECURE BOOT HAZIRLANIYOR"
-    @State private var showCompleted = false
+    // Faz 3: Geçiş
+    @State private var sceneOffset: CGFloat = 0
+    @State private var sceneFade: Double = 1
 
     @State private var sequenceTask: Task<Void, Never>?
 
-    private let modules = ["TAHTA", "KASA", "KULIS", "REJIM", "ORACLE", "RISK"]
-    private let bootScript = [
-        "[INIT] Core integrity check",
-        "[SYNC] Council topology restored",
-        "[LOAD] Market routers engaged",
-        "[BIND] Portfolio shield active",
-        "[READY] Strategy chamber online"
-    ]
+    private let titleText = "ARGUS"
 
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-            let compact = size.width < 380
-            let coreSize: CGFloat = compact ? 214 : 248
 
             ZStack {
-                backgroundLayer
-
-                SplashConstellationLayer(pulse: starPulse)
-                    .opacity(0.28)
+                // Arka plan: saf siyahtan doğuş
+                InstitutionalTheme.Colors.background
                     .ignoresSafeArea()
 
-                SplashCommandGridLayer(shift: gridShift)
-                    .opacity(0.24)
-                    .ignoresSafeArea()
-
+                // Merkezi glow efekti
                 RadialGradient(
                     colors: [
-                        InstitutionalTheme.Colors.primary.opacity(0.18),
-                        InstitutionalTheme.Colors.warning.opacity(0.08),
+                        Color(hex: "D4A843").opacity(0.22),
+                        InstitutionalTheme.Colors.primary.opacity(0.08),
                         .clear
                     ],
                     center: .center,
-                    startRadius: 10,
-                    endRadius: max(size.width, size.height) * 0.54
+                    startRadius: 4,
+                    endRadius: min(size.width, size.height) * 0.42
                 )
-                .blur(radius: 24)
+                .scaleEffect(glowScale)
+                .opacity(glowOpacity)
+                .blur(radius: 40)
                 .ignoresSafeArea()
-                .opacity(coreOpacity)
 
-                VStack(spacing: compact ? 14 : 18) {
-                    sigil(size: coreSize)
+                // Ambiyans partikülleri
+                SplashAmbientParticles(opacity: glowOpacity * 0.4)
+                    .ignoresSafeArea()
 
-                    VStack(spacing: compact ? 8 : 10) {
-                        Text("ARGUS")
-                            .font(.system(size: compact ? 34 : 40, weight: .semibold, design: .rounded))
-                            .tracking(compact ? 7 : 9)
-                            .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(coreOpacity))
+                // Ana içerik
+                VStack(spacing: 0) {
+                    Spacer()
 
-                        Text("INSTITUTIONAL DECISION CORE")
-                            .font(.system(size: compact ? 9 : 10, weight: .semibold, design: .monospaced))
-                            .tracking(2.8)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary.opacity(coreOpacity))
-                    }
+                    // Logo + Ring grubu
+                    ZStack {
+                        // Dönen halka
+                        SplashOrbitalRing(rotation: ringRotation)
+                            .frame(width: 188, height: 188)
+                            .opacity(ringOpacity)
 
-                    moduleRow(compact: compact)
-                        .padding(.top, compact ? 2 : 4)
-
-                    bootPanel(compact: compact)
-                        .padding(.top, compact ? 2 : 6)
-                }
-                .frame(maxWidth: 560)
-                .padding(.horizontal, 18)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .opacity(sceneOpacity)
-                .scaleEffect(sceneScale)
-
-                LinearGradient(
-                    colors: [.black.opacity(0.50), .clear, .black.opacity(0.76)],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                .allowsHitTesting(false)
-            }
-        }
-        .onAppear {
-            startSequence()
-        }
-        .onDisappear {
-            sequenceTask?.cancel()
-        }
-    }
-
-    private var backgroundLayer: some View {
-        LinearGradient(
-            colors: [
-                InstitutionalTheme.Colors.background,
-                InstitutionalTheme.Colors.surface1,
-                InstitutionalTheme.Colors.background
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-        .ignoresSafeArea()
-    }
-
-    private func sigil(size: CGFloat) -> some View {
-        ZStack {
-            Circle()
-                .stroke(InstitutionalTheme.Colors.borderStrong, lineWidth: 1)
-                .frame(width: size, height: size)
-
-            Circle()
-                .trim(from: 0, to: ringProgress)
-                .stroke(
-                    AngularGradient(
-                        colors: [
-                            InstitutionalTheme.Colors.primary.opacity(0.18),
-                            InstitutionalTheme.Colors.primary,
-                            InstitutionalTheme.Colors.warning,
-                            InstitutionalTheme.Colors.primary.opacity(0.18)
-                        ],
-                        center: .center
-                    ),
-                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round)
-                )
-                .rotationEffect(.degrees(ringRotation - 90))
-                .frame(width: size, height: size)
-
-            Circle()
-                .trim(from: 0.05, to: 0.95)
-                .stroke(
-                    InstitutionalTheme.Colors.primary.opacity(0.28),
-                    style: StrokeStyle(lineWidth: 1.2, dash: [4, 8])
-                )
-                .rotationEffect(.degrees(-ringRotation * 0.6))
-                .frame(width: size - 26, height: size - 26)
-
-            HexagonShape()
-                .stroke(InstitutionalTheme.Colors.borderStrong, lineWidth: 1)
-                .frame(width: size - 76, height: size - 76)
-                .rotationEffect(.degrees(coreRotation))
-
-            Circle()
-                .stroke(InstitutionalTheme.Colors.primary.opacity(0.26), lineWidth: 7)
-                .frame(width: size - 90, height: size - 90)
-                .blur(radius: 8)
-                .scaleEffect(lensPulse)
-
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [.clear, InstitutionalTheme.Colors.primary.opacity(0.78), .clear],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(width: size + 36, height: 2)
-                .offset(y: scanPosition)
-                .opacity(coreOpacity)
-
-            Text("A")
-                .font(.system(size: size * 0.27, weight: .bold, design: .monospaced))
-                .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.94))
-                .shadow(color: InstitutionalTheme.Colors.primary.opacity(0.35), radius: 16, x: 0, y: 0)
-        }
-        .scaleEffect(coreScale)
-        .opacity(coreOpacity)
-    }
-
-    private func moduleRow(compact: Bool) -> some View {
-        let columns = [
-            GridItem(.flexible(), spacing: 8),
-            GridItem(.flexible(), spacing: 8),
-            GridItem(.flexible(), spacing: 8)
-        ]
-
-        return LazyVGrid(columns: columns, spacing: 8) {
-            ForEach(modules.indices, id: \.self) { idx in
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(moduleStates[idx] ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.textTertiary.opacity(0.45))
-                        .frame(width: 6, height: 6)
-
-                    Text(modules[idx])
-                        .font(.system(size: compact ? 9 : 10, weight: .semibold, design: .monospaced))
-                        .tracking(1.1)
-                        .foregroundColor(moduleStates[idx] ? InstitutionalTheme.Colors.textPrimary : InstitutionalTheme.Colors.textTertiary)
-                        .lineLimit(1)
-                }
-                .frame(maxWidth: .infinity, minHeight: compact ? 22 : 24)
-                .padding(.horizontal, compact ? 7 : 9)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(InstitutionalTheme.Colors.surface2.opacity(moduleStates[idx] ? 0.88 : 0.62))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(
-                            moduleStates[idx] ? InstitutionalTheme.Colors.borderStrong : InstitutionalTheme.Colors.borderSubtle,
-                            lineWidth: 1
-                        )
-                )
-                .opacity(moduleStates[idx] ? 1 : 0.78)
-                .scaleEffect(moduleStates[idx] ? 1 : 0.95)
-            }
-        }
-        .frame(maxWidth: 470)
-    }
-
-    private func bootPanel(compact: Bool) -> some View {
-        VStack(spacing: 10) {
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(showCompleted ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.warning)
-                    .frame(width: 8, height: 8)
-
-                Text(showCompleted ? "BOOT COMPLETE" : "BOOTING")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-
-                Spacer()
-
-                Text("\(Int(progressValue * 100))%")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(bootScript.indices, id: \.self) { idx in
-                    Text(bootScript[idx])
-                        .font(.system(size: compact ? 10 : 11, weight: .medium, design: .monospaced))
-                        .foregroundColor(colorForBootLine(index: idx))
-                        .lineLimit(1)
-                        .opacity(visibleBootLines > idx ? 1 : 0)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: compact ? 62 : 70, alignment: .topLeading)
-
-            VStack(spacing: 6) {
-                GeometryReader { proxy in
-                    let width = proxy.size.width
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(InstitutionalTheme.Colors.surface3)
-
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        InstitutionalTheme.Colors.primary.opacity(0.76),
-                                        InstitutionalTheme.Colors.warning.opacity(0.72)
-                                    ],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                        // Logo görseli
+                        Image("SplashLogo")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 120, height: 120)
+                            .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+                            .shadow(
+                                color: Color(hex: "D4A843").opacity(0.3),
+                                radius: 28, x: 0, y: 0
                             )
-                            .frame(width: width * progressValue)
+                            .scaleEffect(logoScale)
+                            .opacity(logoOpacity)
                     }
-                }
-                .frame(height: 7)
 
-                Text(statusText)
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                    .tracking(1.1)
-                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Spacer().frame(height: 36)
+
+                    // Başlık: Harf harf reveal
+                    HStack(spacing: 4) {
+                        ForEach(Array(titleText.enumerated()), id: \.offset) { index, char in
+                            Text(String(char))
+                                .font(.system(size: 38, weight: .semibold, design: .rounded))
+                                .tracking(10)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                                .opacity(titleRevealCount > index ? 1 : 0)
+                                .offset(y: titleRevealCount > index ? 0 : 8)
+                                .animation(
+                                    .easeOut(duration: reduceMotion ? 0.1 : 0.28)
+                                        .delay(Double(index) * (reduceMotion ? 0.03 : 0.07)),
+                                    value: titleRevealCount
+                                )
+                        }
+                    }
+
+                    Spacer().frame(height: 12)
+
+                    // Ayırıcı çizgi
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    .clear,
+                                    Color(hex: "D4A843").opacity(0.6),
+                                    .clear
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: lineWidth, height: 1)
+
+                    Spacer().frame(height: 14)
+
+                    // Alt başlık
+                    Text("INSTITUTIONAL DECISION CORE")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                        .tracking(3.2)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                        .opacity(subtitleOpacity)
+
+                    Spacer()
+                    Spacer()
+                }
+                .offset(y: sceneOffset)
+                .opacity(sceneFade)
             }
         }
-        .padding(.horizontal, compact ? 12 : 14)
-        .padding(.vertical, compact ? 11 : 12)
-        .frame(maxWidth: 470)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(InstitutionalTheme.Colors.surface1.opacity(0.94))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(InstitutionalTheme.Colors.borderStrong, lineWidth: 1)
-        )
+        .onAppear { startSequence() }
+        .onDisappear { sequenceTask?.cancel() }
     }
 
-    private func colorForBootLine(index: Int) -> Color {
-        if visibleBootLines > index {
-            return showCompleted
-                ? InstitutionalTheme.Colors.positive.opacity(0.92)
-                : InstitutionalTheme.Colors.textPrimary.opacity(0.93)
-        }
-        return InstitutionalTheme.Colors.textTertiary.opacity(0.4)
-    }
+    // MARK: - Animasyon Sekansı
 
     private func startSequence() {
         sequenceTask?.cancel()
-        sequenceTask = Task {
-            await runSequence()
-        }
+        sequenceTask = Task { await runSequence() }
     }
 
     private func runSequence() async {
-        let step: UInt64 = reduceMotion ? 70 : 130
+        let fast = reduceMotion
 
+        // ── Faz 1: Karanlıktan doğuş ──
+        await animate(duration: fast ? 0.4 : 0.9) {
+            glowOpacity = 1
+            glowScale = 1.0
+        }
+
+        guard await pause(ms: fast ? 100 : 250) else { return }
+
+        // ── Faz 2: Amblem ortaya çıkışı ──
+        await animate(duration: fast ? 0.3 : 0.7, spring: true) {
+            logoOpacity = 1
+            logoScale = 1.0
+        }
+
+        await animate(duration: fast ? 0.4 : 0.8) {
+            ringOpacity = 1
+        }
+
+        // Halka dönüşü başlat
+        await animate(duration: fast ? 8 : 14, repeating: true) {
+            ringRotation = 360
+        }
+
+        guard await pause(ms: fast ? 80 : 180) else { return }
+
+        // Başlık reveal
         await MainActor.run {
-            withAnimation(.easeOut(duration: reduceMotion ? 0.20 : 0.38)) {
-                sceneOpacity = 1
-                sceneScale = 1
-                coreOpacity = 1
-                coreScale = 1
-            }
-
-            withAnimation(.linear(duration: reduceMotion ? 6 : 10).repeatForever(autoreverses: false)) {
-                gridShift = 38
-                ringRotation = 360
-            }
-
-            withAnimation(.easeInOut(duration: reduceMotion ? 1.0 : 1.6).repeatForever(autoreverses: true)) {
-                lensPulse = 1.03
-                starPulse = 1
-            }
+            titleRevealCount = titleText.count
         }
 
-        guard await pause(milliseconds: step) else { return }
+        guard await pause(ms: fast ? 200 : 500) else { return }
 
-        await MainActor.run {
-            withAnimation(.easeInOut(duration: reduceMotion ? 0.38 : 0.72)) {
-                ringProgress = 1
-                coreRotation = 0
-            }
+        // Çizgi genişlemesi
+        await animate(duration: fast ? 0.3 : 0.6) {
+            lineWidth = 160
         }
 
-        guard await pause(milliseconds: step) else { return }
+        guard await pause(ms: fast ? 80 : 160) else { return }
 
-        await MainActor.run {
-            withAnimation(.easeInOut(duration: reduceMotion ? 0.34 : 1.02)) {
-                scanPosition = 150
-            }
+        // Alt başlık fade in
+        await animate(duration: fast ? 0.2 : 0.5) {
+            subtitleOpacity = 1
         }
 
-        for idx in bootScript.indices {
-            await MainActor.run {
-                withAnimation(.easeOut(duration: reduceMotion ? 0.15 : 0.26)) {
-                    visibleBootLines = idx + 1
-                    progressValue = min(0.78, Double(idx + 1) / Double(bootScript.count + 1))
-                }
-            }
-            guard await pause(milliseconds: step) else { return }
+        // Sahneyi göster - dinlenme süresi
+        guard await pause(ms: fast ? 400 : 900) else { return }
+
+        // ── Faz 3: Zarif çıkış ──
+        await animate(duration: fast ? 0.3 : 0.5) {
+            sceneFade = 0
+            sceneOffset = -16
         }
 
-        for idx in modules.indices {
-            await MainActor.run {
-                withAnimation(.spring(response: reduceMotion ? 0.18 : 0.40, dampingFraction: 0.84)) {
-                    moduleStates[idx] = true
-                    progressValue = min(0.94, progressValue + 0.03)
-                }
-            }
-            guard await pause(milliseconds: step / 2 + 32) else { return }
-        }
+        guard await pause(ms: fast ? 100 : 200) else { return }
 
-        await MainActor.run {
-            withAnimation(.easeOut(duration: reduceMotion ? 0.16 : 0.3)) {
-                statusText = "ARGUS CORE STABLE"
-                progressValue = 1
-                showCompleted = true
-            }
-        }
-
-        guard await pause(milliseconds: reduceMotion ? 220 : 560) else { return }
-
-        await MainActor.run {
-            withAnimation(.easeIn(duration: reduceMotion ? 0.2 : 0.42)) {
-                sceneOpacity = 0
-                sceneScale = 1.02
-            }
-        }
-
-        guard await pause(milliseconds: reduceMotion ? 180 : 420) else { return }
         await MainActor.run {
             onFinished()
         }
     }
 
-    private func pause(milliseconds: UInt64) async -> Bool {
+    // MARK: - Yardımcılar
+
+    private func animate(
+        duration: Double,
+        spring: Bool = false,
+        repeating: Bool = false,
+        block: @escaping () -> Void
+    ) async {
+        await MainActor.run {
+            let animation: Animation
+            if repeating {
+                animation = .linear(duration: duration).repeatForever(autoreverses: false)
+            } else if spring {
+                animation = .spring(response: duration, dampingFraction: 0.78)
+            } else {
+                animation = .easeInOut(duration: duration)
+            }
+            withAnimation(animation, block)
+        }
+    }
+
+    private func pause(ms: UInt64) async -> Bool {
         do {
-            try await Task.sleep(nanoseconds: milliseconds * 1_000_000)
+            try await Task.sleep(nanoseconds: ms * 1_000_000)
             return !Task.isCancelled
         } catch {
             return false
@@ -409,88 +237,79 @@ struct SplashScreenView: View {
     }
 }
 
-private struct SplashConstellationLayer: View {
-    let pulse: Double
+// MARK: - Orbital Ring
+
+private struct SplashOrbitalRing: View {
+    let rotation: Double
+
+    var body: some View {
+        ZStack {
+            // Dış halka
+            Circle()
+                .stroke(
+                    AngularGradient(
+                        colors: [
+                            Color(hex: "D4A843").opacity(0.5),
+                            InstitutionalTheme.Colors.primary.opacity(0.2),
+                            .clear,
+                            .clear,
+                            Color(hex: "D4A843").opacity(0.5)
+                        ],
+                        center: .center
+                    ),
+                    style: StrokeStyle(lineWidth: 1.4, lineCap: .round)
+                )
+                .rotationEffect(.degrees(rotation))
+
+            // İç ince halka
+            Circle()
+                .stroke(
+                    InstitutionalTheme.Colors.primary.opacity(0.12),
+                    style: StrokeStyle(lineWidth: 0.6, dash: [3, 9])
+                )
+                .padding(14)
+                .rotationEffect(.degrees(-rotation * 0.5))
+        }
+    }
+}
+
+// MARK: - Ambient Particles
+
+private struct SplashAmbientParticles: View {
+    let opacity: Double
 
     var body: some View {
         GeometryReader { proxy in
             let size = proxy.size
-
             ZStack {
-                ForEach(0..<40, id: \.self) { idx in
-                    let point = starPoint(for: idx, in: size)
+                ForEach(0..<18, id: \.self) { idx in
                     Circle()
-                        .fill(InstitutionalTheme.Colors.textPrimary)
-                        .frame(width: idx % 7 == 0 ? 2.4 : 1.4, height: idx % 7 == 0 ? 2.4 : 1.4)
-                        .opacity(baseOpacity(for: idx) + pulse * 0.10)
-                        .position(point)
+                        .fill(
+                            idx % 3 == 0
+                                ? Color(hex: "D4A843")
+                                : InstitutionalTheme.Colors.textPrimary
+                        )
+                        .frame(width: particleSize(idx), height: particleSize(idx))
+                        .opacity(particleOpacity(idx) * opacity)
+                        .position(particlePosition(idx, in: size))
                 }
             }
         }
         .allowsHitTesting(false)
     }
 
-    private func starPoint(for index: Int, in size: CGSize) -> CGPoint {
-        let normalizedX = (sin(Double(index) * 12.37) * 0.5) + 0.5
-        let normalizedY = (cos(Double(index) * 8.11) * 0.5) + 0.5
-        return CGPoint(
-            x: normalizedX * size.width,
-            y: normalizedY * size.height
-        )
+    private func particleSize(_ idx: Int) -> CGFloat {
+        CGFloat(1.0 + Double((idx * 7) % 5) * 0.4)
     }
 
-    private func baseOpacity(for index: Int) -> Double {
-        0.06 + Double((index * 13) % 9) * 0.01
+    private func particleOpacity(_ idx: Int) -> Double {
+        0.15 + Double((idx * 11) % 7) * 0.06
     }
-}
 
-private struct SplashCommandGridLayer: View {
-    let shift: CGFloat
-
-    var body: some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            let height = proxy.size.height
-            let spacing: CGFloat = 34
-            let shifted = shift.truncatingRemainder(dividingBy: spacing)
-
-            Path { path in
-                for x in stride(from: 0, through: width, by: spacing) {
-                    path.move(to: CGPoint(x: x, y: 0))
-                    path.addLine(to: CGPoint(x: x, y: height))
-                }
-
-                for y in stride(from: -spacing + shifted, through: height + spacing, by: spacing) {
-                    path.move(to: CGPoint(x: 0, y: y))
-                    path.addLine(to: CGPoint(x: width, y: y))
-                }
-            }
-            .stroke(InstitutionalTheme.Colors.primary.opacity(0.22), lineWidth: 0.45)
-        }
-        .allowsHitTesting(false)
-    }
-}
-
-private struct HexagonShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-
-        for index in 0..<6 {
-            let angle = Angle.degrees(Double(index) * 60 - 90).radians
-            let point = CGPoint(
-                x: center.x + CGFloat(Foundation.cos(angle)) * radius,
-                y: center.y + CGFloat(Foundation.sin(angle)) * radius
-            )
-            if index == 0 {
-                path.move(to: point)
-            } else {
-                path.addLine(to: point)
-            }
-        }
-        path.closeSubpath()
-        return path
+    private func particlePosition(_ idx: Int, in size: CGSize) -> CGPoint {
+        let nx = (sin(Double(idx) * 9.73) * 0.5) + 0.5
+        let ny = (cos(Double(idx) * 6.29) * 0.5) + 0.5
+        return CGPoint(x: nx * size.width, y: ny * size.height)
     }
 }
 
