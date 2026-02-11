@@ -1,0 +1,162 @@
+{
+    "version": "1.0",
+    "bootstrapDate": "2026-01-18",
+    "source": "TradeHistory_and_SQLite_Analysis",
+    "modules": {
+        "orion": {
+            "brackets": {
+                "80-100": {
+                    "attempts": 52,
+                    "correct": 31,
+                    "hitRate": 0.596
+                },
+                "60-80": {
+                    "attempts": 118,
+                    "correct": 48,
+                    "hitRate": 0.407
+                },
+                "40-60": {
+                    "attempts": 156,
+                    "correct": 42,
+                    "hitRate": 0.269
+                },
+                "20-40": {
+                    "attempts": 45,
+                    "correct": 8,
+                    "hitRate": 0.178
+                },
+                "0-20": {
+                    "attempts": 12,
+                    "correct": 1,
+                    "hitRate": 0.083
+                }
+            }
+        },
+        "atlas": {
+            "brackets": {
+                "80-100": {
+                    "attempts": 68,
+                    "correct": 38,
+                    "hitRate": 0.559
+                },
+                "60-80": {
+                    "attempts": 142,
+                    "correct": 55,
+                    "hitRate": 0.387
+                },
+                "40-60": {
+                    "attempts": 185,
+                    "correct": 48,
+                    "hitRate": 0.259
+                },
+                "20-40": {
+                    "attempts": 52,
+                    "correct": 10,
+                    "hitRate": 0.192
+                },
+                "0-20": {
+                    "attempts": 8,
+                    "correct": 0,
+                    "hitRate": 0.000
+                }
+            }
+        },
+        "aether": {
+            "brackets": {
+                "60-80": {
+                    "attempts": 28,
+                    "correct": 14,
+                    "hitRate": 0.500
+                },
+                "40-60": {
+                    "attempts": 425,
+                    "correct": 140,
+                    "hitRate": 0.329
+                }
+            }
+        },
+        "hermes": {
+            "brackets": {
+                "80-100": {
+                    "attempts": 15,
+                    "correct": 9,
+                    "hitRate": 0.600
+                },
+                "60-80": {
+                    "attempts": 42,
+                    "correct": 18,
+                    "hitRate": 0.429
+                },
+                "40-60": {
+                    "attempts": 85,
+                    "correct": 28,
+                    "hitRate": 0.329
+                },
+                "20-40": {
+                    "attempts": 38,
+                    "correct": 8,
+                    "hitRate": 0.211
+                },
+                "0-20": {
+                    "attempts": 12,
+                    "correct": 2,
+                    "hitRate": 0.167
+                }
+            }
+        },
+        "phoenix": {
+            "brackets": {
+                "80-100": {
+                    "attempts": 8,
+                    "correct": 5,
+                    "hitRate": 0.625
+                },
+                "60-80": {
+                    "attempts": 22,
+                    "correct": 11,
+                    "hitRate": 0.500
+                },
+                "40-60": {
+                    "attempts": 65,
+                    "correct": 22,
+                    "hitRate": 0.338
+                },
+                "20-40": {
+                    "attempts": 95,
+                    "correct": 25,
+                    "hitRate": 0.263
+                },
+                "0-20": {
+                    "attempts": 45,
+                    "correct": 8,
+                    "hitRate": 0.178
+                }
+            }
+        }
+    },
+    "correlations": {
+        "orion_80+_atlas_80+": {
+            "attempts": 22,
+            "correct": 15,
+            "hitRate": 0.682
+        },
+        "orion_60+_atlas_60+": {
+            "attempts": 85,
+            "correct": 42,
+            "hitRate": 0.494
+        },
+        "orion_80+_aether_50+": {
+            "attempts": 48,
+            "correct": 28,
+            "hitRate": 0.583
+        }
+    },
+    "summary": {
+        "total_trades": 455,
+        "profitable_trades": 151,
+        "losing_trades": 142,
+        "breakeven_trades": 162,
+        "overall_hitRate": 0.332,
+        "notes": "Bootstrap created from historical trade data. Aether mostly at 50-53 range during this period."
+    }
+}
