@@ -183,9 +183,16 @@ actor TCMBDataService {
     // MARK: - Cache
     private var cachedSnapshot: TCMBMacroSnapshot?
     private var lastFetchTime: Date?
-    private let cacheValiditySeconds: TimeInterval = 3600 // 1 saat
+    private let cacheValiditySeconds: TimeInterval = 20 * 60 // 20 dakika
+    private let staleRefreshThresholdSeconds: TimeInterval = 8 * 60 // 8 dakika sonra arka plan yenile
+    private let minMeaningfulFieldCount = 4
+    private var refreshTask: Task<TCMBMacroSnapshot, Never>?
     private var seriesHistoryCache: [String: (data: [MacroDataPoint], fetchedAt: Date)] = [:]
     private let seriesHistoryCacheValidity: TimeInterval = 10 * 60 // 10 dakika
+    private var cachedOracleInput: OracleDataInput?
+    private var oracleInputFetchTime: Date?
+    private let oracleCacheValiditySeconds: TimeInterval = 10 * 60 // 10 dakika
+    private var oracleRefreshTask: Task<OracleDataInput, Never>?
     
     // MARK: - Public API
     
@@ -195,40 +202,32 @@ actor TCMBDataService {
     }
     
     /// Guncel makro snapshot'i dondur (cache varsa kullan)
-    func getMacroSnapshot() async -> TCMBMacroSnapshot {
-        // Cache gecerli mi?
-        if let cached = cachedSnapshot,
-           let lastTime = lastFetchTime,
-           Date().timeIntervalSince(lastTime) < cacheValiditySeconds {
-            return cached
-        }
-        
-        let apiKey = await currentAPIKey()
-
-        // API Key yoksa, resmi keyless kaynaklardan (tcmb.gov.tr + yahoo) canli fallback dene
-        guard !apiKey.isEmpty else {
-            if let publicSnapshot = await fetchPublicKeylessSnapshot() {
-                cachedSnapshot = publicSnapshot
-                lastFetchTime = Date()
-                print("✅ TCMB: Keyless resmi fallback verileri guncellendi")
-                return publicSnapshot
+    func getMacroSnapshot(forceRefresh: Bool = false) async -> TCMBMacroSnapshot {
+        if !forceRefresh,
+           let cached = cachedSnapshot,
+           let lastTime = lastFetchTime {
+            let age = Date().timeIntervalSince(lastTime)
+            if age < cacheValiditySeconds, isMeaningful(snapshot: cached) {
+                if age >= staleRefreshThresholdSeconds {
+                    scheduleBackgroundRefreshIfNeeded()
+                }
+                return cached
             }
-
-            print("⚠️ TCMB: API Key yok ve keyless fallback de alinmadi, bos snapshot donuluyor")
-            let emptySnapshot = TCMBMacroSnapshot.empty
-            cachedSnapshot = emptySnapshot
-            lastFetchTime = Date()
-            return emptySnapshot
         }
-        
-        // Yeni veri cek
-        return await fetchFreshData()
+
+        return await refreshSnapshotNow()
+    }
+
+    /// UI/Background job'larin explicit yenileme cagirmasi icin.
+    func refreshMacroSnapshot() async -> TCMBMacroSnapshot {
+        await getMacroSnapshot(forceRefresh: true)
     }
     
     /// API Key'i ayarla
     func setAPIKey(_ key: String) async {
         await APIKeyStore.shared.setCustomValue(key, for: "tcmb_evds_api_key")
         cachedSnapshot = nil // Cache'i invalidate et
+        lastFetchTime = nil
     }
     
     /// API baglantisini test et
@@ -314,9 +313,6 @@ actor TCMBDataService {
             timestamp: Date()
         )
 
-        cachedSnapshot = snapshot
-        lastFetchTime = Date()
-        
         print("✅ TCMB: Kapsamlı makro veriler güncellendi")
         print("   USD/TRY: \(snapshot.usdTry ?? 0), Faiz: %\(snapshot.policyRate ?? 0), Enflasyon: %\(snapshot.inflation ?? 0)")
         print("   Reel Faiz: %\(snapshot.realInterestRate ?? 0), Cari Denge: \(snapshot.currentAccount ?? 0)B$")
@@ -617,6 +613,75 @@ actor TCMBDataService {
         case apiError
         case parseError
     }
+
+    // MARK: - Cache/Refresh Policy
+
+    private func refreshSnapshotNow() async -> TCMBMacroSnapshot {
+        if let task = refreshTask {
+            return await task.value
+        }
+
+        let task = Task<TCMBMacroSnapshot, Never> {
+            await self.performRefreshPipeline()
+        }
+
+        refreshTask = task
+        let result = await task.value
+        refreshTask = nil
+        return result
+    }
+
+    private func scheduleBackgroundRefreshIfNeeded() {
+        guard refreshTask == nil else { return }
+        refreshTask = Task<TCMBMacroSnapshot, Never> {
+            await self.performRefreshPipeline()
+        }
+    }
+
+    private func performRefreshPipeline() async -> TCMBMacroSnapshot {
+        let apiKey = await currentAPIKey()
+
+        if !apiKey.isEmpty {
+            let evdsSnapshot = await fetchFreshData()
+            if isMeaningful(snapshot: evdsSnapshot) {
+                store(snapshot: evdsSnapshot)
+                return evdsSnapshot
+            }
+        }
+
+        if let publicSnapshot = await fetchPublicKeylessSnapshot(),
+           isMeaningful(snapshot: publicSnapshot) {
+            store(snapshot: publicSnapshot)
+            print("✅ TCMB: Keyless resmi fallback verileri guncellendi")
+            return publicSnapshot
+        }
+
+        if let cached = cachedSnapshot, isMeaningful(snapshot: cached) {
+            print("⚠️ TCMB: Yeni veri alinamadı, son anlamli cache kullaniliyor")
+            return cached
+        }
+
+        print("⚠️ TCMB: Anlamli veri alinamadı, bos snapshot donuluyor")
+        return .empty
+    }
+
+    private func store(snapshot: TCMBMacroSnapshot) {
+        cachedSnapshot = snapshot
+        lastFetchTime = Date()
+    }
+
+    private func isMeaningful(snapshot: TCMBMacroSnapshot) -> Bool {
+        var count = 0
+        if snapshot.usdTry != nil { count += 1 }
+        if snapshot.policyRate != nil { count += 1 }
+        if snapshot.inflation != nil { count += 1 }
+        if snapshot.bist100 != nil { count += 1 }
+        if snapshot.brentOil != nil { count += 1 }
+        if snapshot.goldPrice != nil { count += 1 }
+        if snapshot.currentAccount != nil { count += 1 }
+        if snapshot.reserves != nil { count += 1 }
+        return count >= minMeaningfulFieldCount
+    }
 }
 
 // MARK: - Sirkiye Engine Integration
@@ -667,27 +732,91 @@ extension TCMBDataService {
 extension TCMBDataService {
     /// OracleEngine icin genisletilmis veri seti
     /// Veri yoksa alanlar nil kalir; sahte/fallback rakam uretilmez.
-    func getOracleInput() async -> OracleDataInput {
-        let snapshot = await getMacroSnapshot()
-        async let kkoHistory = fetchKKOWithHistory()
-        async let ccHistory = fetchCCSpendingWithHistory()
-        let kko = await kkoHistory
-        let cc = await ccHistory
+    func getOracleInput(forceRefresh: Bool = false) async -> OracleDataInput {
+        if !forceRefresh,
+           let cached = cachedOracleInput,
+           let fetchedAt = oracleInputFetchTime,
+           Date().timeIntervalSince(fetchedAt) < oracleCacheValiditySeconds {
+            return cached
+        }
 
-        return OracleDataInput(
-            inflationYoY: snapshot.inflation,
-            housingSalesTotal: nil,
-            housingSalesChangeYoY: nil,
-            housingSalesChangeMoM: nil,
-            creditCardSpendingTotal: cc?.current ?? snapshot.creditCardSpendingBillionTL,
-            creditCardSpendingChangeYoY: cc?.changeYoY,
-            capacityUsageRatio: kko?.current ?? snapshot.capacityUsage,
-            prevCapacityUsageRatio: kko?.prevYear,
-            touristArrivalsTotal: nil,
-            touristArrivalsChangeYoY: nil,
-            autoSalesTotal: nil,
-            autoSalesChangeYoY: nil
-        )
+        if !forceRefresh, let task = oracleRefreshTask {
+            return await task.value
+        }
+
+        let task = Task<OracleDataInput, Never> {
+            let snapshot = await self.getMacroSnapshot(forceRefresh: forceRefresh)
+            async let kkoHistory = self.fetchKKOWithHistory()
+            async let ccHistory = self.fetchCCSpendingWithHistory()
+            async let housingProxy = self.fetchSectorProxy(code: "XGMYO")
+            async let tourismProxy = self.fetchSectorProxy(code: "XULAS")
+            async let autoProxy = self.fetchSectorProxy(code: "XMANA")
+            let kko = await kkoHistory
+            let cc = await ccHistory
+            let housing = await housingProxy
+            let tourism = await tourismProxy
+            let auto = await autoProxy
+
+            return OracleDataInput(
+                inflationYoY: snapshot.inflation,
+                housingSalesTotal: housing?.current,
+                housingSalesChangeYoY: housing?.changeYoY,
+                housingSalesChangeMoM: housing?.changeMoM,
+                creditCardSpendingTotal: cc?.current ?? snapshot.creditCardSpendingBillionTL,
+                creditCardSpendingChangeYoY: cc?.changeYoY,
+                capacityUsageRatio: kko?.current ?? snapshot.capacityUsage,
+                prevCapacityUsageRatio: kko?.prevYear,
+                touristArrivalsTotal: tourism?.current,
+                touristArrivalsChangeYoY: tourism?.changeYoY,
+                autoSalesTotal: auto?.current,
+                autoSalesChangeYoY: auto?.changeYoY
+            )
+        }
+
+        oracleRefreshTask = task
+        let input = await task.value
+        oracleRefreshTask = nil
+        cachedOracleInput = input
+        oracleInputFetchTime = Date()
+        return input
+    }
+
+    private struct SectorProxySignal {
+        let current: Double
+        let changeYoY: Double
+        let changeMoM: Double
+    }
+
+    /// Oracle için sektör bazlı gerçek piyasa proxy'si (endeks momentumundan)
+    /// Konut: XGMYO, Turizm/Ulaşım: XULAS, Otomotiv/imalat: XMANA
+    private func fetchSectorProxy(code: String) async -> SectorProxySignal? {
+        do {
+            let candles = try await BorsaPyProvider.shared.getBistHistory(symbol: code, days: 380)
+            let sorted = candles.sorted { $0.date < $1.date }
+            guard sorted.count >= 25, let latest = sorted.last?.close, latest > 0 else {
+                return nil
+            }
+
+            // 1 ay ~ 21 işlem günü, 1 yıl ~ 252 işlem günü
+            let monthIndex = max(0, sorted.count - 22)
+            let yearIndex = max(0, sorted.count - 253)
+            let monthBase = sorted[monthIndex].close
+            let yearBase = sorted[yearIndex].close
+
+            guard monthBase > 0, yearBase > 0 else { return nil }
+
+            let changeMoM = ((latest - monthBase) / monthBase) * 100.0
+            let changeYoY = ((latest - yearBase) / yearBase) * 100.0
+
+            return SectorProxySignal(
+                current: latest,
+                changeYoY: changeYoY,
+                changeMoM: changeMoM
+            )
+        } catch {
+            print("⚠️ Oracle sektör proxy alınamadı (\(code)): \(error)")
+            return nil
+        }
     }
 
     /// KKO için YoY değişim hesapla (1 yıllık veri çekerek)

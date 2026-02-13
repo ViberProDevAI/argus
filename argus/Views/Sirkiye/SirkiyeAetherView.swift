@@ -5,9 +5,15 @@ import SwiftUI
 /// Premium cyberpunk terminal estetiği
 
 struct SirkiyeAetherView: View {
+    let linkedDecision: AetherDecision?
     @State private var macroScore: SirkiyeAetherEngine.TurkeyMacroScore = .empty
     @State private var snapshot: TCMBDataService.TCMBMacroSnapshot = .empty
+    @State private var sectorRotation: BistSektorResult?
     @State private var isLoading = true
+
+    init(linkedDecision: AetherDecision? = nil) {
+        self.linkedDecision = linkedDecision
+    }
     
     var body: some View {
         ScrollView {
@@ -26,6 +32,9 @@ struct SirkiyeAetherView: View {
                 // Trend Grafikleri (Sparklines)
                 trendSparklinesSection
                 
+                // Sektör Rotasyonu Özeti
+                sectorRotationSection
+                
                 // Bileşen Detayları
                 componentsSection
                 
@@ -40,13 +49,13 @@ struct SirkiyeAetherView: View {
             .padding()
         }
         .background(InstitutionalTheme.Colors.background)
-        .navigationTitle("Aether • Türkiye Makro")
+        .navigationTitle("Türkiye Makro Paneli")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            await loadData()
+            await loadData(forceRefresh: true)
         }
         .refreshable {
-            await loadData()
+            await loadData(forceRefresh: true)
         }
     }
     
@@ -71,6 +80,11 @@ struct SirkiyeAetherView: View {
                     .fontWeight(.bold)
                     .tracking(2)
                     .foregroundColor(Theme.textSecondary)
+                if linkedDecision != nil {
+                    Text("• SİRKIYE KORTEKS SENKRON")
+                        .font(.caption2)
+                        .foregroundColor(Theme.primary)
+                }
                 
                 Spacer()
                 
@@ -91,14 +105,14 @@ struct SirkiyeAetherView: View {
                 
                 // Skor Halkası
                 Circle()
-                    .trim(from: 0, to: isLoading ? 0 : macroScore.overallScore / 100)
+                    .trim(from: 0, to: isLoading ? 0 : heroScore / 100)
                     .stroke(
                         scoreGradient,
                         style: StrokeStyle(lineWidth: 12, lineCap: .round)
                     )
                     .frame(width: 180, height: 180)
                     .rotationEffect(.degrees(-90))
-                    .animation(.spring(response: 1.0, dampingFraction: 0.7), value: macroScore.overallScore)
+                    .animation(.spring(response: 1.0, dampingFraction: 0.7), value: heroScore)
                 
                 // Merkez İçerik
                 VStack(spacing: 4) {
@@ -106,11 +120,11 @@ struct SirkiyeAetherView: View {
                         ProgressView()
                             .tint(Theme.primary)
                     } else {
-                        Text("\(Int(macroScore.overallScore))")
+                        Text("\(Int(heroScore))")
                             .font(.system(size: 48, weight: .bold, design: .rounded))
                             .foregroundStyle(scoreGradient)
                         
-                        Text(macroScore.investmentRisk.rawValue)
+                        Text(heroLabel)
                             .font(.caption)
                             .fontWeight(.medium)
                             .foregroundColor(riskColor)
@@ -121,7 +135,7 @@ struct SirkiyeAetherView: View {
             
             // Risk Önerisi
             if !isLoading {
-                Text(macroScore.investmentRisk.recommendation)
+                Text(heroRecommendation)
                     .font(.subheadline)
                     .foregroundColor(Theme.textSecondary)
                     .multilineTextAlignment(.center)
@@ -216,6 +230,40 @@ struct SirkiyeAetherView: View {
 
     // MARK: - Bileşenler Section
     
+    private var sectorRotationSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.medium) {
+            Text("SEKTÖR ROTASYONU")
+                .font(.caption)
+                .fontWeight(.bold)
+                .tracking(2)
+                .foregroundColor(Theme.textSecondary)
+            
+            if let sectorRotation {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(sectorRotation.rotation.rawValue)
+                            .font(.headline)
+                            .foregroundColor(Theme.textPrimary)
+                        Text("Güçlü: \(sectorRotation.strongestSector?.name ?? "—")")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+                    Spacer()
+                    Text(String(format: "%+.1f%%", sectorRotation.strongestSector?.dailyChange ?? 0))
+                        .font(.system(size: 16, weight: .bold, design: .monospaced))
+                        .foregroundColor((sectorRotation.strongestSector?.dailyChange ?? 0) >= 0 ? Theme.positive : Theme.negative)
+                }
+            } else {
+                Text("Sektör rotasyonu verisi bekleniyor.")
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+        }
+        .padding()
+        .background(glassBackground)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.large))
+    }
+    
     private var componentsSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.medium) {
             Text("SKOR BİLEŞENLERİ")
@@ -244,18 +292,25 @@ struct SirkiyeAetherView: View {
                 Image(systemName: "text.bubble.fill")
                     .foregroundColor(Theme.primary)
                 
-                Text("SIRKIYE INSIGHTS")
+                Text("MAKRO NOTLAR")
                     .font(.caption)
                     .fontWeight(.bold)
                     .tracking(2)
                     .foregroundColor(Theme.textSecondary)
             }
             
-            ForEach(sanitizedInsights, id: \.self) { insight in
-                Text(insight)
+            if sanitizedInsights.isEmpty {
+                Text("Analiz notu üretilemedi. Makro veri güncellendiğinde özet notlar burada görünecek.")
                     .font(.subheadline)
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(Theme.textSecondary)
                     .padding(.vertical, 4)
+            } else {
+                ForEach(sanitizedInsights, id: \.self) { insight in
+                    Text(insight)
+                        .font(.subheadline)
+                        .foregroundColor(Theme.textPrimary)
+                        .padding(.vertical, 4)
+                }
             }
         }
         .padding()
@@ -358,21 +413,23 @@ struct SirkiyeAetherView: View {
     
     // MARK: - Data Loading
     
-    private func loadData() async {
+    private func loadData(forceRefresh: Bool = false) async {
         isLoading = true
         // Parallel fetch
-        async let scoreTask = SirkiyeAetherEngine.shared.analyze()
-        async let snapshotTask = TCMBDataService.shared.getMacroSnapshot()
+        async let scoreTask = SirkiyeAetherEngine.shared.analyze(forceRefresh: forceRefresh)
+        async let snapshotTask = TCMBDataService.shared.getMacroSnapshot(forceRefresh: forceRefresh)
+        async let sectorTask = try? BistSektorEngine.shared.analyze(forceRefresh: forceRefresh)
         
         macroScore = await scoreTask
         snapshot = await snapshotTask
+        sectorRotation = await sectorTask
         isLoading = false
     }
     
     // MARK: - Helpers
     
     private var scoreGradient: LinearGradient {
-        let score = macroScore.overallScore
+        let score = heroScore
         let colors: [Color]
         
         if score >= 70 {
@@ -389,12 +446,33 @@ struct SirkiyeAetherView: View {
     }
     
     private var riskColor: Color {
-        switch macroScore.investmentRisk {
-        case .low: return InstitutionalTheme.Colors.positive
-        case .moderate: return InstitutionalTheme.Colors.warning
-        case .elevated: return InstitutionalTheme.Colors.warning
-        case .high: return InstitutionalTheme.Colors.negative
+        if heroScore >= 70 { return InstitutionalTheme.Colors.positive }
+        if heroScore >= 50 { return InstitutionalTheme.Colors.warning }
+        if heroScore >= 30 { return .orange }
+        return InstitutionalTheme.Colors.negative
+    }
+
+    private var heroScore: Double {
+        return macroScore.overallScore
+    }
+
+    private var heroLabel: String {
+        if let linkedDecision {
+            switch linkedDecision.stance {
+            case .riskOn: return "RİSK AÇIK"
+            case .cautious: return "TEDBİRLİ"
+            case .defensive: return "DEFANSİF"
+            case .riskOff: return "RİSK KAPALI"
+            }
         }
+        return macroScore.investmentRisk.rawValue
+    }
+
+    private var heroRecommendation: String {
+        if let linkedDecision {
+            return linkedDecision.winningProposal?.reasoning ?? "SİRKIYE kararı güncellendi."
+        }
+        return macroScore.investmentRisk.recommendation
     }
     
     private var glassBackground: some View {
@@ -760,7 +838,7 @@ struct SirkiyeDataGrid: View {
                 Group {
                     Text("GÖSTERGE").font(.caption2).foregroundColor(.gray)
                     Text("DEĞER").font(.caption2).foregroundColor(.gray)
-                    Text("TREND").font(.caption2).foregroundColor(.gray)
+                    Text("DURUM").font(.caption2).foregroundColor(.gray)
                 }
                 
                 Divider()
@@ -768,14 +846,14 @@ struct SirkiyeDataGrid: View {
                 Divider()
                 
                 // Rows
-                gridRow(name: "Enflasyon", value: snapshot.inflation, format: "%.1f%%", trend: .down) // Trend logic basitleştirildi
-                gridRow(name: "Çekirdek Enflasyon", value: snapshot.coreInflation, format: "%.1f%%", trend: .down)
-                gridRow(name: "Politika Faizi", value: snapshot.policyRate, format: "%.0f%%", trend: .up)
-                gridRow(name: "USD/TRY", value: snapshot.usdTry, format: "%.2f₺", trend: .up)
-                gridRow(name: "Rezervler", value: snapshot.reserves, format: "%.1fB$", trend: .up)
-                gridRow(name: "Cari Denge", value: snapshot.currentAccount, format: "%.1fB$", trend: .down)
-                gridRow(name: "Sanayi Üretimi", value: snapshot.industrialProduction, format: "%.1f", trend: .stable)
-                gridRow(name: "İşsizlik", value: snapshot.unemployment, format: "%.1f%%", trend: .stable)
+                gridRow(name: "Enflasyon", value: snapshot.inflation, format: "%.1f%%")
+                gridRow(name: "Çekirdek Enflasyon", value: snapshot.coreInflation, format: "%.1f%%")
+                gridRow(name: "Politika Faizi", value: snapshot.policyRate, format: "%.0f%%")
+                gridRow(name: "USD/TRY", value: snapshot.usdTry, format: "%.2f₺")
+                gridRow(name: "Rezervler", value: snapshot.reserves, format: "%.1fB$")
+                gridRow(name: "Cari Denge", value: snapshot.currentAccount, format: "%.1fB$")
+                gridRow(name: "Sanayi Üretimi", value: snapshot.industrialProduction, format: "%.1f")
+                gridRow(name: "İşsizlik", value: snapshot.unemployment, format: "%.1f%%")
             }
         }
         .padding()
@@ -787,7 +865,7 @@ struct SirkiyeDataGrid: View {
         )
     }
     
-    private func gridRow(name: String, value: Double?, format: String, trend: SirkiyeAetherEngine.Trend) -> some View {
+    private func gridRow(name: String, value: Double?, format: String) -> some View {
         Group {
             Text(name)
                 .font(.system(size: 13, weight: .medium))
@@ -797,13 +875,9 @@ struct SirkiyeDataGrid: View {
                 .font(.system(size: 13, design: .monospaced))
                 .foregroundColor(Theme.textPrimary)
             
-            Image(systemName: trend.icon)
-                .font(.caption)
-                .foregroundColor(
-                    trend == .up
-                    ? InstitutionalTheme.Colors.positive
-                    : (trend == .down ? InstitutionalTheme.Colors.negative : InstitutionalTheme.Colors.textSecondary)
-                )
+            Text(value != nil ? "Anlık Veri" : "Veri Yok")
+                .font(.caption2)
+                .foregroundColor(value != nil ? InstitutionalTheme.Colors.textSecondary : InstitutionalTheme.Colors.warning)
         }
     }
 }

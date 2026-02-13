@@ -32,11 +32,9 @@ struct PantheonDeckView: View {
                 isPrimary: true
             )
             .onTapGesture {
-                if isBist {
-                    selectedBistModule = .oracle
-                } else {
-                    selectedModule = .chiron
-                }
+                // Chiron always opens Chiron UI.
+                // Oracle belongs to the Rejim flow, not Chiron.
+                selectedModule = .chiron
             }
             
             // DEMETER (Sağ)

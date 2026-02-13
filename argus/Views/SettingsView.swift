@@ -8,6 +8,9 @@ struct SettingsView: View {
     @State private var showDrawer = false
     @StateObject private var deepLinkManager = DeepLinkManager.shared
     @State private var activeSettingsSheet: SettingsSheet?
+    @State private var chironTradeCount = 0
+    @State private var chironEventCount = 0
+    @State private var chironWinRate = 0
 
     var body: some View {
         NavigationView {
@@ -44,8 +47,24 @@ struct SettingsView: View {
                             NavigationLink(destination: SettingsCortexView(settingsViewModel: settingsViewModel)) {
                                 ArgusTerminalRow(label: "VERİ AKIŞI & API", value: "BAĞLI", icon: "server.rack", color: .cyan)
                             }
+                            NavigationLink(destination: ChironDetailView()) {
+                                ArgusTerminalRow(
+                                    label: "CHIRON KOKPİT",
+                                    value: "WR %\(chironWinRate) | T \(chironTradeCount)",
+                                    icon: "brain",
+                                    color: .cyan
+                                )
+                            }
+                            NavigationLink(destination: ChironPerformanceView()) {
+                                ArgusTerminalRow(
+                                    label: "CHIRON PERFORMANS",
+                                    value: "EVENT \(chironEventCount)",
+                                    icon: "chart.bar.xaxis",
+                                    color: .green
+                                )
+                            }
                             NavigationLink(destination: ChironInsightsView(symbol: nil)) {
-                                ArgusTerminalRow(label: "CHIRON ÖĞRENME", value: "AKTİF", icon: "brain", color: .cyan)
+                                ArgusTerminalRow(label: "CHIRON İNSIGHT", value: "DETAY", icon: "waveform.path.ecg", color: .purple)
                             }
                             NavigationLink(destination: AlkindusDashboardView()) {
                                 ArgusTerminalRow(label: "ALKINDUS KALİBRASYON", value: "SHADOW", icon: "eye.circle", color: .purple)
@@ -116,9 +135,28 @@ struct SettingsView: View {
         }
         .preferredColorScheme(isDarkMode ? .dark : .light)
         .navigationViewStyle(StackNavigationViewStyle())
+        .task {
+            await refreshChironSnapshot()
+        }
         .sheet(item: $activeSettingsSheet) { sheet in
             settingsSheetView(for: sheet)
         }
+    }
+
+    private func refreshChironSnapshot() async {
+        let trades = await ChironDataLakeService.shared.loadAllTradeHistory()
+        let events = await ChironDataLakeService.shared.loadLearningEvents()
+
+        chironTradeCount = trades.count
+        chironEventCount = events.count
+
+        guard !trades.isEmpty else {
+            chironWinRate = 0
+            return
+        }
+
+        let wins = trades.filter { $0.pnlPercent > 0 }.count
+        chironWinRate = Int((Double(wins) / Double(trades.count)) * 100)
     }
 }
 
@@ -131,6 +169,7 @@ extension SettingsView {
         case apiKeys
         case guide
         case signals
+        case chironCockpit
         
         var id: String {
             switch self {
@@ -140,6 +179,7 @@ extension SettingsView {
             case .apiKeys: return "apiKeys"
             case .guide: return "guide"
             case .signals: return "signals"
+            case .chironCockpit: return "chironCockpit"
             }
         }
     }
@@ -159,6 +199,8 @@ extension SettingsView {
             NavigationView { ArgusGuideView() }
         case .signals:
             NavigationView { SettingsSignalsView() }
+        case .chironCockpit:
+            NavigationView { ChironDetailView() }
         }
     }
     
@@ -178,7 +220,7 @@ extension SettingsView {
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "AlkindusIcon") {
-                        deepLinkManager.navigate(to: .home)
+                        NotificationCenter.default.post(name: NSNotification.Name("OpenAlkindusDashboard"), object: nil)
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
@@ -215,6 +257,10 @@ extension SettingsView {
                     },
                     ArgusDrawerView.DrawerItem(title: "Sinyal Ayarlari", subtitle: "Bildirim ve sinyal", icon: "slider.horizontal.3") {
                         activeSettingsSheet = .signals
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Chiron Kokpit", subtitle: "Ogrenme ve agirliklar", icon: "brain.head.profile") {
+                        activeSettingsSheet = .chironCockpit
                         showDrawer = false
                     }
                 ]

@@ -9,6 +9,11 @@ actor BistSektorEngine {
     
     private init() {}
     
+    private var cachedResult: BistSektorResult?
+    private var lastFetchTime: Date?
+    private var refreshTask: Task<BistSektorResult, Error>?
+    private let cacheValiditySeconds: TimeInterval = 5 * 60
+    
     // MARK: - Sektör Listesi
     
     // MARK: - Sektör Listesi
@@ -18,7 +23,30 @@ actor BistSektorEngine {
     
     // MARK: - Ana Analiz
     
-    func analyze() async throws -> BistSektorResult {
+    func analyze(forceRefresh: Bool = false) async throws -> BistSektorResult {
+        if !forceRefresh,
+           let cachedResult,
+           let lastFetchTime,
+           Date().timeIntervalSince(lastFetchTime) < cacheValiditySeconds {
+            return cachedResult
+        }
+
+        if let refreshTask {
+            return try await refreshTask.value
+        }
+
+        let task = Task<BistSektorResult, Error> {
+            try await self.fetchFreshSectorResult()
+        }
+        refreshTask = task
+        let result = try await task.value
+        refreshTask = nil
+        cachedResult = result
+        lastFetchTime = Date()
+        return result
+    }
+
+    private func fetchFreshSectorResult() async throws -> BistSektorResult {
         var sectorData: [BistSektorItem] = []
         
         // Her sektör için veri çek
@@ -27,19 +55,23 @@ actor BistSektorEngine {
                 let quote = try await BorsaPyProvider.shared.getSectorIndex(code: sector.rawValue)
                 
                 // Performans hesapla
-                let dailyChange = quote.changePercent
+                let dailyChange = await quote.changePercent
                 let momentum: SektorMomentum
+                let strongThreshold = await BistThresholds.Momentum.strong
+                let positiveThreshold = await BistThresholds.Momentum.positive
+                let negativeUpperThreshold = await BistThresholds.Momentum.negativeUpper
+                let negativeThreshold = await BistThresholds.Momentum.negative
                 
-                if dailyChange > BistThresholds.Momentum.strong { momentum = .strong }
-                else if dailyChange > BistThresholds.Momentum.positive { momentum = .positive }
-                else if dailyChange > BistThresholds.Momentum.negativeUpper { momentum = .neutral }
-                else if dailyChange > BistThresholds.Momentum.negative { momentum = .negative }
+                if dailyChange > strongThreshold { momentum = .strong }
+                else if dailyChange > positiveThreshold { momentum = .positive }
+                else if dailyChange > negativeUpperThreshold { momentum = .neutral }
+                else if dailyChange > negativeThreshold { momentum = .negative }
                 else { momentum = .weak }
                 
                 sectorData.append(BistSektorItem(
                     code: sector.rawValue,
-                    name: sector.displayName,
-                    icon: sector.icon,
+                    name: await sector.displayName,
+                    icon: await sector.icon,
                     value: quote.last,
                     dailyChange: dailyChange,
                     momentum: momentum,
@@ -54,7 +86,14 @@ actor BistSektorEngine {
         sectorData.sort { $0.dailyChange > $1.dailyChange }
         
         // Rotasyon Analizi
-        let rotationMetrics = analyzeRotationMetrics(strongest: sectorData.first, weakest: sectorData.last, avgChange: sectorData.map { $0.dailyChange }.reduce(0, +) / Double(sectorData.count))
+        let avgChange = sectorData.isEmpty
+            ? 0
+            : sectorData.map { $0.dailyChange }.reduce(0, +) / Double(sectorData.count)
+        let rotationMetrics = analyzeRotationMetrics(
+            strongest: sectorData.first,
+            weakest: sectorData.last,
+            avgChange: avgChange
+        )
         
         return BistSektorResult(
             sectors: sectorData,
@@ -173,14 +212,32 @@ actor BistSektorEngine {
     
     // MARK: - Tekil Hisse Sektör Analizi
     
-    func analyze(symbol: String) -> (score: Double, sector: String) {
+    func analyze(symbol: String, forceRefresh: Bool = false) async throws -> (score: Double, sector: String) {
         guard let sectorCode = getSector(for: symbol) else {
             return (50.0, "Bilinmiyor")
         }
-        
-        // Basit skor mantığı (şimdilik)
-        // Gerçek implementasyonda sektörün o anki momentumuna bakılmalı
-        return (50.0, sectorCode)
+
+        let sectorSnapshot = try await analyze(forceRefresh: forceRefresh)
+        guard let sectorItem = sectorSnapshot.sectors.first(where: { $0.code == sectorCode }) else {
+            return (50.0, sectorCode)
+        }
+
+        let avgChange = sectorSnapshot.sectors.isEmpty
+            ? 0
+            : sectorSnapshot.sectors.map { $0.dailyChange }.reduce(0, +) / Double(sectorSnapshot.sectors.count)
+        let relativeStrength = sectorItem.dailyChange - avgChange
+
+        let baseScore: Double
+        switch sectorItem.momentum {
+        case .strong: baseScore = 80
+        case .positive: baseScore = 65
+        case .neutral: baseScore = 50
+        case .negative: baseScore = 35
+        case .weak: baseScore = 20
+        }
+
+        let adjusted = baseScore + max(-15, min(15, relativeStrength * 2.0))
+        return (min(100, max(0, adjusted)), sectorCode)
     }
 }
 

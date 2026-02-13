@@ -156,6 +156,9 @@ enum BorsaPyError: Error, LocalizedError {
     case missingApiKey
     case dataUnavailable
     case backendUnavailable
+    case timeout
+    case rateLimited(retryAfter: TimeInterval?)
+    case serverError(statusCode: Int)
     
     var errorDescription: String? {
         switch self {
@@ -164,6 +167,9 @@ enum BorsaPyError: Error, LocalizedError {
         case .missingApiKey: return "API anahtarı eksik"
         case .dataUnavailable: return "Veri bulunamadı"
         case .backendUnavailable: return "BorsaPy backend erişilemez"
+        case .timeout: return "İstek zaman aşımına uğradı"
+        case .rateLimited: return "BorsaPy hız limiti aşıldı"
+        case .serverError(let statusCode): return "Sunucu hatası (\(statusCode))"
         default: return "Bir hata oluştu"
         }
     }
@@ -172,6 +178,42 @@ enum BorsaPyError: Error, LocalizedError {
 enum GoldType: String {
     case gramAltin = "gram-altin"
     case ons = "ons"
+}
+
+// Global request gate to prevent BorsaPy bursts from starving modules.
+private actor BorsaPyRequestGate {
+    static let shared = BorsaPyRequestGate(maxConcurrent: 3, minIntervalSeconds: 0.12)
+
+    private let maxConcurrent: Int
+    private let minIntervalNanos: UInt64
+    private var activeCount: Int = 0
+    private var lastRequestStartedAtNanos: UInt64 = 0
+
+    init(maxConcurrent: Int, minIntervalSeconds: TimeInterval) {
+        self.maxConcurrent = max(1, maxConcurrent)
+        self.minIntervalNanos = UInt64(max(0, minIntervalSeconds) * 1_000_000_000)
+    }
+
+    func acquire() async {
+        while activeCount >= maxConcurrent {
+            try? await Task.sleep(nanoseconds: 30_000_000)
+        }
+
+        let now = DispatchTime.now().uptimeNanoseconds
+        if lastRequestStartedAtNanos > 0, now > lastRequestStartedAtNanos {
+            let elapsed = now - lastRequestStartedAtNanos
+            if elapsed < minIntervalNanos {
+                try? await Task.sleep(nanoseconds: minIntervalNanos - elapsed)
+            }
+        }
+
+        activeCount += 1
+        lastRequestStartedAtNanos = DispatchTime.now().uptimeNanoseconds
+    }
+
+    func release() {
+        activeCount = max(0, activeCount - 1)
+    }
 }
 
 // MARK: - BorsaPyProvider (borsapy FastAPI Backend Entegrasyonu)
@@ -189,6 +231,13 @@ actor BorsaPyProvider {
         "http://localhost:8899",
         "http://localhost:8899"
     ]
+    nonisolated private static var canUseLocalNetworkFallbacks: Bool {
+#if targetEnvironment(simulator) || targetEnvironment(macCatalyst)
+        true
+#else
+        false
+#endif
+    }
     
     // Cache
     private var quoteCache: [String: (quote: BistQuote, timestamp: Date)] = [:]
@@ -197,7 +246,11 @@ actor BorsaPyProvider {
     private var preferredBackendBaseURL: String?
     private var blockedBackendsUntil: [String: Date] = [:]
     private let backendCooldownSeconds: TimeInterval = 30
-    private let requestTimeoutSeconds: TimeInterval = 8
+    private let requestTimeoutSeconds: TimeInterval = 20
+    private let slowRequestThresholdSeconds: TimeInterval = 4
+    private let maxAttemptsPerBackend = 3
+    private let initialRetryDelaySeconds: TimeInterval = 0.35
+    private let requestGate = BorsaPyRequestGate.shared
     
     private init() {
         // no-op
@@ -328,17 +381,21 @@ actor BorsaPyProvider {
         }
         
         return items.compactMap { item -> BistDividend? in
-            guard let dateStr = item["date"] as? String else { return nil }
-            let date = ISO8601DateFormatter().date(from: dateStr) ?? Date()
+            let dateRaw = item["date"] as? String ?? item["Date"] as? String ?? item["index"] as? String
+            guard let dateStr = dateRaw, let date = parseAnyDate(dateStr) else { return nil }
             return BistDividend(
                 date: date,
                 grossRate: item["grossRate"] as? Double
+                    ?? item["GrossRate"] as? Double
                     ?? item["Brüt Kar Payı Oranı (%)"] as? Double ?? 0,
                 netRate: item["netRate"] as? Double
+                    ?? item["NetRate"] as? Double
                     ?? item["Net Kar Payı Oranı (%)"] as? Double ?? 0,
                 totalAmount: item["totalAmount"] as? Double
+                    ?? item["TotalDividend"] as? Double
                     ?? item["Toplam Kar Payı Tutarı (TL)"] as? Double ?? 0,
                 perShare: item["perShare"] as? Double
+                    ?? item["Amount"] as? Double
                     ?? item["Hisse Başına Kar Payı (TL)"] as? Double ?? 0
             )
         }
@@ -355,14 +412,14 @@ actor BorsaPyProvider {
         }
         
         return items.compactMap { item -> BistCapitalIncrease? in
-            guard let dateStr = item["date"] as? String ?? item["index"] as? String else { return nil }
-            let date = ISO8601DateFormatter().date(from: dateStr) ?? Date()
+            guard let dateStr = item["date"] as? String ?? item["index"] as? String,
+                  let date = parseAnyDate(dateStr) else { return nil }
             return BistCapitalIncrease(
                 date: date,
-                capitalAfter: item["capitalAfter"] as? Double ?? 0,
-                rightsIssueRate: item["rightsIssueRate"] as? Double ?? 0,
-                bonusFromCapitalRate: item["bonusFromCapitalRate"] as? Double ?? 0,
-                bonusFromDividendRate: item["bonusFromDividendRate"] as? Double ?? 0
+                capitalAfter: item["capitalAfter"] as? Double ?? item["Capital"] as? Double ?? 0,
+                rightsIssueRate: item["rightsIssueRate"] as? Double ?? item["RightsIssue"] as? Double ?? 0,
+                bonusFromCapitalRate: item["bonusFromCapitalRate"] as? Double ?? item["BonusFromCapital"] as? Double ?? 0,
+                bonusFromDividendRate: item["bonusFromDividendRate"] as? Double ?? item["BonusFromDividend"] as? Double ?? 0
             )
         }
     }
@@ -377,16 +434,20 @@ actor BorsaPyProvider {
         let recs = json["recommendations"] as? [String: Any] ?? [:]
         
         let avgTarget = targets["targetMeanPrice"] as? Double
+            ?? targets["mean"] as? Double
             ?? targets["averageTargetPrice"] as? Double
         let highTarget = targets["targetHighPrice"] as? Double
+            ?? targets["high"] as? Double
         let lowTarget = targets["targetLowPrice"] as? Double
+            ?? targets["low"] as? Double
         
         let buyCount = (recs["buy"] as? Int ?? 0) + (recs["strongBuy"] as? Int ?? 0)
         let holdCount = recs["hold"] as? Int ?? 0
         let sellCount = (recs["sell"] as? Int ?? 0) + (recs["strongSell"] as? Int ?? 0)
         
         let recommendation = recs["recommendationKey"] as? String
-            ?? recs["consensus"] as? String ?? "N/A"
+            ?? recs["consensus"] as? String
+            ?? derivedConsensusLabel(buy: buyCount, hold: holdCount, sell: sellCount)
         
         // Potansiyel getiri hesapla
         var potentialReturn = 0.0
@@ -516,11 +577,15 @@ actor BorsaPyProvider {
         let newsArray = json["news"] as? [[String: Any]] ?? []
         
         return newsArray.compactMap { item in
-            guard let title = item["title"] as? String else { return nil }
+            guard let title = item["title"] as? String ?? item["Title"] as? String else { return nil }
+            let summary = item["summary"] as? String
+                ?? item["Summary"] as? String
+                ?? item["URL"] as? String
+                ?? ""
             return BistNewsItem(
                 title: title,
-                summary: item["summary"] as? String ?? "",
-                date: item["date"] as? String ?? "",
+                summary: summary,
+                date: item["date"] as? String ?? item["Date"] as? String ?? "",
                 source: item["source"] as? String ?? "KAP"
             )
         }
@@ -536,19 +601,37 @@ actor BorsaPyProvider {
         
         var lastError: Error = BorsaPyError.backendUnavailable
         for baseURL in candidates {
-            do {
-                let json = try await requestJSON(baseURL: baseURL, path: path)
-                preferredBackendBaseURL = baseURL
-                blockedBackendsUntil.removeValue(forKey: baseURL)
-                return json
-            } catch {
-                lastError = error
-                if shouldTryNextBackend(for: error) {
-                    blockedBackendsUntil[baseURL] = Date().addingTimeInterval(backendCooldownSeconds)
-                    continue
+            var backendError: Error = BorsaPyError.backendUnavailable
+            for attempt in 1...maxAttemptsPerBackend {
+                do {
+                    let json = try await requestJSON(baseURL: baseURL, path: path)
+                    preferredBackendBaseURL = baseURL
+                    blockedBackendsUntil.removeValue(forKey: baseURL)
+                    return json
+                } catch {
+                    backendError = error
+                    lastError = error
+
+                    if attempt < maxAttemptsPerBackend, shouldRetryOnSameBackend(error) {
+                        let delay = retryDelay(for: error, attempt: attempt)
+                        print("BorsaPyProvider: Retry \(attempt + 1)/\(maxAttemptsPerBackend) in \(String(format: "%.2f", delay))s — \(baseURL)\(path)")
+                        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                        continue
+                    }
+
+                    break
                 }
-                throw error
             }
+
+            if shouldTryNextBackend(for: backendError) {
+                // Tek backend varsa cooldown'a alma; aksi halde 30sn boyunca tüm istekler boşta kalıyor.
+                if candidates.count > 1 {
+                    blockedBackendsUntil[baseURL] = Date().addingTimeInterval(backendCooldownSeconds)
+                }
+                continue
+            }
+
+            throw backendError
         }
         
         if let borsaError = lastError as? BorsaPyError {
@@ -569,12 +652,28 @@ actor BorsaPyProvider {
         
         let data: Data
         let response: URLResponse
-        
+        let startedAt = Date()
+
+        await requestGate.acquire()
+        defer {
+            Task {
+                await requestGate.release()
+            }
+        }
+
         do {
             (data, response) = try await URLSession.shared.data(for: request)
+        } catch let urlError as URLError where urlError.code == .timedOut {
+            print("BorsaPyProvider: Zaman aşımı — \(baseURL) — \(urlError.localizedDescription)")
+            throw BorsaPyError.timeout
         } catch {
             print("BorsaPyProvider: Backend erişilemez — \(baseURL) — \(error.localizedDescription)")
             throw BorsaPyError.backendUnavailable
+        }
+        
+        let elapsed = Date().timeIntervalSince(startedAt)
+        if elapsed >= slowRequestThresholdSeconds {
+            print("BorsaPyProvider: Yavaş yanıt (\(String(format: "%.2f", elapsed))s) — \(urlString)")
         }
         
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -584,6 +683,13 @@ actor BorsaPyProvider {
         guard (200...299).contains(httpResponse.statusCode) else {
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 throw BorsaPyError.missingApiKey
+            }
+            if httpResponse.statusCode == 429 {
+                let retryAfter = parseRetryAfterHeader(httpResponse.value(forHTTPHeaderField: "Retry-After"))
+                throw BorsaPyError.rateLimited(retryAfter: retryAfter)
+            }
+            if (500...599).contains(httpResponse.statusCode) {
+                throw BorsaPyError.serverError(statusCode: httpResponse.statusCode)
             }
             print("BorsaPyProvider: HTTP \(httpResponse.statusCode) — \(urlString)")
             throw BorsaPyError.requestFailed
@@ -602,13 +708,58 @@ actor BorsaPyProvider {
         }
         
         switch borsaError {
-        case .backendUnavailable, .requestFailed, .invalidResponse:
+        case .backendUnavailable, .requestFailed, .invalidResponse, .timeout, .rateLimited, .serverError:
             return true
         case .missingApiKey:
             return false
         default:
             return false
         }
+    }
+
+    private func shouldRetryOnSameBackend(_ error: Error) -> Bool {
+        guard let borsaError = error as? BorsaPyError else {
+            return true
+        }
+
+        switch borsaError {
+        case .missingApiKey, .invalidURL, .decodingError, .dataUnavailable:
+            return false
+        case .backendUnavailable, .requestFailed, .invalidResponse, .timeout, .rateLimited, .serverError:
+            return true
+        }
+    }
+
+    private func retryDelay(for error: Error, attempt: Int) -> TimeInterval {
+        if case .rateLimited(let retryAfter) = error as? BorsaPyError,
+           let retryAfter,
+           retryAfter > 0 {
+            return min(retryAfter, 8.0)
+        }
+
+        let exp = initialRetryDelaySeconds * pow(2.0, Double(max(0, attempt - 1)))
+        let jitter = Double.random(in: 0...0.2)
+        return min(exp + jitter, 5.0)
+    }
+
+    private func parseRetryAfterHeader(_ rawValue: String?) -> TimeInterval? {
+        guard let raw = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !raw.isEmpty else {
+            return nil
+        }
+
+        if let seconds = TimeInterval(raw), seconds >= 0 {
+            return seconds
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss z"
+        if let date = formatter.date(from: raw) {
+            return max(0, date.timeIntervalSinceNow)
+        }
+
+        return nil
     }
     
     private func activeBackendCandidates() async -> [String] {
@@ -639,7 +790,14 @@ actor BorsaPyProvider {
         appendBackendCandidate(from: Bundle.main.object(forInfoDictionaryKey: Self.infoPlistBackendURLKey) as? String, to: &candidates)
         appendBackendCandidate(from: ProcessInfo.processInfo.environment[Self.infoPlistBackendURLKey], to: &candidates)
         
-        for fallback in Self.fallbackBaseURLs {
+        let fallbackList: [String]
+        if Self.canUseLocalNetworkFallbacks {
+            fallbackList = Self.fallbackBaseURLs
+        } else {
+            fallbackList = ["https://argus-borsapy.onrender.com"]
+        }
+        
+        for fallback in fallbackList {
             appendBackendCandidate(from: fallback, to: &candidates)
         }
         
@@ -707,6 +865,34 @@ actor BorsaPyProvider {
         if clean.contains("GBPTRY") || clean == "GBP" { return "GBP" }
         if clean.contains("BRENT") || clean.contains("BRN") { return "BRENT" }
         return clean
+    }
+    
+    private func parseAnyDate(_ raw: String) -> Date? {
+        if let d = ISO8601DateFormatter().date(from: raw) {
+            return d
+        }
+        
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        let formats = [
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd",
+            "dd.MM.yyyy HH:mm:ss",
+            "dd.MM.yyyy"
+        ]
+        for format in formats {
+            formatter.dateFormat = format
+            if let d = formatter.date(from: raw) {
+                return d
+            }
+        }
+        return nil
+    }
+    
+    private func derivedConsensusLabel(buy: Int, hold: Int, sell: Int) -> String {
+        if buy >= hold && buy >= sell { return "BUY" }
+        if sell >= buy && sell >= hold { return "SELL" }
+        return "HOLD"
     }
     
     private func periodFromDays(_ days: Int) -> String {

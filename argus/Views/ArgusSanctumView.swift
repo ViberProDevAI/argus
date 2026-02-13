@@ -131,39 +131,30 @@ struct ArgusSanctumView: View {
             
             // 5. BIST HoloPanel
             if let bistMod = selectedBistModule {
-                if bistMod == .oracle {
-                    // Oracle BIST içinde legacy bir modül; dedicated panel ile açılır.
-                    BistHoloPanelView(
-                        module: bistMod,
-                        viewModel: viewModel,
-                        symbol: symbol,
-                        onClose: { withAnimation { selectedBistModule = nil } }
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(100)
-                } else {
-                    // Map BIST module to Global equivalent for HoloPanel
-                    let mappedModule: ModuleType = {
-                        switch bistMod {
-                        case .tahta: return .orion
-                        case .kasa: return .atlas
-                        case .kulis: return .hermes
-                        case .rejim: return .aether
-                        default: return .orion // Fallback for other types
-                        }
-                    }()
-                    
-                    HoloPanelView(
-                        module: mappedModule,
-                        viewModel: viewModel,
-                        vm: vm,
-                        symbol: symbol,
-                        router: router,
-                        onClose: { withAnimation { selectedBistModule = nil } }
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(100)
-                }
+                // Legacy oracle entry is normalized to Rejim/Aether flow.
+                let normalizedBistMod: BistModuleType = (bistMod == .oracle) ? .rejim : bistMod
+
+                // Map BIST module to Global equivalent for HoloPanel
+                let mappedModule: ModuleType = {
+                    switch normalizedBistMod {
+                    case .tahta: return .orion
+                    case .kasa: return .atlas
+                    case .kulis: return .hermes
+                    case .rejim: return .aether
+                    default: return .orion // Fallback for legacy types
+                    }
+                }()
+                
+                HoloPanelView(
+                    module: mappedModule,
+                    viewModel: viewModel,
+                    vm: vm,
+                    symbol: symbol,
+                    router: router,
+                    onClose: { withAnimation { selectedBistModule = nil } }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(100)
             }
             
             // 6. Sheets & Modals
@@ -243,7 +234,7 @@ struct ArgusSanctumView: View {
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "AlkindusIcon") {
-                        deepLinkManager.navigate(to: .home)
+                        NotificationCenter.default.post(name: NSNotification.Name("OpenAlkindusDashboard"), object: nil)
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
@@ -296,8 +287,16 @@ struct ArgusSanctumView: View {
                         selectedModule = .hermes
                         showDrawer = false
                     },
+                    ArgusDrawerView.DrawerItem(title: "Chiron", subtitle: "Ogrenme ve agirliklar", icon: "ChironIcon") {
+                        selectedModule = .chiron
+                        showDrawer = false
+                    },
                     ArgusDrawerView.DrawerItem(title: "Aether", subtitle: "Makro rejim", icon: "AetherIcon") {
                         selectedModule = .aether
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Prometheus", subtitle: "Bilimsel fiyat projeksiyonu", icon: "crystal.ball") {
+                        selectedModule = .prometheus
                         showDrawer = false
                     }
                 ]
@@ -435,7 +434,7 @@ struct ArgusSanctumView: View {
                 }
             } else {
                 // GLOBAL MODULES ORBIT (Classic Argus)
-                let globalModules: [ModuleType] = [.orion, .atlas, .aether, .hermes]
+                let globalModules: [ModuleType] = [.orion, .atlas, .aether, .hermes, .prometheus]
                 ForEach(0..<globalModules.count, id: \.self) { i in
                     let angle = Double(i) * (360.0 / Double(globalModules.count)) - 90
                     let mod = globalModules[i]
@@ -502,8 +501,9 @@ struct ArgusSanctumView: View {
         if isBistSymbol, let bistRaw {
             let rawBist = bistRaw.uppercased()
             if let bistModule = SanctumBistModuleType(rawValue: rawBist) {
+                let normalizedBistModule: BistModuleType = (bistModule == .oracle) ? .rejim : bistModule
                 withAnimation(.spring()) {
-                    selectedBistModule = bistModule
+                    selectedBistModule = normalizedBistModule
                 }
                 hasAppliedLaunchOverride = true
                 return
@@ -527,8 +527,9 @@ struct ArgusSanctumView: View {
         let rawModule = globalRaw.uppercased()
 
         if isBistSymbol, let bistModule = SanctumBistModuleType(rawValue: rawModule) {
+            let normalizedBistModule: BistModuleType = (bistModule == .oracle) ? .rejim : bistModule
             withAnimation(.spring()) {
-                selectedBistModule = bistModule
+                selectedBistModule = normalizedBistModule
             }
             hasAppliedLaunchOverride = true
             return
@@ -884,6 +885,21 @@ struct HoloPanelView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(SanctumTheme.aetherColor)
+                            Text("ORACLE LENS")
+                                .font(InstitutionalTheme.Typography.micro)
+                                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                            Spacer()
+                        }
+
+                        OracleChamberEmbeddedView()
+                            .frame(height: 320)
                     }
                 }
             }
@@ -1383,58 +1399,8 @@ struct HoloPanelView: View {
             }
             
         case .prometheus:
-            // Prometheus - 5 Day Price Forecasting (Holt-Winters)
-            VStack(spacing: 16) {
-                // Header
-                HStack {
-                    Image(systemName: "crystal.ball")
-                        .font(.title2)
-                        .foregroundColor(SanctumTheme.titanGold)
-                    Text("Prometheus Öngörü Sistemi")
-                        .font(.headline)
-                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    Spacer()
-                }
-                
-                // Info Box
-                HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: "info.circle")
-                        .foregroundColor(SanctumTheme.titanGold)
-                    Text("Prometheus, geçmiş fiyat verilerini Holt-Winters algoritması ile analiz ederek 5 günlük fiyat tahmini üretir. Güven skoru, son dönem volatilitesine göre hesaplanır.")
-                        .font(.caption)
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                }
-                .padding()
-                .background(SanctumTheme.titanGold.opacity(0.1))
-                .cornerRadius(12)
-                
-                // Forecast Card
-                if let candles = viewModel.candles[symbol], candles.count >= 30 {
-                    ForecastCard(
-                        symbol: symbol,
-                        historicalPrices: candles.map { $0.close }
-                    )
-                } else {
-                    VStack(spacing: 12) {
-                        ProgressView()
-                            .tint(SanctumTheme.titanGold)
-                        Text("Fiyat verisi yükleniyor...")
-                            .font(.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        Text("En az 30 günlük veri gerekli")
-                            .font(.caption2)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    }
-                    .frame(maxWidth: .infinity, minHeight: 150)
-                    .padding()
-                    .background(InstitutionalTheme.Colors.surface1)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
-                    )
-                    .cornerRadius(12)
-                }
-            }
+            PrometheusPanelView(symbol: symbol, candles: vm.candles)
+
         case .council:
             VStack {
                 ArgusAnalystReportView(symbol: symbol, viewModel: viewModel)

@@ -1,9 +1,5 @@
 import SwiftUI
 
-// MARK: - Strategy Dashboard View
-/// Tüm strateji bucket'larının performansını gösteren dashboard.
-/// Scalp, Swing, Position stratejilerinin durumu tek bakışta.
-
 struct StrategyDashboardView: View {
     @ObservedObject var viewModel: TradingViewModel
     
@@ -11,43 +7,23 @@ struct StrategyDashboardView: View {
     @State private var multiFrameReports: [String: OrionMultiFrameEngine.MultiFrameReport] = [:]
     @State private var isLoading = true
     
-    // Theme
-    private let bg = Color(red: 0.04, green: 0.05, blue: 0.08)
-    private let cardBg = Color(red: 0.08, green: 0.10, blue: 0.14)
-    private let gold = Color(red: 1.0, green: 0.8, blue: 0.2)
-    private let cyan = Color(red: 0.0, green: 0.8, blue: 1.0)
-    private let green = Color(red: 0.0, green: 0.9, blue: 0.5)
-    private let red = Color(red: 0.9, green: 0.2, blue: 0.2)
-    
     var body: some View {
         ZStack {
-            bg.ignoresSafeArea()
+            InstitutionalTheme.Colors.background.ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Header
                 headerView
-                
-                // Bucket Selector
                 bucketSelector
                 
-                // Content
                 if isLoading {
                     loadingView
                 } else {
                     ScrollView {
                         VStack(spacing: 16) {
-                            // Selected Bucket Detail
                             bucketDetailCard
-                            
-                            // Timeframe Consensus
                             timeframeConsensusSection
-                            
-                            // Top Opportunities
                             topOpportunitiesSection
-                            
-                            // Alkindus Insights
                             alkindusInsightsSection
-                            
                             Spacer(minLength: 100)
                         }
                         .padding()
@@ -62,33 +38,28 @@ struct StrategyDashboardView: View {
         }
     }
     
-    // MARK: - Header
-    
     private var headerView: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("TRADE BRAIN 2.0")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(gold)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.warning)
                     .tracking(2)
                 
                 Text("Multi-Timeframe Strategy Conductor")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
             
             Spacer()
             
-            // Refresh Button
             Button(action: { Task { await loadData() } }) {
                 Image(systemName: "arrow.clockwise")
-                    .foregroundColor(cyan)
+                    .foregroundColor(InstitutionalTheme.Colors.primary)
             }
         }
         .padding()
     }
-    
-    // MARK: - Bucket Selector
     
     private var bucketSelector: some View {
         HStack(spacing: 12) {
@@ -104,14 +75,13 @@ struct StrategyDashboardView: View {
         Button(action: { selectedBucket = bucket }) {
             VStack(spacing: 4) {
                 Text(bucket.rawValue)
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(selectedBucket == bucket ? .white : .gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(selectedBucket == bucket ? InstitutionalTheme.Colors.textPrimary : InstitutionalTheme.Colors.textSecondary)
                 
                 Text(bucketTimeframeLabel(bucket))
-                    .font(.caption2)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 
-                // Indicator line
                 Rectangle()
                     .fill(selectedBucket == bucket ? bucketColor(bucket) : Color.clear)
                     .frame(height: 2)
@@ -130,13 +100,11 @@ struct StrategyDashboardView: View {
     
     private func bucketColor(_ bucket: OrionMultiFrameEngine.StrategyBucket) -> Color {
         switch bucket {
-        case .scalp: return .orange
-        case .swing: return cyan
-        case .position: return gold
+        case .scalp: return InstitutionalTheme.Colors.warning
+        case .swing: return InstitutionalTheme.Colors.primary
+        case .position: return InstitutionalTheme.Colors.warning
         }
     }
-    
-    // MARK: - Bucket Detail Card
     
     private var bucketDetailCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -146,48 +114,45 @@ struct StrategyDashboardView: View {
                     .frame(width: 12, height: 12)
                 
                 Text(selectedBucket.displayName)
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(InstitutionalTheme.Typography.bodyStrong)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 
                 Spacer()
                 
                 Text("Aktif")
-                    .font(.caption)
-                    .foregroundColor(green)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.positive)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(green.opacity(0.2))
+                    .background(InstitutionalTheme.Colors.positive.opacity(0.2))
                     .cornerRadius(8)
             }
             
-            Divider().background(Color.gray.opacity(0.3))
+            Divider().background(InstitutionalTheme.Colors.borderSubtle)
             
-            // Stats
             HStack(spacing: 20) {
                 statItem(label: "Risk", value: riskLabel(selectedBucket))
                 statItem(label: "Hold Süresi", value: holdLabel(selectedBucket))
                 statItem(label: "Hedef", value: targetLabel(selectedBucket))
             }
             
-            // Description
             Text(bucketDescription(selectedBucket))
-                .font(.caption)
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .padding(.top, 4)
         }
         .padding()
-        .background(cardBg)
-        .cornerRadius(12)
+        .institutionalCard(scale: .insight, elevated: false)
     }
     
     private func statItem(label: String, value: String) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                .foregroundColor(.white)
+                .font(InstitutionalTheme.Typography.dataSmall)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             Text(label)
-                .font(.caption2)
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
         }
         .frame(maxWidth: .infinity)
     }
@@ -224,19 +189,17 @@ struct StrategyDashboardView: View {
         }
     }
     
-    // MARK: - Timeframe Consensus
-    
     private var timeframeConsensusSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("⏱️ ZAMAN DİLİMİ KONSENSUS")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.gray)
+            Text("ZAMAN DILİMİ KONSENSUS")
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 .tracking(1)
             
             if multiFrameReports.isEmpty {
                 Text("Veri yükleniyor...")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
             } else {
                 ForEach(Array(multiFrameReports.keys.prefix(5)), id: \.self) { symbol in
                     if let report = multiFrameReports[symbol] {
@@ -246,19 +209,17 @@ struct StrategyDashboardView: View {
             }
         }
         .padding()
-        .background(cardBg)
-        .cornerRadius(12)
+        .institutionalCard(scale: .standard, elevated: false)
     }
     
     private func consensusRow(symbol: String, report: OrionMultiFrameEngine.MultiFrameReport) -> some View {
         HStack {
             Text(symbol)
-                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                .foregroundColor(.white)
+                .font(InstitutionalTheme.Typography.dataSmall)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             
             Spacer()
             
-            // Timeframe dots
             HStack(spacing: 4) {
                 ForEach(report.analyses, id: \.timeframe.rawValue) { analysis in
                     Circle()
@@ -270,7 +231,7 @@ struct StrategyDashboardView: View {
             Spacer()
             
             Text(report.consensus.overallSignal.rawValue)
-                .font(.caption)
+                .font(InstitutionalTheme.Typography.caption)
                 .fontWeight(.semibold)
                 .foregroundColor(signalColor(report.consensus.overallSignal))
         }
@@ -279,29 +240,27 @@ struct StrategyDashboardView: View {
     
     private func signalColor(_ signal: OrionMultiFrameEngine.TimeframeAnalysis.Signal) -> Color {
         switch signal {
-        case .strongBuy: return green
-        case .buy: return green.opacity(0.7)
-        case .neutral: return .gray
-        case .sell: return red.opacity(0.7)
-        case .strongSell: return red
+        case .strongBuy: return InstitutionalTheme.Colors.positive
+        case .buy: return InstitutionalTheme.Colors.positive.opacity(0.7)
+        case .neutral: return InstitutionalTheme.Colors.textTertiary
+        case .sell: return InstitutionalTheme.Colors.negative.opacity(0.7)
+        case .strongSell: return InstitutionalTheme.Colors.negative
         }
     }
     
-    // MARK: - Top Opportunities
-    
     private var topOpportunitiesSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(" EN İYİ FIRSATLAR")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.gray)
+            Text("EN İYİ FIRSATLAR")
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 .tracking(1)
             
             let opportunities = getTopOpportunities()
             
             if opportunities.isEmpty {
                 Text("Şu an güçlü fırsat yok")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
             } else {
                 ForEach(opportunities.prefix(3), id: \.symbol) { opp in
                     opportunityRow(opp)
@@ -309,31 +268,30 @@ struct StrategyDashboardView: View {
             }
         }
         .padding()
-        .background(cardBg)
-        .cornerRadius(12)
+        .institutionalCard(scale: .standard, elevated: false)
     }
     
     private func opportunityRow(_ opp: Opportunity) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(opp.symbol)
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundColor(.white)
+                    .font(InstitutionalTheme.Typography.dataSmall)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 
                 Text(opp.reason)
-                    .font(.caption2)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
             
             Spacer()
             
             VStack(alignment: .trailing, spacing: 2) {
                 Text("\(Int(opp.confidence * 100))%")
-                    .font(.system(size: 16, weight: .bold, design: .monospaced))
-                    .foregroundColor(green)
+                    .font(InstitutionalTheme.Typography.data)
+                    .foregroundColor(InstitutionalTheme.Colors.positive)
                 
                 Text(opp.bucket.rawValue)
-                    .font(.caption2)
+                    .font(InstitutionalTheme.Typography.micro)
                     .foregroundColor(bucketColor(opp.bucket))
             }
         }
@@ -362,37 +320,32 @@ struct StrategyDashboardView: View {
         }.sorted { $0.confidence > $1.confidence }
     }
     
-    // MARK: - Alkindus Insights
-    
     private var alkindusInsightsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: "brain.head.profile")
-                    .foregroundColor(gold)
+                    .foregroundColor(InstitutionalTheme.Colors.warning)
                 Text("ALKINDUS TAVSİYELERİ")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     .tracking(1)
             }
             
             Text("Bu strateji bucketı için Alkindus önerileri yükleniyor...")
-                .font(.caption)
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
         .padding()
-        .background(cardBg)
-        .cornerRadius(12)
+        .institutionalCard(scale: .standard, elevated: false)
     }
-    
-    // MARK: - Loading View
     
     private var loadingView: some View {
         VStack(spacing: 20) {
             ProgressView()
                 .scaleEffect(1.5)
             Text("Multi-timeframe analiz yapılıyor...")
-                .font(.caption)
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             
             LoadingQuoteView()
                 .padding(.top, 16)
@@ -400,18 +353,13 @@ struct StrategyDashboardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    // MARK: - Data Loading
-    
     private func loadData() async {
         isLoading = true
         
-        // Get watchlist symbols
         let symbols = Array(viewModel.quotes.keys.prefix(10))
         
         for symbol in symbols {
             let report = await OrionMultiFrameEngine.shared.analyzeMultiFrame(symbol: symbol) { sym, tf in
-                // Return candles for the timeframe
-                // This is a simplified version - in production, fetch from MarketDataStore
                 return viewModel.candles[symbol]
             }
             
@@ -425,8 +373,6 @@ struct StrategyDashboardView: View {
         }
     }
 }
-
-// MARK: - Preview
 
 #Preview {
     NavigationView {

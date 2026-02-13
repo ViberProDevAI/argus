@@ -15,11 +15,20 @@ class TradeBrainExecutor: ObservableObject {
     
     @Published var executionLogs: [String] = []
     @Published var isEnabled: Bool = true
+    @Published var lastMultiHorizonDecisions: [String: MultiHorizonDecision] = [:]
+    @Published var lastContradictionAnalyses: [String: ContradictionAnalysis] = [:]
     
     private var cancellables = Set<AnyCancellable>()
-    private var lastExecutionTime: [String: Date] = [:]  // Cooldown tracking
+    private var lastExecutionTime: [String: Date] = [:]
     
-    private let baseCooldownSeconds: TimeInterval = 300  // 5 dakika
+    private let baseCooldownSeconds: TimeInterval = 300
+    
+    private let horizonEngine = HorizonEngine.shared
+    private let selfQuestionEngine = SelfQuestionEngine.shared
+    private let confidenceCalibration = ConfidenceCalibrationService.shared
+    private let eventMemory = EventMemoryService.shared
+    private let regimeMemory = RegimeMemoryService.shared
+    private let learningService = TradeBrainLearningService.shared
     
     private init() {}
 
@@ -542,5 +551,143 @@ class TradeBrainExecutor: ObservableObject {
     
     func resetCooldowns() {
         lastExecutionTime.removeAll()
+    }
+    
+    // MARK: - Trade Brain 3.0 Enhanced Decision
+    
+    func makeEnhancedDecision(
+        symbol: String,
+        grandDecision: ArgusGrandDecision,
+        candles: [Candle],
+        orionScore: OrionScoreResult?,
+        atlasScore: Double?
+    ) async -> EnhancedTradeBrainDecision {
+        
+        let regimeContext = await regimeMemory.getRegimeContext()
+        let eventContext = await eventMemory.getEventContextForDecision(symbol: symbol)
+        
+        let macroContext = MacroContext(
+            vix: regimeContext.vix,
+            regime: regimeContext.regime,
+            trend: "Yatay",
+            fearGreedIndex: 50
+        )
+        
+        let multiHorizon = await horizonEngine.generateMultiHorizonDecision(
+            symbol: symbol,
+            candles: candles,
+            orionScore: orionScore,
+            atlasScore: atlasScore,
+            macroContext: macroContext
+        )
+        
+        let orionModule = OrionModuleDecision(
+            trendSignal: grandDecision.action == .aggressiveBuy || grandDecision.action == .accumulate ? "buy" : 
+                         grandDecision.action == .trim || grandDecision.action == .liquidate ? "sell" : "neutral",
+            confidence: grandDecision.confidence,
+            rsi: orionScore?.components.rsi ?? 50,
+            macdSignal: orionScore?.components.macdHistogram != nil ? (orionScore!.components.macdHistogram! > 0 ? "bullish" : "bearish") : "notr"
+        )
+        
+        let atlasModule = atlasScore.map { AtlasModuleDecision(
+            action: grandDecision.action == .aggressiveBuy || grandDecision.action == .accumulate ? "buy" : "sell",
+            confidence: Double($0) / 100.0,
+            score: $0
+        )}
+        
+        let aetherModule = AetherModuleDecision(
+            stance: regimeContext.regime == "Risk On" ? "risk_on" : regimeContext.regime == "Risk Off" ? "risk_off" : "neutral",
+            confidence: regimeContext.historicalWinRate,
+            riskLevel: regimeContext.riskScore
+        )
+        
+        let hermesModule: HermesModuleDecision? = nil
+        
+        let contradictionAnalysis = await selfQuestionEngine.analyzeContradictions(
+            orionDecision: orionModule,
+            atlasDecision: atlasModule,
+            aetherDecision: aetherModule,
+            hermesDecision: hermesModule
+        )
+        
+        let calibratedConfidence: Double
+        if contradictionAnalysis.hasContradictions {
+            calibratedConfidence = max(0.1, multiHorizon.calibratedConfidence - contradictionAnalysis.suggestedConfidenceDrop)
+        } else {
+            calibratedConfidence = multiHorizon.calibratedConfidence
+        }
+        
+        await MainActor.run {
+            self.lastMultiHorizonDecisions[symbol] = multiHorizon
+            self.lastContradictionAnalyses[symbol] = contradictionAnalysis
+        }
+        
+        await learningService.observeDecision(
+            symbol: symbol,
+            multiHorizon: multiHorizon,
+            contradictionAnalysis: contradictionAnalysis,
+            macroContext: macroContext,
+            finalAction: grandDecision.action.rawValue,
+            finalConfidence: calibratedConfidence
+        )
+        
+        return EnhancedTradeBrainDecision(
+            symbol: symbol,
+            grandDecision: grandDecision,
+            multiHorizon: multiHorizon,
+            contradictionAnalysis: contradictionAnalysis,
+            regimeContext: regimeContext,
+            eventContext: eventContext,
+            calibratedConfidence: calibratedConfidence,
+            timestamp: Date()
+        )
+    }
+    
+    func recordTradeOutcome(
+        symbol: String,
+        wasCorrect: Bool,
+        pnlPercent: Double,
+        holdingDays: Int
+    ) async {
+        guard let multiHorizon = lastMultiHorizonDecisions[symbol],
+              let contradiction = lastContradictionAnalyses[symbol] else {
+            return
+        }
+        
+        await confidenceCalibration.recordOutcome(
+            confidence: multiHorizon.calibratedConfidence,
+            wasCorrect: wasCorrect,
+            pnlPercent: pnlPercent
+        )
+        
+        print("TradeBrain: \(symbol) sonuc kaydedildi - \(wasCorrect ? "BASARILI" : "BASARISIZ")")
+    }
+}
+
+struct EnhancedTradeBrainDecision {
+    let symbol: String
+    let grandDecision: ArgusGrandDecision
+    let multiHorizon: MultiHorizonDecision
+    let contradictionAnalysis: ContradictionAnalysis
+    let regimeContext: RegimeDecisionContext
+    let eventContext: EventDecisionContext
+    let calibratedConfidence: Double
+    let timestamp: Date
+    
+    var shouldProceed: Bool {
+        calibratedConfidence > 0.45 && !contradictionAnalysis.hasContradictions || contradictionAnalysis.severity != .high
+    }
+    
+    var riskWarning: String? {
+        if contradictionAnalysis.hasContradictions {
+            return contradictionAnalysis.recommendation
+        }
+        if eventContext.hasHighImpactEvent {
+            return "Yuksek etkili olay yaklasti"
+        }
+        if regimeContext.riskScore > 0.6 {
+            return "Piyasa risk ortami yuksek"
+        }
+        return nil
     }
 }

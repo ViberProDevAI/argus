@@ -140,7 +140,7 @@ struct PiyasaRejimiCard: View {
 }
 
 // MARK: - Makro Göstergeler Kartı
-/// BorsaPy'den çekilen canlı makro veriler.
+/// Öncelik: TCMBDataService (EVDS / resmi kaynaklar), fallback: BorsaPy.
 /// Enflasyon, faiz, USD/TRY, BIST 100, Brent, Altın vb.
 
 struct MakroGostergelerCard: View {
@@ -326,17 +326,32 @@ struct MakroGostergelerCard: View {
 
     private func loadData() async {
         // Paralel veri çekimi (hatalar loglanıyor)
+        let snapshot = await TCMBDataService.shared.getMacroSnapshot(forceRefresh: true)
         var inf: BistInflationData?
         var rate: Double?
         var xu: BistQuote?
         var br: FXRate?
         var gld: FXRate?
 
-        do { inf = try await BorsaPyProvider.shared.getInflationData() }
-        catch { print("⚠️ MakroGostergeler: Enflasyon verisi alınamadı — \(error)") }
+        if let infl = snapshot.inflation {
+            let monthly = snapshot.coreInflation ?? 0
+            inf = BistInflationData(
+                date: ISO8601DateFormatter().string(from: snapshot.timestamp),
+                yearlyInflation: infl,
+                monthlyInflation: monthly,
+                type: "TUFE"
+            )
+        } else {
+            do { inf = try await BorsaPyProvider.shared.getInflationData() }
+            catch { print("⚠️ MakroGostergeler: Enflasyon verisi alınamadı — \(error)") }
+        }
 
-        do { rate = try await BorsaPyProvider.shared.getPolicyRate() }
-        catch { print("⚠️ MakroGostergeler: Politika faizi alınamadı — \(error)") }
+        if let snapshotRate = snapshot.policyRate {
+            rate = snapshotRate
+        } else {
+            do { rate = try await BorsaPyProvider.shared.getPolicyRate() }
+            catch { print("⚠️ MakroGostergeler: Politika faizi alınamadı — \(error)") }
+        }
 
         do { xu = try await BorsaPyProvider.shared.getXU100() }
         catch { print("⚠️ MakroGostergeler: XU100 verisi alınamadı — \(error)") }
@@ -347,8 +362,18 @@ struct MakroGostergelerCard: View {
         do { gld = try await BorsaPyProvider.shared.getGoldPrice() }
         catch { print("⚠️ MakroGostergeler: Altın verisi alınamadı — \(error)") }
 
-        // USD/TRY'yi MarketDataStore'dan al
-        let usd = await MainActor.run { MarketDataStore.shared.liveQuotes["USD/TRY"]?.currentPrice }
+        // USD/TRY: snapshot öncelikli, store fallback
+        let usdFromStore = await MainActor.run { MarketDataStore.shared.liveQuotes["USD/TRY"]?.currentPrice }
+        let usd = snapshot.usdTry ?? usdFromStore
+
+        // Güvenlik filtresi: bariz bozuk politika faizi gösterme
+        if let candidateRate = rate,
+           let yearlyInflation = inf?.yearlyInflation,
+           candidateRate < 10,
+           yearlyInflation > 15 {
+            print("⚠️ MakroGostergeler: Politika faizi şüpheli (\(candidateRate)); gizleniyor")
+            rate = nil
+        }
 
         await MainActor.run {
             self.inflation = inf

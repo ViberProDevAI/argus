@@ -53,10 +53,13 @@ struct RejimView: View {
                     // 2. Makro Göstergeler (BorsaPy canlı)
                     MakroGostergelerCard()
 
-                    // 3. Teknik Konsensüs (28 gösterge)
+                    // 3. Oracle Lens (Makro Sinyal ve Etki)
+                    oracleLensSection
+
+                    // 4. Teknik Konsensüs (28 gösterge)
                     TeknikKonsensusCard(symbol: symbol)
 
-                    // 4. Sektör Analizi (mevcut bileşen)
+                    // 5. Sektör Analizi (mevcut bileşen)
                     BistSektorCard()
 
                     // Disclaimer
@@ -78,6 +81,23 @@ struct RejimView: View {
                 .foregroundColor(InstitutionalTheme.Colors.textTertiary)
         }
         .padding(.vertical, 8)
+    }
+
+    private var oracleLensSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(SanctumTheme.aetherColor)
+                Text("ORACLE LENS")
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                Spacer()
+            }
+
+            OracleChamberEmbeddedView()
+                .frame(height: 320)
+        }
     }
 
     // MARK: - Data Loading

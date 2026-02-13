@@ -3,27 +3,27 @@ import SwiftUI
 struct NotificationsView: View {
     @ObservedObject var store = NotificationStore.shared
     @State private var selectedNotification: ArgusNotification?
-    @ObservedObject var viewModel: TradingViewModel // Needed for execution
-    var deepLinkID: String? = nil // Deep Link Parameter
+    @ObservedObject var viewModel: TradingViewModel
+    var deepLinkID: String? = nil
     @StateObject private var deepLinkManager = DeepLinkManager.shared
     @State private var showDrawer = false
     
     var body: some View {
         NavigationView {
             ZStack {
-                Theme.background.ignoresSafeArea()
+                InstitutionalTheme.Colors.background.ignoresSafeArea()
                 
                 if store.notifications.isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "bell.slash")
                             .font(.system(size: 50))
-                            .foregroundColor(Theme.textSecondary)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Text("Henüz bildirim yok.")
-                            .font(.headline)
-                            .foregroundColor(Theme.textSecondary)
+                            .font(InstitutionalTheme.Typography.bodyStrong)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Text("Argus gözcüsü arka planda fırsat arıyor.")
-                            .font(.caption)
-                            .foregroundColor(Theme.textSecondary)
+                            .font(InstitutionalTheme.Typography.caption)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 } else {
                     ScrollView {
@@ -43,7 +43,6 @@ struct NotificationsView: View {
             .onAppear {
                 if let idString = deepLinkID, let id = UUID(uuidString: idString) {
                     if let note = store.notifications.first(where: { $0.id == id }) {
-                        // Delay slightly to ensure view is ready
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                             selectedNotification = note
                             store.markAsRead(note)
@@ -56,7 +55,7 @@ struct NotificationsView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button(action: { showDrawer = true }) {
                         Image(systemName: "line.3.horizontal")
-                            .foregroundColor(.white)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -97,7 +96,7 @@ struct NotificationsView: View {
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkez", icon: "AlkindusIcon") {
-                        deepLinkManager.navigate(to: .home)
+                        NotificationCenter.default.post(name: NSNotification.Name("OpenAlkindusDashboard"), object: nil)
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Portfoy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
@@ -151,55 +150,53 @@ struct NotificationsView: View {
     }
 }
 
-// MARK: - Row Component
 struct NotificationRow: View {
     let notification: ArgusNotification
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Icon
             ZStack {
                 Circle()
-                    .fill(notification.type == .buyOpportunity ? Theme.positive.opacity(0.2) : (notification.type == .sellWarning ? Theme.negative.opacity(0.2) : Color.blue.opacity(0.2)))
+                    .fill(notification.type == .buyOpportunity ? InstitutionalTheme.Colors.positive.opacity(0.2) : (notification.type == .sellWarning ? InstitutionalTheme.Colors.negative.opacity(0.2) : InstitutionalTheme.Colors.primary.opacity(0.2)))
                     .frame(width: 44, height: 44)
                 
                 Image(systemName: iconName(for: notification.type))
-                    .foregroundColor(notification.type == .buyOpportunity ? Theme.positive : (notification.type == .sellWarning ? Theme.negative : Color.blue))
+                    .foregroundColor(notification.type == .buyOpportunity ? InstitutionalTheme.Colors.positive : (notification.type == .sellWarning ? InstitutionalTheme.Colors.negative : InstitutionalTheme.Colors.primary))
             }
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(notification.headline)
-                        .font(.headline)
-                        .foregroundColor(Theme.textPrimary)
+                        .font(InstitutionalTheme.Typography.bodyStrong)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         .lineLimit(1)
                     
                     Spacer()
                     
                     if !notification.isRead {
                         Circle()
-                            .fill(Color.red)
+                            .fill(InstitutionalTheme.Colors.negative)
                             .frame(width: 8, height: 8)
                     }
                 }
                 
                 Text(notification.summary)
-                    .font(.caption)
-                    .foregroundColor(Theme.textSecondary)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     .lineLimit(2)
                 
                 Text(notification.timestamp.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption2)
-                    .foregroundColor(Theme.textSecondary.opacity(0.6))
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     .padding(.top, 4)
             }
         }
         .padding()
-        .background(notification.isRead ? Theme.background : Theme.secondaryBackground)
+        .background(notification.isRead ? InstitutionalTheme.Colors.background : InstitutionalTheme.Colors.surface1)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Theme.border, lineWidth: 0.5)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
         )
     }
     
@@ -217,7 +214,6 @@ struct NotificationRow: View {
     }
 }
 
-// MARK: - Detail Sheet (Persuasion Engine UI)
 struct ArgusReportDetailView: View {
     let notification: ArgusNotification
     @ObservedObject var viewModel: TradingViewModel
@@ -226,39 +222,35 @@ struct ArgusReportDetailView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                // Header
                 HStack {
                     CompanyLogoView(symbol: notification.symbol, size: 48)
                     VStack(alignment: .leading) {
                         Text(notification.symbol)
-                            .font(.title)
+                            .font(InstitutionalTheme.Typography.title)
                             .bold()
                         Text(notification.timestamp.formatted())
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(InstitutionalTheme.Typography.caption)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     Spacer()
                     
                     Button(action: { presentationMode.wrappedValue.dismiss() }) {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
-                            .foregroundColor(.gray)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                 }
                 .padding(.bottom)
                 
-                // Report Content (Markdown Rendering)
                 Text(LocalizedStringKey(notification.detailedReport))
-                    .font(.body)
-                    .foregroundColor(Theme.textPrimary)
+                    .font(InstitutionalTheme.Typography.body)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     .multilineTextAlignment(.leading)
-                    .padding(.all, 12)
-                    .background(Theme.secondaryBackground)
-                    .cornerRadius(12)
+                    .padding(12)
+                    .institutionalCard(scale: .standard, elevated: false)
                 
                 Spacer(minLength: 40)
                 
-                // ACTION BUTTON (The "Uygula" Button)
                 if notification.type == .buyOpportunity || notification.type == .sellWarning {
                     Button(action: {
                         executeAction()
@@ -266,13 +258,13 @@ struct ArgusReportDetailView: View {
                         HStack {
                             Image(systemName: notification.type == .buyOpportunity ? "bolt.fill" : "xmark.circle.fill")
                             Text(notification.type == .buyOpportunity ? "Sinyali Uygula: 1000$ AL" : "Sinyali Uygula: SAT")
-                                .font(.headline)
+                                .font(InstitutionalTheme.Typography.bodyStrong)
                                 .bold()
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(notification.type == .buyOpportunity ? Theme.positive : Theme.negative)
+                        .background(notification.type == .buyOpportunity ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative)
                         .cornerRadius(12)
                         .shadow(radius: 5)
                     }
@@ -280,13 +272,11 @@ struct ArgusReportDetailView: View {
             }
             .padding()
         }
-        .background(Theme.background.ignoresSafeArea())
+        .background(InstitutionalTheme.Colors.background.ignoresSafeArea())
     }
     
     private func executeAction() {
         if notification.type == .buyOpportunity {
-            // Fetch current price safely?
-            // Since we are in Report view, we might not have live price, but ViewModel has quotes
             if let quote = viewModel.quotes[notification.symbol] {
                 let price = quote.currentPrice
                 if price > 0 {

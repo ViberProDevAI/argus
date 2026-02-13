@@ -75,6 +75,13 @@ final class HermesNewsViewModel: ObservableObject {
     // MARK: - Initialization
     private init() {}
 
+    // MARK: - BIST Atmosphere State
+
+    @MainActor
+    func currentBistAtmosphereState() -> (decision: AetherDecision?, lastUpdated: Date?) {
+        (bistAtmosphere, bistAtmosphereLastUpdated)
+    }
+
     // MARK: - News & Insights (Gemini)
 
     @MainActor
@@ -258,51 +265,7 @@ final class HermesNewsViewModel: ObservableObject {
 
     @MainActor
     func refreshBistAtmosphere() async {
-        // 1. USD/TRY Kuru (BorsaPyProvider - Doviz.com'dan)
-        var usdTry: Double = self.usdTryRate
-        var usdTryPrevious: Double = self.usdTryRate
-
-        do {
-            let fxRate = try await BorsaPyProvider.shared.getFXRate(asset: "USD")
-            usdTry = fxRate.last
-            usdTryPrevious = fxRate.open
-            self.usdTryRate = usdTry
-            print("💱 BorsaPy: USD/TRY = \(String(format: "%.4f", usdTry))")
-        } catch {
-            // Fallback: Mevcut quote'ları kullan
-            if let usdTryQuote = self.quotes["USD/TRY"] ?? self.quotes["USDTRY=X"] {
-                usdTry = usdTryQuote.currentPrice
-                usdTryPrevious = usdTryQuote.previousClose ?? usdTryQuote.currentPrice
-            }
-        }
-
-        // 2. Global VIX (Gerçek Veri)
-        var globalVix: Double? = nil
-        if let vixQuote = self.quotes["^VIX"] {
-            globalVix = vixQuote.currentPrice
-        } else if let macro = self.macroRating {
-            globalVix = macro.volatilityScore
-        }
-
-        // 3. Brent Petrol (BorsaPyProvider - Doviz.com'dan)
-        var brentOil: Double? = nil
-        do {
-            let brentRate = try await BorsaPyProvider.shared.getBrentPrice()
-            brentOil = brentRate.last
-            print("🛢️ BorsaPy: Brent = $\(String(format: "%.2f", brentRate.last))")
-        } catch {
-            if let brentQuote = self.quotes["BZ=F"] ?? self.quotes["BRENT"] {
-                brentOil = brentQuote.currentPrice
-            }
-        }
-
-        // 4. DXY (Dolar Endeksi)
-        var dxy: Double? = nil
-        if let dxyQuote = self.quotes["DX-Y.NYB"] ?? self.quotes["DXY"] {
-            dxy = dxyQuote.currentPrice
-        }
-
-        // 5. Haber Verisi (Sirkiye için Türkiye haberleri)
+        // 1. Haber Verisi (Sirkiye için Türkiye haberleri)
         let turkeyRelatedInsights = self.generalNewsInsights.filter { insight in
             let text = insight.headline.lowercased()
             return text.contains("türk") || text.contains("turk") ||
@@ -323,24 +286,31 @@ final class HermesNewsViewModel: ObservableObject {
             )
         }
 
-        // 6. Sirkiye Engine'i çağır
+        // 2. Sirkiye için gerçek veri tabanı (TCMB + public kaynaklar)
+        guard let baseInput = await TCMBDataService.shared.getSirkiyeInput() else {
+            print("⚠️ Sirkiye: Kritik makro veri alınamadı, skor güncellenmedi.")
+            return
+        }
+
+        // 3. Aynı gerçek input üstüne haber snapshot'ı enjekte et
         let input = SirkiyeEngine.SirkiyeInput(
-            usdTry: usdTry,
-            usdTryPrevious: usdTryPrevious,
-            dxy: dxy,
-            brentOil: brentOil,
-            globalVix: globalVix,
+            usdTry: baseInput.usdTry,
+            usdTryPrevious: baseInput.usdTryPrevious,
+            dxy: baseInput.dxy,
+            brentOil: baseInput.brentOil,
+            globalVix: baseInput.globalVix,
             newsSnapshot: hermesSnapshot,
-            currentInflation: 45.0,
-            policyRate: 50.0,
-            xu100Change: nil,
-            xu100Value: nil,
-            goldPrice: nil
+            currentInflation: baseInput.currentInflation,
+            policyRate: baseInput.policyRate,
+            xu100Change: baseInput.xu100Change,
+            xu100Value: baseInput.xu100Value,
+            goldPrice: baseInput.goldPrice
         )
 
         let decision = await SirkiyeEngine.shared.analyze(input: input)
 
-        // 7. Sonucu kaydet
+        // 4. Sonucu kaydet
+        self.usdTryRate = input.usdTry
         self.bistAtmosphere = decision
         self.bistAtmosphereLastUpdated = Date()
 

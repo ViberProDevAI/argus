@@ -13,16 +13,16 @@ struct SanctumTheme {
     static let hologramBlue = InstitutionalTheme.Colors.primary
     static let auroraGreen = InstitutionalTheme.Colors.positive
     static let neonGreen = InstitutionalTheme.Colors.positive
-    static let titanGold = InstitutionalTheme.Colors.warning
+    static let titanGold = InstitutionalTheme.Colors.neutral      // Artık neutral gri
     static let ghostGrey = InstitutionalTheme.Colors.textSecondary
     static let crimsonRed = InstitutionalTheme.Colors.negative
     
     // Module Colors (Mapped to V2)
     static let orionColor = hologramBlue     // Technical -> Hologram Blue
-    static let atlasColor = titanGold        // Fundamental -> Titan Gold
+    static let atlasColor = hologramBlue     // Fundamental -> Mavi (artık altın yok)
     static let aetherColor = ghostGrey       // Macro -> Ghost Grey (Neutral base)
-    static let athenaColor = titanGold       // Smart Beta -> Titan Gold (Wisdom)
-    static let hermesColor = InstitutionalTheme.Colors.warning
+    static let athenaColor = hologramBlue    // Smart Beta -> Mavi
+    static let hermesColor = InstitutionalTheme.Colors.neutral
     static let demeterColor = auroraGreen    // Sectors -> Aurora Green (Growth)
     static let chironColor = InstitutionalTheme.Colors.textPrimary
     

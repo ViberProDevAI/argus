@@ -1,29 +1,23 @@
 import SwiftUI
 import Combine
 
-// MARK: - HERMES FEED VIEW (Refactored)
-// Direct connection to HermesStateViewModel + HermesLLMService
-// No more dependency on broken TradingViewModel functions
-
 struct HermesFeedView: View {
     @ObservedObject var viewModel: TradingViewModel
     @StateObject private var feedState = HermesFeedState()
-    @State private var selectedScope = 0 // 0: Takip Listem, 1: Genel Piyasa
+    @State private var selectedScope = 0
 
     var body: some View {
         ZStack {
-            Theme.background.ignoresSafeArea()
+            InstitutionalTheme.Colors.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Scope Selector
                 ScopeSelectorBar(selectedScope: $selectedScope)
                     .padding(.vertical, 12)
-                    .background(Theme.background)
+                    .background(InstitutionalTheme.Colors.background)
                     .onChange(of: selectedScope) { _, newValue in
                         Task { await feedState.loadFeed(scope: newValue, watchlist: viewModel.watchlist) }
                     }
 
-                // Content
                 if feedState.isLoading {
                     LoadingStateView()
                 } else if let error = feedState.errorMessage {
@@ -51,13 +45,12 @@ struct HermesFeedView: View {
                     }) {
                         Image(systemName: "arrow.clockwise")
                             .font(.system(size: 14))
-                            .foregroundColor(Theme.tint)
+                            .foregroundColor(InstitutionalTheme.Colors.primary)
                     }
                 }
             }
         }
         .task {
-            // Auto-load on appear
             await feedState.loadFeed(scope: selectedScope, watchlist: viewModel.watchlist)
         }
     }
@@ -65,7 +58,6 @@ struct HermesFeedView: View {
     private var feedContent: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
-                // Show Events (from AI analysis)
                 if !feedState.events.isEmpty {
                     ForEach(feedState.events) { event in
                         HermesEventCompactCard(event: event)
@@ -73,7 +65,6 @@ struct HermesFeedView: View {
                     }
                 }
 
-                // Show Insights (from previous analyses)
                 if !feedState.insights.isEmpty && feedState.events.isEmpty {
                     ForEach(feedState.insights) { insight in
                         if insight.symbol != "MARKET" && insight.symbol != "GENERAL" {
@@ -88,7 +79,6 @@ struct HermesFeedView: View {
                     .padding(.horizontal)
                 }
 
-                // Raw News fallback (to verify fetch even if analysis layer fails)
                 if feedState.events.isEmpty && feedState.insights.isEmpty && !feedState.rawArticles.isEmpty {
                     ForEach(feedState.rawArticles.prefix(40)) { article in
                         RawNewsCard(article: article)
@@ -104,7 +94,6 @@ struct HermesFeedView: View {
     }
 }
 
-// MARK: - Feed State Manager
 @MainActor
 class HermesFeedState: ObservableObject {
     @Published var isLoading = false
@@ -120,10 +109,8 @@ class HermesFeedState: ObservableObject {
 
         do {
             if scope == 0 {
-                // Watchlist Feed
                 await loadWatchlistFeed(watchlist: watchlist)
             } else {
-                // General Market Feed
                 await loadGeneralFeed()
             }
         }
@@ -139,7 +126,6 @@ class HermesFeedState: ObservableObject {
         var allInsights: [NewsInsight] = []
         var allRawArticles: [NewsArticle] = []
 
-        // Load from HermesStateViewModel cache first
         let hermesVM = HermesStateViewModel.shared
 
         for symbol in watchlist {
@@ -149,7 +135,6 @@ class HermesFeedState: ObservableObject {
                 allRawArticles.append(contentsOf: cachedRaw)
             }
 
-            // Check cache
             if isBist {
                 if let cached = hermesVM.kulisEventsBySymbol[symbol], !cached.isEmpty {
                     allEvents.append(contentsOf: cached)
@@ -162,13 +147,11 @@ class HermesFeedState: ObservableObject {
                 }
             }
 
-            // Check insights cache
             if let cachedInsights = hermesVM.newsInsightsBySymbol[symbol], !cachedInsights.isEmpty {
                 allInsights.append(contentsOf: cachedInsights)
                 continue
             }
 
-            // Fetch fresh data for this symbol
             do {
                 let articles: [NewsArticle]
                 if isBist {
@@ -181,7 +164,6 @@ class HermesFeedState: ObservableObject {
                 allRawArticles.append(contentsOf: articles)
                 hermesVM.newsBySymbol[symbol] = articles
 
-                // Analyze with LLM
                 let scope: HermesEventScope = isBist ? .bist : .global
                 let events = try await HermesLLMService.shared.analyzeEvents(
                     articles: articles,
@@ -191,7 +173,6 @@ class HermesFeedState: ObservableObject {
 
                 allEvents.append(contentsOf: events)
 
-                // Cache results
                 if isBist {
                     hermesVM.kulisEventsBySymbol[symbol] = events
                 } else {
@@ -205,7 +186,6 @@ class HermesFeedState: ObservableObject {
             }
         }
 
-        // Sort by date
         self.events = allEvents.sorted { $0.publishedAt > $1.publishedAt }
         self.insights = allInsights.sorted { $0.createdAt > $1.createdAt }
         self.rawArticles = Array(Dictionary(grouping: allRawArticles, by: { $0.id }).values.compactMap { $0.first })
@@ -217,7 +197,6 @@ class HermesFeedState: ObservableObject {
     }
 
     private func loadGeneralFeed() async {
-        // Fetch general market news
         do {
             let articles = try await RSSNewsProvider().fetchNews(symbol: "GENERAL", limit: 25)
             self.rawArticles = articles.sorted { $0.publishedAt > $1.publishedAt }
@@ -228,7 +207,6 @@ class HermesFeedState: ObservableObject {
             }
 
             do {
-                // Analyze with LLM
                 let events = try await HermesLLMService.shared.analyzeEvents(
                     articles: articles,
                     scope: .bist,
@@ -236,8 +214,6 @@ class HermesFeedState: ObservableObject {
                 )
 
                 self.events = events.sorted { $0.publishedAt > $1.publishedAt }
-
-                // Cache
                 HermesStateViewModel.shared.hermesEventsBySymbol["GENERAL"] = events
 
                 print("✅ HermesFeed: Genel piyasa için \(events.count) event yüklendi")
@@ -254,24 +230,22 @@ class HermesFeedState: ObservableObject {
     }
 }
 
-// MARK: - Event Compact Card
 struct HermesEventCompactCard: View {
     let event: HermesEvent
 
     private var accentColor: Color {
         switch event.polarity {
-        case .positive: return .green
-        case .negative: return .red
-        case .mixed: return .orange
+        case .positive: return InstitutionalTheme.Colors.positive
+        case .negative: return InstitutionalTheme.Colors.negative
+        case .mixed: return InstitutionalTheme.Colors.warning
         }
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Header
             HStack {
                 Text(event.symbol)
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    .font(InstitutionalTheme.Typography.dataSmall)
                     .foregroundColor(accentColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -281,31 +255,28 @@ struct HermesEventCompactCard: View {
                 Spacer()
 
                 Text(timeAgo(event.publishedAt))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
-            // Headline
             Text(event.headline)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(.white)
+                .font(InstitutionalTheme.Typography.body)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .lineLimit(2)
 
-            // Event Type
             HStack(spacing: 8) {
                 Text(event.eventType.displayTitleTR)
-                    .font(.caption2)
-                    .foregroundColor(.white.opacity(0.7))
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.7))
 
                 Spacer()
 
-                // Sentiment Badge
                 HStack(spacing: 4) {
                     Circle()
                         .fill(accentColor)
                         .frame(width: 6, height: 6)
                     Text(sentimentLabel())
-                        .font(.system(size: 10, weight: .bold))
+                        .font(InstitutionalTheme.Typography.micro)
                         .foregroundColor(accentColor)
                 }
                 .padding(.horizontal, 8)
@@ -314,13 +285,11 @@ struct HermesEventCompactCard: View {
                 .cornerRadius(6)
             }
 
-            // Rationale
             Text(event.summaryTRShort ?? event.rationaleShort)
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.8))
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.8))
                 .lineLimit(3)
 
-            // Tags
             HStack(spacing: 8) {
                 tag("Skor: \(Int(event.finalScore))")
                 tag("Güven: \(Int(event.confidence * 100))%")
@@ -328,10 +297,9 @@ struct HermesEventCompactCard: View {
             }
         }
         .padding(14)
-        .background(Theme.secondaryBackground.opacity(0.5))
-        .cornerRadius(12)
+        .institutionalCard(scale: .insight, elevated: false)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg)
                 .stroke(accentColor.opacity(0.2), lineWidth: 1)
         )
     }
@@ -349,11 +317,11 @@ struct HermesEventCompactCard: View {
 
     private func tag(_ text: String) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .medium, design: .monospaced))
-            .foregroundColor(.gray)
+            .font(InstitutionalTheme.Typography.micro)
+            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             .padding(.horizontal, 6)
             .padding(.vertical, 3)
-            .background(Color.white.opacity(0.05))
+            .background(InstitutionalTheme.Colors.surface2)
             .cornerRadius(4)
     }
 
@@ -364,7 +332,6 @@ struct HermesEventCompactCard: View {
     }
 }
 
-// MARK: - Insight Card
 struct HermesInsightCard: View {
     let insight: NewsInsight
 
@@ -372,29 +339,29 @@ struct HermesInsightCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(insight.symbol)
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .foregroundColor(Theme.tint)
+                    .font(InstitutionalTheme.Typography.dataSmall)
+                    .foregroundColor(InstitutionalTheme.Colors.primary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Theme.tint.opacity(0.15))
+                    .background(InstitutionalTheme.Colors.primary.opacity(0.15))
                     .cornerRadius(6)
 
                 Spacer()
 
                 Text(timeAgo(insight.createdAt))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
             Text(insight.headline)
-                .font(.system(size: 15, weight: .medium))
-                .foregroundColor(.white)
+                .font(InstitutionalTheme.Typography.body)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .lineLimit(2)
 
             if !insight.impactSentenceTR.isEmpty {
                 Text(insight.impactSentenceTR)
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.7))
                     .lineLimit(2)
             }
 
@@ -404,7 +371,7 @@ struct HermesInsightCard: View {
                         .fill(colorForSentiment(insight.sentiment))
                         .frame(width: 6, height: 6)
                     Text(insight.sentiment.displayTitle)
-                        .font(.system(size: 10, weight: .bold))
+                        .font(InstitutionalTheme.Typography.micro)
                         .foregroundColor(colorForSentiment(insight.sentiment))
                 }
                 .padding(.horizontal, 8)
@@ -415,22 +382,21 @@ struct HermesInsightCard: View {
                 Spacer()
 
                 Text("Etki: \(Int(insight.impactScore))")
-                    .font(.caption2)
-                    .foregroundColor(insight.impactScore > 60 ? .green : (insight.impactScore < 40 ? .red : .gray))
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(insight.impactScore > 60 ? InstitutionalTheme.Colors.positive : (insight.impactScore < 40 ? InstitutionalTheme.Colors.negative : InstitutionalTheme.Colors.textSecondary))
             }
         }
         .padding(14)
-        .background(Theme.secondaryBackground.opacity(0.5))
-        .cornerRadius(12)
+        .institutionalCard(scale: .insight, elevated: false)
     }
 
     private func colorForSentiment(_ s: NewsSentiment) -> Color {
         switch s {
-        case .strongPositive: return .green
-        case .weakPositive: return Color.green.opacity(0.7)
-        case .neutral: return .gray
-        case .weakNegative: return Color.red.opacity(0.7)
-        case .strongNegative: return .red
+        case .strongPositive: return InstitutionalTheme.Colors.positive
+        case .weakPositive: return InstitutionalTheme.Colors.positive.opacity(0.7)
+        case .neutral: return InstitutionalTheme.Colors.textSecondary
+        case .weakNegative: return InstitutionalTheme.Colors.negative.opacity(0.7)
+        case .strongNegative: return InstitutionalTheme.Colors.negative
         }
     }
 
@@ -448,26 +414,25 @@ struct RawNewsCard: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(article.symbol)
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(Theme.tint)
+                    .font(InstitutionalTheme.Typography.dataSmall)
+                    .foregroundColor(InstitutionalTheme.Colors.primary)
                 Spacer()
                 Text(timeAgo(article.publishedAt))
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
             Text(article.headline)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundColor(.white)
+                .font(InstitutionalTheme.Typography.body)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .lineLimit(3)
 
             Text(article.source)
-                .font(.system(size: 10, design: .monospaced))
-                .foregroundColor(.gray.opacity(0.9))
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
         .padding(12)
-        .background(Theme.secondaryBackground.opacity(0.5))
-        .cornerRadius(10)
+        .institutionalCard(scale: .micro, elevated: false)
     }
 
     private func timeAgo(_ date: Date) -> String {
@@ -477,8 +442,6 @@ struct RawNewsCard: View {
     }
 }
 
-// MARK: - State Views
-
 struct LoadingStateView: View {
     var body: some View {
         VStack(spacing: 24) {
@@ -486,28 +449,28 @@ struct LoadingStateView: View {
 
             ZStack {
                 Circle()
-                    .fill(Theme.secondaryBackground)
+                    .fill(InstitutionalTheme.Colors.surface2)
                     .frame(width: 100, height: 100)
                     .blur(radius: 5)
 
                 Image(systemName: "antenna.radiowaves.left.and.right")
                     .font(.system(size: 40))
-                    .foregroundColor(Theme.tint.opacity(0.5))
+                    .foregroundColor(InstitutionalTheme.Colors.primary.opacity(0.5))
             }
 
             VStack(spacing: 8) {
                 Text("HABER AKIŞI TARANIYOR")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundColor(.white)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
                 Text("Hermes yapay zekası haberleri analiz ediyor...")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
             ProgressView()
                 .scaleEffect(1.2)
-                .tint(Theme.tint)
+                .tint(InstitutionalTheme.Colors.primary)
 
             Spacer()
         }
@@ -524,11 +487,11 @@ struct ErrorStateView: View {
 
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 48))
-                .foregroundColor(.orange)
+                .foregroundColor(InstitutionalTheme.Colors.warning)
 
             Text(message)
-                .font(.caption)
-                .foregroundColor(.white)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
@@ -537,11 +500,11 @@ struct ErrorStateView: View {
                     Image(systemName: "arrow.clockwise")
                     Text("TEKRAR DENE")
                 }
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(.black)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
-                .background(Theme.tint)
+                .background(InstitutionalTheme.Colors.primary)
                 .cornerRadius(8)
             }
 
@@ -560,16 +523,16 @@ struct EmptyFeedView: View {
 
             Image(systemName: "newspaper")
                 .font(.system(size: 48))
-                .foregroundColor(.gray.opacity(0.5))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary.opacity(0.5))
 
             VStack(spacing: 8) {
                 Text(scope == 0 ? "TAKİP LİSTESİ BOŞ" : "HABER BULUNAMADI")
-                    .font(.system(size: 14, weight: .bold, design: .monospaced))
-                    .foregroundColor(.white)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
                 Text(scope == 0 ? "Takip listenizdeki hisseler için haber bulunamadı." : "Genel piyasa haberi bulunamadı.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     .multilineTextAlignment(.center)
             }
 
@@ -578,11 +541,11 @@ struct EmptyFeedView: View {
                     Image(systemName: "magnifyingglass")
                     Text("TARA")
                 }
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(.black)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(.white)
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
-                .background(Theme.tint)
+                .background(InstitutionalTheme.Colors.primary)
                 .cornerRadius(8)
             }
 
@@ -591,7 +554,6 @@ struct EmptyFeedView: View {
     }
 }
 
-// MARK: - Scope Selector (Preserved)
 struct ScopeSelectorBar: View {
     @Binding var selectedScope: Int
 
@@ -602,7 +564,7 @@ struct ScopeSelectorBar: View {
             }
 
             Rectangle()
-                .fill(Color.gray.opacity(0.3))
+                .fill(InstitutionalTheme.Colors.borderSubtle)
                 .frame(width: 1, height: 20)
 
             ScopeButton(title: "GENEL PİYASA", isSelected: selectedScope == 1) {
@@ -610,7 +572,7 @@ struct ScopeSelectorBar: View {
             }
         }
         .padding(4)
-        .background(Theme.secondaryBackground.opacity(0.5))
+        .background(InstitutionalTheme.Colors.surface1)
         .cornerRadius(10)
         .padding(.horizontal)
     }
@@ -624,15 +586,15 @@ struct ScopeButton: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 11, weight: isSelected ? .bold : .medium, design: .monospaced))
-                .foregroundColor(isSelected ? .white : .gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(isSelected ? InstitutionalTheme.Colors.textPrimary : InstitutionalTheme.Colors.textSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(isSelected ? Theme.tint.opacity(0.2) : Color.clear)
+                .background(isSelected ? InstitutionalTheme.Colors.primary.opacity(0.2) : Color.clear)
                 .cornerRadius(8)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelected ? Theme.tint.opacity(0.5) : Color.clear, lineWidth: 1)
+                        .stroke(isSelected ? InstitutionalTheme.Colors.primary.opacity(0.5) : Color.clear, lineWidth: 1)
                 )
         }
     }

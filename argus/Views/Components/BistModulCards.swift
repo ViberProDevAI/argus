@@ -193,9 +193,8 @@ struct BistFaktorCard: View {
             }
 
             do {
-                // 1. Oracle Verilerini Hazırla (Neural Link)
-                let oracleInput = await TCMBDataService.shared.getOracleInput()
-                let oracleSignals = await OracleEngine.shared.analyze(input: oracleInput)
+                // 1. Oracle verilerini cache katmanından al
+                let oracleSignals = await OracleEngine.shared.getLatestSignals()
 
                 // 2. Faktör Analizi (Oracle Sinyalleri ile)
                 let data = try await BistFaktorEngine.shared.analyze(symbol: symbol, oracleSignals: oracleSignals)

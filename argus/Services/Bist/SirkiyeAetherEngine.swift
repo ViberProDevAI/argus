@@ -138,13 +138,9 @@ actor SirkiyeAetherEngine {
     
     // MARK: - Ana Analiz
     
-    func analyze() async -> TurkeyMacroScore {
-        let snapshot = await TCMBDataService.shared.getMacroSnapshot()
-        
-        // ORACLE ENTEGRASYONU (Neural Link)
-        let oracleInput = await TCMBDataService.shared.getOracleInput()
-        let oracleSignals = await OracleEngine.shared.analyze(input: oracleInput)
-        
+    func analyze(forceRefresh: Bool = false) async -> TurkeyMacroScore {
+        let snapshot = await TCMBDataService.shared.getMacroSnapshot(forceRefresh: forceRefresh)
+
         var components: [ScoreComponent] = []
         var insights: [String] = []
         var totalWeightedScore: Double = 0
@@ -187,24 +183,7 @@ actor SirkiyeAetherEngine {
         totalWeight += reserveComponent.weight
         
         // Toplam Skor (Temel Makro)
-        var overallScore = totalWeight > 0 ? totalWeightedScore / totalWeight : 50
-        
-        // ORACLE MODIFIER (Sinyal Etkisi)
-        // Her bir sinyal skoru +/- 2-5 puan etkiler
-        var oracleModifier: Double = 0
-        for signal in oracleSignals {
-            switch signal.sentiment {
-            case .bullish: oracleModifier += 3
-            case .bearish: oracleModifier -= 3
-            case .neutral: break
-            }
-            // Sinyal mesajını insight'a ekle
-            insights.append("👁️ Oracle: \(signal.message)")
-        }
-        
-        // Modifier'ı uygula (Max +/- 15 puan)
-        oracleModifier = max(-15, min(15, oracleModifier))
-        overallScore += oracleModifier
+        let overallScore = totalWeight > 0 ? totalWeightedScore / totalWeight : 50
         
         // Durum Belirleme
         let monetaryStance = determineMonetaryStance(snapshot)
@@ -425,36 +404,37 @@ actor SirkiyeAetherEngine {
         externalRisk: RiskLevel
     ) -> [String] {
         var insights: [String] = []
-        
-        // Genel Değerlendirme
+
         if score >= 70 {
-            insights.append("🟢 Makro görünüm olumlu. BIST için uygun ortam.")
+            insights.append("Makro görünüm olumlu. Risk iştahı destekleniyor.")
         } else if score >= 50 {
-            insights.append("🟡 Makro görünüm nötr. Seçici olmak önemli.")
+            insights.append("Makro görünüm dengeli. Seçici pozisyonlama öne çıkıyor.")
         } else if score >= 30 {
-            insights.append("🟠 Makro riskler yüksek. Defansif duruş önerilir.")
+            insights.append("Makro riskler artmış durumda. Defansif duruş korunmalı.")
         } else {
-            insights.append("🔴 Makro görünüm olumsuz. Nakit ağırlıklı ol.")
+            insights.append("Makro görünüm zayıf. Nakit ve risk yönetimi öncelikli olmalı.")
         }
-        
-        // Reel Faiz
+
         if let realRate = snapshot.realInterestRate {
             if realRate > 5 {
-                insights.append("💰 Reel faiz pozitif (%\(String(format: "%.1f", realRate))). TL varlıklar cazip.")
+                insights.append("Reel faiz güçlü pozitif (%\(String(format: "%.1f", realRate))). TL varlıklar destek bulabilir.")
             } else if realRate < 0 {
-                insights.append("⚠️ Reel faiz negatif. Döviz/altın hedge düşünülebilir.")
+                insights.append("Reel faiz negatif (%\(String(format: "%.1f", realRate))). Koruma amaçlı dağılım önemli.")
             }
         }
-        
-        // Sektör Önerileri
+
         if monetaryStance == .tight {
-            insights.append("🏦 Sıkı para politikası bankalar için olumlu olabilir.")
+            insights.append("Sıkı para politikası finansal hisseleri göreceli olarak destekleyebilir.")
         }
-        
+
         if externalRisk == .high || externalRisk == .critical {
-            insights.append("📦 Dış kırılganlık yüksek. İhracatçı şirketler değer kazanabilir.")
+            insights.append("Dış kırılganlık yüksek. Döviz geliri güçlü şirketler görece dirençli kalabilir.")
         }
-        
+
+        if let inflation = snapshot.inflation {
+            insights.append("Yıllık enflasyon: %\(String(format: "%.1f", inflation)).")
+        }
+
         return insights
     }
 }

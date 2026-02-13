@@ -32,28 +32,70 @@ actor PrometheusEngine {
         
         // Reverse to oldest-first for time series analysis
         let prices = Array(historicalPrices.reversed())
+        let horizon = horizonDays(for: prices.count)
+        let tuning = tuneParameters(prices: prices)
+        let forecast = holtWintersForecast(
+            prices: prices,
+            daysAhead: horizon,
+            alpha: tuning.alpha,
+            beta: tuning.beta
+        )
         
-        // Apply Holt-Winters Double Exponential Smoothing
-        let forecast = holtWintersForecast(prices: prices, daysAhead: 5)
+        let intervals = buildPredictionIntervals(
+            forecast: forecast,
+            residualAbsErrors: tuning.absErrors,
+            lastPrice: prices.last ?? 0
+        )
         
-        // Calculate confidence based on recent volatility
-        let confidence = calculateConfidence(prices: prices)
+        // Calculate confidence from model diagnostics + volatility.
+        let confidence = calculateConfidence(
+            prices: prices,
+            mape: tuning.mape,
+            directionalAccuracy: tuning.directionalAccuracy,
+            intervalWidthPct: intervals.intervalWidthPct
+        )
         
         // Determine trend direction
         let trend = determineTrend(prices: prices, forecast: forecast)
         
         let currentPrice = historicalPrices.first ?? 0
         let predictedPrice = forecast.last ?? currentPrice
-        let changePercent = ((predictedPrice - currentPrice) / currentPrice) * 100
+        let changePercent = currentPrice > 0 ? ((predictedPrice - currentPrice) / currentPrice) * 100 : 0
+        let recommendation = recommendAction(
+            currentPrice: currentPrice,
+            predictedPrice: predictedPrice,
+            lowerBound: intervals.lower.last ?? predictedPrice,
+            upperBound: intervals.upper.last ?? predictedPrice,
+            confidence: confidence
+        )
+        let rationale = buildRationale(
+            horizon: horizon,
+            dataPoints: prices.count,
+            alpha: tuning.alpha,
+            beta: tuning.beta,
+            mape: tuning.mape,
+            directionalAccuracy: tuning.directionalAccuracy,
+            intervalWidthPct: intervals.intervalWidthPct,
+            recommendation: recommendation
+        )
         
         let result = PrometheusForecast(
             symbol: symbol,
             currentPrice: currentPrice,
             predictedPrice: predictedPrice,
             predictions: forecast,
+            lowerBand: intervals.lower,
+            upperBand: intervals.upper,
             changePercent: changePercent,
             confidence: confidence,
             trend: trend,
+            horizonDays: horizon,
+            recommendation: recommendation,
+            rationale: rationale,
+            dataPointsUsed: prices.count,
+            modelVersion: "Holt-Linear-V2",
+            validationMAPE: tuning.mape,
+            directionalAccuracy: tuning.directionalAccuracy,
             generatedAt: Date()
         )
         
@@ -74,15 +116,11 @@ actor PrometheusEngine {
     
     // MARK: - Holt-Winters Algorithm
     
-    /// Double Exponential Smoothing (Holt-Winters without seasonality)
-    /// Good for short-term trending data
-    private func holtWintersForecast(prices: [Double], daysAhead: Int) -> [Double] {
+    /// Double Exponential Smoothing (Holt-Winters without seasonality).
+    /// Data-aware usage: parameters are tuned via rolling one-step validation.
+    private func holtWintersForecast(prices: [Double], daysAhead: Int, alpha: Double, beta: Double) -> [Double] {
         guard prices.count >= 2 else { return [] }
-        
-        // Smoothing parameters (optimized for stock data)
-        let alpha = 0.3  // Level smoothing
-        let beta = 0.1   // Trend smoothing
-        
+
         // Initialize
         var level = prices[0]
         var trend = prices[1] - prices[0]
@@ -111,25 +149,29 @@ actor PrometheusEngine {
     
     // MARK: - Confidence Calculation
     
-    /// Calculates forecast confidence based on recent price volatility
-    /// Lower volatility = Higher confidence
-    private func calculateConfidence(prices: [Double]) -> Double {
+    /// Scientific confidence from diagnostics + volatility:
+    /// lower MAPE, higher directional accuracy and tighter intervals produce higher confidence.
+    private func calculateConfidence(
+        prices: [Double],
+        mape: Double,
+        directionalAccuracy: Double,
+        intervalWidthPct: Double
+    ) -> Double {
         guard prices.count >= 10 else { return 50.0 }
-        
         let recentPrices = Array(prices.suffix(10))
-        
-        // Calculate standard deviation
         let mean = recentPrices.reduce(0, +) / Double(recentPrices.count)
         let variance = recentPrices.reduce(0) { $0 + pow($1 - mean, 2) } / Double(recentPrices.count)
         let stdDev = sqrt(variance)
-        
-        // Coefficient of variation (normalized volatility)
         let cv = stdDev / mean
-        
-        // Convert to confidence (lower CV = higher confidence)
-        // CV of 0 = 100% confidence, CV of 0.1+ = 50% confidence
-        let confidence = max(50, min(95, 100 - (cv * 500)))
-        
+
+        let mapePenalty = min(45.0, mape * 2.2)
+        let widthPenalty = min(25.0, intervalWidthPct * 1.6)
+        let volPenalty = min(20.0, cv * 220.0)
+        let directionalBoost = directionalAccuracy * 18.0
+
+        let raw = 85.0 - mapePenalty - widthPenalty - volPenalty + directionalBoost
+        let confidence = max(35.0, min(95.0, raw))
+
         return confidence
     }
     
@@ -150,6 +192,179 @@ actor PrometheusEngine {
         default: return .strongBearish
         }
     }
+
+    // MARK: - Scientific Tuning
+
+    private func horizonDays(for barCount: Int) -> Int {
+        switch barCount {
+        case 500...: return 5
+        case 200...: return 4
+        case 120...: return 3
+        case 60...: return 2
+        default: return 1
+        }
+    }
+
+    private func tuneParameters(prices: [Double]) -> PrometheusTuningResult {
+        let alphaCandidates: [Double] = [0.2, 0.3, 0.4, 0.6]
+        let betaCandidates: [Double] = [0.05, 0.1, 0.2, 0.3]
+        let validationWindow = min(60, max(20, prices.count / 5))
+
+        var best = PrometheusTuningResult(
+            alpha: 0.3,
+            beta: 0.1,
+            mape: 100.0,
+            directionalAccuracy: 0.0,
+            absErrors: []
+        )
+
+        for alpha in alphaCandidates {
+            for beta in betaCandidates {
+                let diagnostics = rollingOneStepDiagnostics(
+                    prices: prices,
+                    validationWindow: validationWindow,
+                    alpha: alpha,
+                    beta: beta
+                )
+                guard diagnostics.count > 0 else { continue }
+
+                let mape = diagnostics.map(\.ape).reduce(0, +) / Double(diagnostics.count)
+                let directionHits = diagnostics.filter { $0.directionCorrect }.count
+                let directionAccuracy = Double(directionHits) / Double(diagnostics.count)
+
+                if mape < best.mape {
+                    best = PrometheusTuningResult(
+                        alpha: alpha,
+                        beta: beta,
+                        mape: mape,
+                        directionalAccuracy: directionAccuracy,
+                        absErrors: diagnostics.map(\.absError)
+                    )
+                }
+            }
+        }
+
+        return best
+    }
+
+    private func rollingOneStepDiagnostics(
+        prices: [Double],
+        validationWindow: Int,
+        alpha: Double,
+        beta: Double
+    ) -> [PrometheusPointDiagnostic] {
+        guard prices.count >= (validationWindow + 10) else { return [] }
+
+        var out: [PrometheusPointDiagnostic] = []
+        let start = prices.count - validationWindow
+
+        for i in start..<prices.count {
+            guard i >= 5 else { continue }
+            let train = Array(prices[0..<i])
+            let actual = prices[i]
+            let prediction = holtWintersForecast(prices: train, daysAhead: 1, alpha: alpha, beta: beta).first ?? actual
+
+            let absError = abs(actual - prediction)
+            let ape = actual > 0 ? absError / actual * 100.0 : 100.0
+            let previous = train.last ?? actual
+            let predictedChange = prediction - previous
+            let actualChange = actual - previous
+            let directionCorrect = (predictedChange == 0 && actualChange == 0) || (predictedChange * actualChange > 0)
+
+            out.append(
+                PrometheusPointDiagnostic(
+                    absError: absError,
+                    ape: ape,
+                    directionCorrect: directionCorrect
+                )
+            )
+        }
+        return out
+    }
+
+    private func buildPredictionIntervals(
+        forecast: [Double],
+        residualAbsErrors: [Double],
+        lastPrice: Double
+    ) -> PrometheusIntervals {
+        guard !forecast.isEmpty else {
+            return PrometheusIntervals(lower: [], upper: [], intervalWidthPct: 0)
+        }
+
+        let fallbackError = max(0.01, lastPrice * 0.02)
+        let q90 = quantile(residualAbsErrors, q: 0.90) ?? fallbackError
+        let baseError = max(q90, fallbackError)
+
+        var lower: [Double] = []
+        var upper: [Double] = []
+
+        for (idx, pred) in forecast.enumerated() {
+            let step = Double(idx + 1)
+            let scaled = baseError * sqrt(step)
+            lower.append(max(0.0, pred - scaled))
+            upper.append(pred + scaled)
+        }
+
+        let meanPred = max(0.01, forecast.reduce(0, +) / Double(forecast.count))
+        let width = zip(lower, upper).map { $1 - $0 }.reduce(0, +) / Double(forecast.count)
+        let widthPct = width / meanPred * 100.0
+
+        return PrometheusIntervals(lower: lower, upper: upper, intervalWidthPct: widthPct)
+    }
+
+    private func quantile(_ values: [Double], q: Double) -> Double? {
+        guard !values.isEmpty else { return nil }
+        let sorted = values.sorted()
+        let index = Int(Double(sorted.count - 1) * max(0, min(1, q)))
+        return sorted[index]
+    }
+
+    private func recommendAction(
+        currentPrice: Double,
+        predictedPrice: Double,
+        lowerBound: Double,
+        upperBound: Double,
+        confidence: Double
+    ) -> PrometheusRecommendation {
+        guard currentPrice > 0 else { return .hold }
+        let expectedReturn = (predictedPrice - currentPrice) / currentPrice * 100.0
+        let conservativeReturn = (lowerBound - currentPrice) / currentPrice * 100.0
+        let optimisticReturn = (upperBound - currentPrice) / currentPrice * 100.0
+
+        if confidence >= 60, conservativeReturn >= 1.0, expectedReturn > 1.5 {
+            return .buy
+        }
+        if confidence >= 60, optimisticReturn <= -1.0, expectedReturn < -1.5 {
+            return .sell
+        }
+        return .hold
+    }
+
+    private func buildRationale(
+        horizon: Int,
+        dataPoints: Int,
+        alpha: Double,
+        beta: Double,
+        mape: Double,
+        directionalAccuracy: Double,
+        intervalWidthPct: Double,
+        recommendation: PrometheusRecommendation
+    ) -> [String] {
+        let recText: String
+        switch recommendation {
+        case .buy: recText = "Beklenen getiri ve alt bant pozitif olduğu için AL önerisi üretildi."
+        case .sell: recText = "Tahmin bandı ağırlıklı negatif olduğu için SAT önerisi üretildi."
+        case .hold: recText = "Belirsizlik / getiri dengesi net olmadığı için BEKLE önerisi üretildi."
+        }
+
+        return [
+            "Veri derinliği: \(dataPoints) bar, ufuk: \(horizon) gün.",
+            String(format: "Kalibrasyon parametreleri: alpha=%.2f, beta=%.2f.", alpha, beta),
+            String(format: "Walk-forward MAPE: %.2f%%, yön isabeti: %.1f%%.", mape, directionalAccuracy * 100),
+            String(format: "Tahmin aralığı genişliği: %.2f%%.", intervalWidthPct),
+            recText
+        ]
+    }
     
     // MARK: - Cache Management
     
@@ -169,9 +384,18 @@ struct PrometheusForecast: Equatable {
     let currentPrice: Double
     let predictedPrice: Double
     let predictions: [Double]  // Day 1, 2, 3, 4, 5
+    let lowerBand: [Double]
+    let upperBand: [Double]
     let changePercent: Double
     let confidence: Double     // 0-100
     let trend: PrometheusTrend
+    let horizonDays: Int
+    let recommendation: PrometheusRecommendation
+    let rationale: [String]
+    let dataPointsUsed: Int
+    let modelVersion: String
+    let validationMAPE: Double
+    let directionalAccuracy: Double
     let generatedAt: Date
     
     var isValid: Bool {
@@ -198,12 +422,47 @@ struct PrometheusForecast: Equatable {
             currentPrice: 0,
             predictedPrice: 0,
             predictions: [],
+            lowerBand: [],
+            upperBand: [],
             changePercent: 0,
             confidence: 0,
             trend: .neutral,
+            horizonDays: 0,
+            recommendation: .hold,
+            rationale: [],
+            dataPointsUsed: 0,
+            modelVersion: "Holt-Linear-V2",
+            validationMAPE: 0,
+            directionalAccuracy: 0,
             generatedAt: Date()
         )
     }
+}
+
+enum PrometheusRecommendation: String {
+    case buy = "AL"
+    case hold = "BEKLE"
+    case sell = "SAT"
+}
+
+private struct PrometheusPointDiagnostic {
+    let absError: Double
+    let ape: Double
+    let directionCorrect: Bool
+}
+
+private struct PrometheusTuningResult {
+    let alpha: Double
+    let beta: Double
+    let mape: Double
+    let directionalAccuracy: Double
+    let absErrors: [Double]
+}
+
+private struct PrometheusIntervals {
+    let lower: [Double]
+    let upper: [Double]
+    let intervalWidthPct: Double
 }
 
 enum PrometheusTrend: String {

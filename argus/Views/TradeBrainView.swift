@@ -27,6 +27,7 @@ struct TradeBrainView: View {
         case positions
         case risk
         case calendar
+        case brain
         case learn
 
         var title: String {
@@ -34,7 +35,8 @@ struct TradeBrainView: View {
             case .positions: return "Pozisyon"
             case .risk: return "Risk"
             case .calendar: return "Takvim"
-            case .learn: return "Öğren"
+            case .brain: return "Beyin"
+            case .learn: return "Ogren"
             }
         }
 
@@ -43,6 +45,7 @@ struct TradeBrainView: View {
             case .positions: return "waveform.path.ecg"
             case .risk: return "shield.lefthalf.filled"
             case .calendar: return "calendar"
+            case .brain: return "brain.head.profile"
             case .learn: return "book.closed"
             }
         }
@@ -321,6 +324,10 @@ struct TradeBrainView: View {
             riskDashboardSection
         case .calendar:
             calendarSection
+        case .brain:
+            brainMemorySection
+            brainConfidenceSection
+            brainMultiHorizonSection
         case .learn:
             educationSection
         }
@@ -606,6 +613,123 @@ struct TradeBrainView: View {
         }
     }
 
+    // MARK: - Trade Brain 3.0 Sections
+
+    private var brainMemorySection: some View {
+        sectionCard {
+            SectionHeader(title: "Pazar Hafizasi", icon: "brain.head.profile", color: InstitutionalTheme.Colors.primary)
+            
+            if let multiHorizon = executor.lastMultiHorizonDecisions.first?.value {
+                let regimeContext = RegimeDecisionContext(
+                    regime: "Notr",
+                    vix: 20,
+                    historicalWinRate: 0.55,
+                    riskScore: 0.25,
+                    recommendation: "Normal piyasa kosullari"
+                )
+                let eventContext = EventDecisionContext(
+                    hasHighImpactEvent: false,
+                    riskScore: 0.15,
+                    warnings: [],
+                    eventCount: 0
+                )
+                
+                MarketMemoryBar(
+                    regimeContext: regimeContext,
+                    eventContext: eventContext
+                )
+            } else {
+                BrainEmptyCard(
+                    icon: "brain",
+                    title: "Hafiza bekleniyor",
+                    subtitle: "Trade Brain 3.0 karar urettiginde pazar hafizasi burada gorunur."
+                )
+            }
+            
+            EducationCard(
+                title: "Pazar Hafizasi nedir?",
+                content: "Gecmis rejim ve olay verilerini kullanarak mevcut piyasa kosullarini degerlendirir. VIX, Fear/Greed ve olay riskini birlestirir.",
+                icon: "lightbulb.fill"
+            )
+        }
+    }
+    
+    private var brainConfidenceSection: some View {
+        sectionCard {
+            SectionHeader(title: "Guven Kalibrasyonu", icon: "chart.bar.xaxis", color: InstitutionalTheme.Colors.warning)
+            
+            if let contradiction = executor.lastContradictionAnalyses.first?.value {
+                SelfQuestionAlertCard(analysis: contradiction)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(InstitutionalTheme.Colors.positive)
+                        Text("Celiski tespit edilmedi")
+                            .font(InstitutionalTheme.Typography.bodyStrong)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    }
+                    
+                    Text("Tum moduller ayni yonde oy veriyor. Guven skoru korunabilir.")
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
+                        .fill(InstitutionalTheme.Colors.positive.opacity(0.1))
+                )
+            }
+            
+            EducationCard(
+                title: "Kendini Sorgulama",
+                content: "Orion, Atlas, Aether ve Hermes modulleri arasindaki celiskileri tespit eder. Gecmis benzer celiskilerde ne oldugunu arastirir.",
+                icon: "questionmark.circle.fill"
+            )
+        }
+    }
+    
+    private var brainMultiHorizonSection: some View {
+        sectionCard {
+            SectionHeader(title: "Cok Zaman Dilimli Karar", icon: "clock.arrow.circlepath", color: InstitutionalTheme.Colors.primary)
+            
+            if let multiHorizon = executor.lastMultiHorizonDecisions.first?.value {
+                MultiHorizonDecisionCard(decision: multiHorizon)
+            } else {
+                BrainEmptyCard(
+                    icon: "clock",
+                    title: "Karar bekleniyor",
+                    subtitle: "Scalp, Swing ve Position zaman dilimleri icin kararlar uretiliyor."
+                )
+            }
+            
+            HStack(spacing: 8) {
+                HorizonInfoBadge(
+                    title: "Scalp",
+                    description: "5-15 dk",
+                    color: InstitutionalTheme.Colors.warning
+                )
+                HorizonInfoBadge(
+                    title: "Swing",
+                    description: "1-4 saat",
+                    color: InstitutionalTheme.Colors.primary
+                )
+                HorizonInfoBadge(
+                    title: "Position",
+                    description: "1-7 gun",
+                    color: InstitutionalTheme.Colors.positive
+                )
+            }
+            
+            EducationCard(
+                title: "Cok Zaman Dilimi",
+                content: "Ayni hisse icin farkli zaman dilimlerinde ayri kararlar uretilir. Makro ortama gore en uygun dilim secilir.",
+                icon: "gauge.with.dots.needle.67percent"
+            )
+        }
+    }
+
     private var educationSection: some View {
         sectionCard {
             SectionHeader(title: "Trade Brain Öğretici Katman", icon: "book.closed.fill", color: InstitutionalTheme.Colors.primary)
@@ -737,7 +861,7 @@ struct TradeBrainView: View {
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Alkindus", subtitle: "Yapay zeka merkezi", icon: "brain.head.profile") {
-                        deepLinkManager.navigate(to: .home)
+                        NotificationCenter.default.post(name: NSNotification.Name("OpenAlkindusDashboard"), object: nil)
                         showDrawer = false
                     },
                     ArgusDrawerView.DrawerItem(title: "Portföy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
@@ -1672,5 +1796,39 @@ struct ScenarioCard: View {
 
 #Preview {
     TradeBrainView()
-        .environmentObject(TradingViewModel())
+        .environmentObject(TradingViewModel()
+        )
+}
+
+// MARK: - Trade Brain 3.0 Helper Components
+
+struct HorizonInfoBadge: View {
+    let title: String
+    let description: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            Text(title)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(color)
+            Text(description)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
+                .fill(color.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
+                        .stroke(color.opacity(0.2), lineWidth: 1)
+                )
+        )
+    }
+}
+
+#Preview {
+    TradeBrainView()
 }

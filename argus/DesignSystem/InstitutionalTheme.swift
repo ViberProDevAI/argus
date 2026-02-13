@@ -7,10 +7,11 @@ enum InstitutionalTheme {
         static let surface2 = Color(hex: "151C26")
         static let surface3 = Color(hex: "1B2430")
 
-        static let primary = Color(hex: "3B82F6")
-        static let positive = Color(hex: "16A34A")
-        static let negative = Color(hex: "DC2626")
-        static let warning = Color(hex: "D97706")
+        static let primary = Color(hex: "3B82F6")      // Mavi
+        static let positive = Color(hex: "16A34A")    // Yeşil
+        static let negative = Color(hex: "DC2626")    // Kırmızı
+        static let neutral = Color(hex: "64748B")      // Slate gri (nötr)
+        static let warning = neutral                   // Deprecated: Artık neutral kullanılıyor
 
         static let textPrimary = Color(hex: "E5E7EB")
         static let textSecondary = Color(hex: "9CA3AF")
@@ -45,6 +46,13 @@ enum InstitutionalTheme {
         static let md: CGFloat = 14
         static let lg: CGFloat = 18
         static let xl: CGFloat = 22
+    }
+    
+    // MARK: - Helper Functions
+    static func colorForScore(_ score: Double) -> Color {
+        if score >= 70 { return Colors.positive }
+        if score >= 40 { return Colors.neutral }
+        return Colors.negative
     }
 }
 

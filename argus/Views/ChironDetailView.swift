@@ -7,6 +7,12 @@ struct ChironDetailView: View {
     @State private var corseWeights: ChironModuleWeights?
     @State private var pulseWeights: ChironModuleWeights?
     @State private var learningEvents: [ChironLearningEvent] = []
+    @State private var availableSymbols: [String] = ["ALL"]
+    @State private var selectedSymbol: String = "ALL"
+    @State private var selectedSymbolStats: SymbolLearningStats?
+    @State private var totalTrades: Int = 0
+    @State private var totalEvents: Int = 0
+    @State private var lastLearningDate: Date?
     // @State private var regimeResult removed - using engine.lastResult directly
     
     @State private var isAnalyzing = false
@@ -83,6 +89,15 @@ struct ChironDetailView: View {
                             // MARK: - NEW: Regime Card (Reactive)
                             RegimeCard(result: engine.lastResult)
                                 .padding(.horizontal)
+
+                            LearningHealthCard(
+                                selectedSymbol: selectedSymbol,
+                                symbolCount: max(0, availableSymbols.count - 1),
+                                totalTrades: totalTrades,
+                                totalEvents: totalEvents,
+                                lastLearningDate: lastLearningDate
+                            )
+                            .padding(.horizontal)
                             
                             // MARK: - Engine Selector
                             HStack(spacing: 0) {
@@ -96,6 +111,9 @@ struct ChironDetailView: View {
                             .background(Theme.secondaryBackground)
                             .cornerRadius(12)
                             .padding(.horizontal)
+
+                            // MARK: - Symbol Selector
+                            symbolSelectorCard
                             
                             // MARK: - Active Weights Display
                             if let weights = selectedEngine == .corse ? corseWeights : pulseWeights {
@@ -146,7 +164,7 @@ struct ChironDetailView: View {
                                         .frame(maxWidth: .infinity, alignment: .center)
                                         .padding()
                                 } else {
-                                    ForEach(learningEvents.prefix(10)) { event in
+                                    ForEach(filteredLearningEvents.prefix(10)) { event in
                                         LearningEventRow(event: event)
                                     }
                                 }
@@ -184,17 +202,99 @@ struct ChironDetailView: View {
         }
     }
     
+    private var filteredLearningEvents: [ChironLearningEvent] {
+        if selectedSymbol == "ALL" {
+            return learningEvents
+        }
+        return learningEvents.filter { $0.symbol == selectedSymbol }
+    }
+    
+    private var weightsSymbol: String {
+        if selectedSymbol != "ALL" {
+            return selectedSymbol
+        }
+        return availableSymbols.dropFirst().first ?? "DEFAULT"
+    }
+    
+    private var symbolSelectorCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "target")
+                    .foregroundColor(.cyan)
+                Text("ÖĞRENME HEDEFİ")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Spacer()
+            }
+            
+            Picker("Sembol", selection: $selectedSymbol) {
+                ForEach(availableSymbols, id: \.self) { symbol in
+                    Text(symbol == "ALL" ? "Tümü" : symbol).tag(symbol)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(.white)
+            
+            if let stats = selectedSymbolStats, stats.totalTrades > 0 {
+                HStack(spacing: 14) {
+                    StatPill(title: "Trade", value: "\(stats.totalTrades)", color: .white)
+                    StatPill(title: "Win", value: "%\(Int(stats.winRate))", color: stats.winRate >= 50 ? .green : .red)
+                    StatPill(title: "PnL", value: String(format: "%+.1f", stats.avgPnlPercent), color: stats.avgPnlPercent >= 0 ? .green : .red)
+                }
+            }
+        }
+        .padding()
+        .background(Color.cyan.opacity(0.08))
+        .cornerRadius(12)
+        .padding(.horizontal)
+        .onChange(of: selectedSymbol) { _, _ in
+            Task { await refreshSymbolSpecificData() }
+        }
+    }
+    
     private func loadData() async {
-        corseWeights = await ChironWeightStore.shared.getWeights(symbol: "DEFAULT", engine: .corse)
-        pulseWeights = await ChironWeightStore.shared.getWeights(symbol: "DEFAULT", engine: .pulse)
-        learningEvents = await ChironDataLakeService.shared.loadLearningEvents()
-        // regimeResult load removed - using reactive engine.lastResult
+        let allTrades = await ChironDataLakeService.shared.loadAllTradeHistory()
+        let allEvents = await ChironDataLakeService.shared.loadLearningEvents()
+        let weightSymbols = await MainActor.run { Array(ChironWeightStore.shared.getAllWeights().keys) }
+        
+        let tradeSymbols = Set(allTrades.map(\.symbol))
+        let eventSymbols = Set(allEvents.compactMap(\.symbol))
+        let merged = Set(weightSymbols).union(tradeSymbols).union(eventSymbols)
+        
+        let sortedSymbols = merged.sorted()
+        availableSymbols = ["ALL"] + sortedSymbols
+        
+        if selectedSymbol != "ALL" && !sortedSymbols.contains(selectedSymbol) {
+            selectedSymbol = "ALL"
+        }
+        
+        learningEvents = allEvents
+        totalTrades = allTrades.count
+        totalEvents = allEvents.count
+        lastLearningDate = allEvents.max(by: { $0.date < $1.date })?.date
+        await refreshSymbolSpecificData()
+    }
+    
+    private func refreshSymbolSpecificData() async {
+        let symbol = weightsSymbol
+        corseWeights = await ChironWeightStore.shared.getWeights(symbol: symbol, engine: .corse)
+        pulseWeights = await ChironWeightStore.shared.getWeights(symbol: symbol, engine: .pulse)
+        
+        if symbol == "DEFAULT" {
+            selectedSymbolStats = nil
+        } else {
+            selectedSymbolStats = await ChironDataLakeService.shared.getSymbolStats(symbol: symbol)
+        }
     }
     
     private func triggerAnalysis() {
         isAnalyzing = true
         Task {
-            await ChironLearningJob.shared.runFullAnalysis()
+            if selectedSymbol == "ALL" {
+                await ChironLearningJob.shared.runFullAnalysis()
+            } else {
+                await ChironLearningJob.shared.analyzeSymbol(selectedSymbol)
+            }
             await loadData()
             isAnalyzing = false
         }
@@ -294,6 +394,27 @@ struct WeightBar: View {
                 .foregroundColor(color)
                 .frame(width: 40, alignment: .trailing)
         }
+    }
+}
+
+private struct StatPill: View {
+    let title: String
+    let value: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 13, weight: .bold, design: .monospaced))
+                .foregroundColor(color)
+            Text(title)
+                .font(.caption2)
+                .foregroundColor(.gray)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 6)
+        .background(Color.white.opacity(0.04))
+        .cornerRadius(8)
     }
 }
 
@@ -647,6 +768,58 @@ struct RegimeCard: View {
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .stroke(regimeColor.opacity(0.3), lineWidth: 1)
+        )
+    }
+}
+
+private struct LearningHealthCard: View {
+    let selectedSymbol: String
+    let symbolCount: Int
+    let totalTrades: Int
+    let totalEvents: Int
+    let lastLearningDate: Date?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundColor(.cyan)
+                Text("Öğrenme Sağlığı")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                Spacer()
+                Text(selectedSymbol == "ALL" ? "Tüm Semboller" : selectedSymbol)
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+            }
+
+            HStack(spacing: 12) {
+                StatPill(title: "Sembol", value: "\(symbolCount)", color: .white)
+                StatPill(title: "Trade", value: "\(totalTrades)", color: .cyan)
+                StatPill(title: "Event", value: "\(totalEvents)", color: .green)
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "clock")
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+                if let lastLearningDate {
+                    Text("Son öğrenme: \(lastLearningDate.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption2)
+                        .foregroundColor(.gray)
+                } else {
+                    Text("Son öğrenme: henüz kayıt yok")
+                        .font(.caption2)
+                        .foregroundColor(.gray)
+                }
+            }
+        }
+        .padding()
+        .background(Color.cyan.opacity(0.08))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.cyan.opacity(0.2), lineWidth: 1)
         )
     }
 }

@@ -19,7 +19,7 @@ struct ForecastCard: View {
                     .font(.system(size: 12, weight: .bold, design: .monospaced))
                     .foregroundColor(.orange)
                 Spacer()
-                Text("5 Günlük Tahmin")
+                Text("\(forecast?.horizonDays ?? 5) Günlük Tahmin")
                     .font(.system(size: 10))
                     .foregroundColor(.gray)
             }
@@ -50,7 +50,7 @@ struct ForecastCard: View {
                         
                         // Predicted Price
                         VStack(spacing: 4) {
-                            Text("5 GÜN SONRA")
+                            Text("\(forecast.horizonDays) GÜN SONRA")
                                 .font(.system(size: 9, weight: .medium))
                                 .foregroundColor(.gray)
                             Text(formatPrice(forecast.predictedPrice))
@@ -161,7 +161,7 @@ struct ForecastCard: View {
         isLoading = true
         forecast = await PrometheusEngine.shared.forecast(
             symbol: symbol,
-            historicalPrices: historicalPrices
+            historicalPrices: Array(historicalPrices.reversed())
         )
         isLoading = false
     }

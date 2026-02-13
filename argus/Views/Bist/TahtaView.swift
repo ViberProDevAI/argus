@@ -36,7 +36,7 @@ struct TahtaView: View {
             }
             .padding()
         }
-        .background(Color.black.ignoresSafeArea())
+        .background(InstitutionalTheme.Colors.background.ignoresSafeArea())
         .onAppear { loadData() }
     }
 
@@ -46,11 +46,11 @@ struct TahtaView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.2)
-                .tint(.cyan)
+                .tint(InstitutionalTheme.Colors.primary)
 
             Text("Teknik analiz yapılıyor...")
-                .font(.caption)
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
         .frame(maxWidth: .infinity, minHeight: 300)
     }
@@ -61,22 +61,21 @@ struct TahtaView: View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.largeTitle)
-                .foregroundColor(.orange)
+                .foregroundColor(InstitutionalTheme.Colors.warning)
 
             Text(message)
-                .font(.subheadline)
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .multilineTextAlignment(.center)
 
             Button("Tekrar Dene") {
                 loadData()
             }
-            .foregroundColor(.cyan)
+            .foregroundColor(InstitutionalTheme.Colors.primary)
         }
         .frame(maxWidth: .infinity, minHeight: 200)
         .padding()
-        .background(Color.white.opacity(0.05))
-        .cornerRadius(16)
+        .institutionalCard(scale: .insight, elevated: false)
     }
 
     // MARK: - Ana Sinyal Kartı
@@ -385,11 +384,11 @@ struct TahtaView: View {
 
     private func signalColor(_ signal: TahtaSignal) -> Color {
         switch signal {
-        case .gucluAl: return .green
-        case .al: return Color(red: 0.4, green: 0.9, blue: 0.7) // mint
-        case .tut: return .yellow
-        case .sat: return .orange
-        case .gucluSat: return .red
+        case .gucluAl: return InstitutionalTheme.Colors.positive
+        case .al: return InstitutionalTheme.Colors.positive.opacity(0.8)
+        case .tut: return InstitutionalTheme.Colors.warning
+        case .sat: return InstitutionalTheme.Colors.warning
+        case .gucluSat: return InstitutionalTheme.Colors.negative
         }
     }
 
@@ -418,11 +417,11 @@ struct TahtaView: View {
 
     private func flowColor(_ status: FlowStatus) -> Color {
         switch status {
-        case .strongInflow: return .green
-        case .inflow: return Color(red: 0.4, green: 0.9, blue: 0.7)
-        case .neutral: return .yellow
-        case .outflow: return .orange
-        case .strongOutflow: return .red
+        case .strongInflow: return InstitutionalTheme.Colors.positive
+        case .inflow: return InstitutionalTheme.Colors.positive.opacity(0.8)
+        case .neutral: return InstitutionalTheme.Colors.warning
+        case .outflow: return InstitutionalTheme.Colors.warning
+        case .strongOutflow: return InstitutionalTheme.Colors.negative
         }
     }
 

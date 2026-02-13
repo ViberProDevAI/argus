@@ -400,15 +400,17 @@ struct SectorNode: Identifiable {
     let id = UUID()
     let name: String
     let icon: String
-    let impact: Double
+    let impact: Double?
     
     var impactColor: Color {
+        guard let impact else { return .gray.opacity(0.8) }
         if impact > 0 { return .green }
         if impact < 0 { return .red }
         return .gray
     }
     
     var impactText: String {
+        guard let impact else { return "—" }
         if impact > 0 { return "+\(Int(impact))" }
         if impact < 0 { return "\(Int(impact))" }
         return "0"
@@ -444,6 +446,7 @@ class OracleChamberViewModel: ObservableObject {
     @Published var chainReactions: [ChainReaction] = []
     @Published var economyStatus: EconomyStatus = .stable
     @Published var economyScore: String = "72"
+    @Published var dataCoverageText: String = "Veri yükleniyor..."
     @Published var coreColor: Color = .cyan
     
     // Animation State
@@ -461,20 +464,16 @@ class OracleChamberViewModel: ObservableObject {
     }
     
     func loadSignals() async {
-        // Oracle Engine'den sinyalleri al - GERÇEK VERİ
-        let input = await TCMBDataService.shared.getOracleInput()
-        let signals = await OracleEngine.shared.analyze(input: input)
+        // Oracle Engine cache katmanından sinyalleri al
+        let signals = await OracleEngine.shared.getLatestSignals()
         
         // Sektör Node'larını oluştur
         sectorNodes = [
-            SectorNode(name: "KONUT", icon: "house.fill", impact: signals.first(where: { $0.type == .housingBoom })?.effects.first?.scoreImpact ?? 0),
-            SectorNode(name: "TÜKETİM", icon: "creditcard.fill", impact: signals.first(where: { $0.type == .retailPulse })?.effects.first?.scoreImpact ?? 0),
-            SectorNode(name: "SANAYİ", icon: "gearshape.2.fill", impact: signals.first(where: { $0.type == .industryGear })?.effects.first?.scoreImpact ?? 0),
-            SectorNode(name: "TURİZM", icon: "airplane.departure", impact: signals.first(where: { $0.type == .tourismRush })?.effects.first?.scoreImpact ?? 0),
-            SectorNode(name: "OTOMOTİV", icon: "car.fill", impact: signals.first(where: { $0.type == .autoVelocity })?.effects.first?.scoreImpact ?? 0),
-            SectorNode(name: "BANKALAR", icon: "building.columns.fill", impact: 12), // Mock
-            SectorNode(name: "SAVUNMA", icon: "shield.checkered", impact: 8), // Mock
-            SectorNode(name: "SERMAYE", icon: "chart.line.uptrend.xyaxis", impact: -5) // Mock
+            SectorNode(name: "KONUT", icon: "house.fill", impact: signals.first(where: { $0.type == .housingBoom })?.effects.first?.scoreImpact),
+            SectorNode(name: "TÜKETİM", icon: "creditcard.fill", impact: signals.first(where: { $0.type == .retailPulse })?.effects.first?.scoreImpact),
+            SectorNode(name: "SANAYİ", icon: "gearshape.2.fill", impact: signals.first(where: { $0.type == .industryGear })?.effects.first?.scoreImpact),
+            SectorNode(name: "TURİZM", icon: "airplane.departure", impact: signals.first(where: { $0.type == .tourismRush })?.effects.first?.scoreImpact),
+            SectorNode(name: "OTOMOTİV", icon: "car.fill", impact: signals.first(where: { $0.type == .autoVelocity })?.effects.first?.scoreImpact)
         ]
         
         // Zincir Reaksiyonları oluştur
@@ -494,6 +493,7 @@ class OracleChamberViewModel: ObservableObject {
         
         // Ekonomi durumunu belirle
         updateEconomyStatus()
+        updateCoverageText()
     }
     
     func runSimulation() async {
@@ -534,7 +534,13 @@ class OracleChamberViewModel: ObservableObject {
                     sectorNodes[index] = SectorNode(
                         name: node.name,
                         icon: node.icon,
-                        impact: matchingSignal.effects.first?.scoreImpact ?? 0
+                        impact: matchingSignal.effects.first?.scoreImpact
+                    )
+                } else {
+                    sectorNodes[index] = SectorNode(
+                        name: node.name,
+                        icon: node.icon,
+                        impact: nil
                     )
                 }
             }
@@ -555,6 +561,7 @@ class OracleChamberViewModel: ObservableObject {
             }
             
             updateEconomyStatus()
+            updateCoverageText()
         }
     }
     
@@ -570,23 +577,39 @@ class OracleChamberViewModel: ObservableObject {
     }
     
     private func updateEconomyStatus() {
-        // Basit durum hesaplama
-        if simInflation > 60 && simInterestRate < 40 {
-            economyStatus = .overheating
-            coreColor = .red
-            economyScore = "35"
-        } else if simInflation > 50 {
-            economyStatus = .stagflation
-            coreColor = .purple
-            economyScore = "45"
-        } else if simInflation < 30 && simInterestRate < 30 {
+        let availableImpacts = sectorNodes.compactMap { $0.impact }
+        guard !availableImpacts.isEmpty else {
+            economyStatus = .stable
+            coreColor = .gray
+            economyScore = "--"
+            return
+        }
+
+        let normalized = availableImpacts.reduce(0.0, +) / Double(max(availableImpacts.count, 1))
+        let score = max(10, min(95, 50 + normalized))
+        economyScore = String(Int(score.rounded()))
+
+        if score >= 75 {
             economyStatus = .growing
             coreColor = .green
-            economyScore = "85"
-        } else {
+        } else if score >= 55 {
             economyStatus = .stable
             coreColor = .cyan
-            economyScore = "72"
+        } else if score >= 40 {
+            economyStatus = .stagflation
+            coreColor = .purple
+        } else {
+            economyStatus = .recession
+            coreColor = .red
+        }
+    }
+
+    private func updateCoverageText() {
+        let loadedCount = sectorNodes.compactMap(\.impact).count
+        if loadedCount == 0 {
+            dataCoverageText = "Sektör verisi henüz gelmedi"
+        } else {
+            dataCoverageText = "Sektör kapsamı: \(loadedCount)/\(sectorNodes.count)"
         }
     }
 }
@@ -698,7 +721,7 @@ struct OracleChamberEmbeddedView: View {
                     }
                 }
             } else {
-                Text("Veri yükleniyor...")
+                Text(viewModel.dataCoverageText)
                     .font(.caption)
                     .foregroundColor(.gray)
                     .padding()
@@ -708,7 +731,7 @@ struct OracleChamberEmbeddedView: View {
             HStack {
                 Image(systemName: "info.circle")
                     .font(.system(size: 10))
-                Text("TCMB EVDS + TÜİK Verileri")
+                Text("TCMB EVDS + BIST Sektör Verileri")
                     .font(.system(size: 9))
             }
             .foregroundColor(.gray.opacity(0.6))

@@ -18,6 +18,13 @@ final class AlkindusRAGEngine {
     private let symbolNamespace = "symbols"
     private let chironNamespace = "chiron"
     
+    // Trade Brain 3.0 Namespaces
+    static let eventNamespace = "market_events"
+    static let regimeNamespace = "regime_memory"
+    static let horizonNamespace = "horizon_decisions"
+    static let contradictionNamespace = "contradictions"
+    static let calibrationNamespace = "confidence_calibration"
+    
     private init() {}
     
     // MARK: - Data Models
@@ -33,6 +40,16 @@ final class AlkindusRAGEngine {
         let content: String
         let score: Float
         let metadata: [String: String]
+    }
+    
+    // MARK: - Trade Brain 3.0 Data Models
+    
+    struct CalibratedConfidence: Codable {
+        let raw: Double
+        let calibrated: Double
+        let bucket: String
+        let historicalWinRate: Double
+        let sampleSize: Int
     }
     
     // MARK: - Sync Methods
@@ -260,9 +277,224 @@ final class AlkindusRAGEngine {
         }.joined(separator: "\n")
         
         return """
-        📚 Geçmiş Deneyimler:
+        Geçmiş Deneyimler:
         \(insights)
         """
+    }
+    
+    // MARK: - Trade Brain 3.0 Sync Methods
+    
+    /// Sync event outcome to vector DB
+    func syncEventOutcome(
+        eventType: String,
+        symbol: String,
+        context: String,
+        outcome: String,
+        priceImpact: Double
+    ) async {
+        let text = """
+        Olay: \(eventType) - \(symbol)
+        Bağlam: \(context)
+        Sonuç: \(outcome), Etki: \(String(format: "%.2f", priceImpact))%
+        """
+        
+        let id = "event_\(eventType)_\(symbol)_\(Date().timeIntervalSince1970)"
+        
+        await upsertDocument(
+            id: id,
+            content: text,
+            metadata: [
+                "type": "event",
+                "event_type": eventType,
+                "symbol": symbol,
+                "outcome": outcome,
+                "impact": String(format: "%.2f", priceImpact)
+            ],
+            namespace: Self.eventNamespace
+        )
+    }
+    
+    /// Sync regime performance to vector DB
+    func syncRegimePerformance(
+        regime: String,
+        vixBucket: String,
+        avgReturn: Double,
+        winRate: Double,
+        sampleSize: Int
+    ) async {
+        let text = """
+        Rejim: \(regime)
+        VIX Aralığı: \(vixBucket)
+        Ortalama Getiri: \(String(format: "%.2f", avgReturn))%
+        Başarı Oranı: \(String(format: "%.0f", winRate * 100))%
+        Örnek Sayısı: \(sampleSize)
+        """
+        
+        let id = "regime_\(regime)_\(vixBucket)"
+        
+        await upsertDocument(
+            id: id,
+            content: text,
+            metadata: [
+                "type": "regime",
+                "regime": regime,
+                "vix_bucket": vixBucket,
+                "win_rate": String(format: "%.2f", winRate),
+                "sample_size": "\(sampleSize)"
+            ],
+            namespace: Self.regimeNamespace
+        )
+    }
+    
+    /// Sync horizon decision outcome to vector DB
+    func syncHorizonOutcome(
+        symbol: String,
+        timeframe: String,
+        action: String,
+        confidence: Double,
+        outcome: String,
+        pnlPercent: Double
+    ) async {
+        let text = """
+        Sembol: \(symbol)
+        Zaman Dilimi: \(timeframe)
+        Karar: \(action) - Güven: \(String(format: "%.0f", confidence * 100))%
+        Sonuç: \(outcome) - PnL: \(String(format: "%.2f", pnlPercent))%
+        """
+        
+        let id = "horizon_\(symbol)_\(timeframe)_\(Date().timeIntervalSince1970)"
+        
+        await upsertDocument(
+            id: id,
+            content: text,
+            metadata: [
+                "type": "horizon",
+                "symbol": symbol,
+                "timeframe": timeframe,
+                "action": action,
+                "outcome": outcome,
+                "pnl": String(format: "%.2f", pnlPercent)
+            ],
+            namespace: Self.horizonNamespace
+        )
+    }
+    
+    /// Sync contradiction record to vector DB
+    func syncContradiction(
+        symbol: String,
+        module1: String,
+        stance1: String,
+        module2: String,
+        stance2: String,
+        finalDecision: String,
+        outcome: String,
+        pnlPercent: Double
+    ) async {
+        let text = """
+        Çelişki: \(symbol)
+        \(module1): \(stance1) vs \(module2): \(stance2)
+        Nihai Karar: \(finalDecision)
+        Sonuç: \(outcome) - PnL: \(String(format: "%.2f", pnlPercent))%
+        """
+        
+        let id = "contradiction_\(symbol)_\(module1)_\(module2)_\(Date().timeIntervalSince1970)"
+        
+        await upsertDocument(
+            id: id,
+            content: text,
+            metadata: [
+                "type": "contradiction",
+                "symbol": symbol,
+                "module1": module1,
+                "module2": module2,
+                "outcome": outcome,
+                "pnl": String(format: "%.2f", pnlPercent)
+            ],
+            namespace: Self.contradictionNamespace
+        )
+    }
+    
+    /// Sync calibration bucket to vector DB
+    func syncCalibrationBucket(
+        bucket: String,
+        actualWinRate: Double,
+        sampleSize: Int
+    ) async {
+        let text = """
+        Confidence Aralığı: \(bucket)
+        Gerçek Başarı: \(String(format: "%.0f", actualWinRate * 100))%
+        Örnek Sayısı: \(sampleSize)
+        """
+        
+        let id = "calib_\(bucket)"
+        
+        await upsertDocument(
+            id: id,
+            content: text,
+            metadata: [
+                "type": "calibration",
+                "bucket": bucket,
+                "actual_win_rate": String(format: "%.2f", actualWinRate),
+                "sample_size": "\(sampleSize)"
+            ],
+            namespace: Self.calibrationNamespace
+        )
+    }
+    
+    // MARK: - Trade Brain 3.0 Query Methods
+    
+    /// Search for similar event outcomes
+    func searchEventExperiences(eventType: String, context: String) async -> [RAGSearchResult] {
+        let query = "Olay: \(eventType), Bağlam: \(context)"
+        return await search(query: query, namespace: Self.eventNamespace, topK: 5)
+    }
+    
+    /// Search for regime history
+    func searchRegimeHistory(regime: String, vixBucket: String) async -> [RAGSearchResult] {
+        let query = "Rejim: \(regime), VIX: \(vixBucket)"
+        return await search(query: query, namespace: Self.regimeNamespace, topK: 3)
+    }
+    
+    /// Search for horizon decision history
+    func searchHorizonHistory(symbol: String, timeframe: String) async -> [RAGSearchResult] {
+        let query = "\(symbol) \(timeframe) karar geçmişi"
+        return await search(query: query, namespace: Self.horizonNamespace, topK: 5)
+    }
+    
+    /// Search for contradiction patterns
+    func searchContradictionPatterns(module1: String, module2: String) async -> [RAGSearchResult] {
+        let query = "\(module1) vs \(module2) çelişkisi"
+        return await search(query: query, namespace: Self.contradictionNamespace, topK: 10)
+    }
+    
+    /// Get calibration for confidence bucket
+    func getCalibrationForBucket(_ bucket: String) async -> CalibratedConfidence? {
+        let results = await search(query: "Calibration bucket \(bucket)", namespace: Self.calibrationNamespace, topK: 1)
+        
+        guard let result = results.first,
+              let winRateStr = result.metadata["actual_win_rate"],
+              let sampleStr = result.metadata["sample_size"],
+              let winRate = Double(winRateStr),
+              let sampleSize = Int(sampleStr),
+              let rawRange = parseBucketRange(bucket) else {
+            return nil
+        }
+        
+        return CalibratedConfidence(
+            raw: (rawRange.lowerBound + rawRange.upperBound) / 2,
+            calibrated: winRate,
+            bucket: bucket,
+            historicalWinRate: winRate,
+            sampleSize: sampleSize
+        )
+    }
+    
+    private func parseBucketRange(_ bucket: String) -> ClosedRange<Double>? {
+        let parts = bucket.split(separator: "-")
+        guard parts.count == 2,
+              let lower = Double(parts[0]),
+              let upper = Double(parts[1]) else { return nil }
+        return lower...upper
     }
     
     // MARK: - Private Helpers

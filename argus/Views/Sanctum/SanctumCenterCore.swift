@@ -206,7 +206,7 @@ struct CenterCoreView: View {
         let isBist = symbol.uppercased().hasSuffix(".IS")
         
         let bistModules: [SanctumBistModuleType] = [.grafik, .bilanco, .oracle, .sirkiye, .kulis, .moneyflow]
-        let globalModules: [SanctumModuleType] = [.orion, .atlas, .aether, .hermes]
+        let globalModules: [SanctumModuleType] = [.orion, .atlas, .aether, .hermes, .prometheus]
         
         let sectors = isBist ? bistModules.count : globalModules.count
         let sectorAngle = 360.0 / Double(sectors)

@@ -112,28 +112,22 @@ actor RejimEngine {
             }
         }
         
-        // MARK: - Oracle Sinyalleri (sadece Global için)
+        // MARK: - Oracle Sinyalleri (özellikle BIST için)
         var oracleScore: Double = 50.0
         
-        if symbolType == .global {
-            do {
-                let signals = try await OracleEngine.shared.getSignals(for: cleanSymbol)
-                let buySignals = signals.filter { $0.sentiment == .bullish }
-                let sellSignals = signals.filter { $0.sentiment == .bearish }
-                
-                if buySignals.count > sellSignals.count * 2 {
-                    oracleScore = 80.0 // Strong buy
-                } else if buySignals.count > sellSignals.count {
-                    oracleScore = 60.0 // Buy
-                } else if sellSignals.count > buySignals.count * 2 {
-                    oracleScore = 35.0 // Strong sell
-                } else if sellSignals.count > buySignals.count {
-                    oracleScore = 50.0 // Neutral
-                } else {
-                    oracleScore = 50.0
-                }
-            } catch {
-                print("⚠️ RejimEngine: Oracle analizi başarısız: \(error)")
+        if symbolType == .bist {
+            let signals = await OracleEngine.shared.getSignals(for: cleanSymbol)
+            if !signals.isEmpty {
+                let buySignals = signals.filter { $0.sentiment == .bullish }.count
+                let sellSignals = signals.filter { $0.sentiment == .bearish }.count
+                let effectValues = signals
+                    .flatMap { $0.effects }
+                    .map(\.scoreImpact)
+                let meanImpact = effectValues.isEmpty
+                    ? 0
+                    : effectValues.reduce(0, +) / Double(effectValues.count)
+                let sentimentTilt = Double(buySignals - sellSignals) * 6.0
+                oracleScore = max(0, min(100, 50 + (meanImpact * 1.2) + sentimentTilt))
             }
         }
         

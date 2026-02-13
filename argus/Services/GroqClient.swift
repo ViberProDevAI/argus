@@ -1,7 +1,7 @@
 import Foundation
 
 /// Shared Client for LLM APIs
-/// Priority: GLM -> Groq -> Gemini
+/// Priority: Gemini 2.5 Flash -> GLM -> Groq
 /// Replaces ad-hoc implementations in Hermes and ArgusExplanationService.
 final class GroqClient: Sendable {
     static let shared = GroqClient()
@@ -9,6 +9,7 @@ final class GroqClient: Sendable {
     // API Keys from Secrets (Modified to use APIKeyStore for Runtime Updates)
     private var apiKey: String { APIKeyStore.shared.groqApiKey }
     private var glmKey: String { APIKeyStore.shared.glmApiKey }
+    private var geminiKey: String { APIKeyStore.shared.geminiApiKey }
 
     private let baseURL = "https://api.groq.com/openai/v1/chat/completions"
     private let glmURLs = [
@@ -17,6 +18,13 @@ final class GroqClient: Sendable {
         "https://api.z.ai/api/paas/v4/chat/completions",
         "https://api.z.ai/api/coding/paas/v4/chat/completions"
     ]
+
+    // Gemini 2.5 Flash - Primary model for all analysis
+    private let geminiModels = [
+        "gemini-2.5-flash-preview-05-20",
+        "gemini-2.0-flash"
+    ]
+    private let geminiBaseURL = "https://generativelanguage.googleapis.com"
 
     private let primaryModel = "llama-3.3-70b-versatile" // NEW LLaMA 3.3
     private let fallbackModel = "llama-3.1-8b-instant" // Fast Fallback
@@ -39,9 +47,19 @@ final class GroqClient: Sendable {
     private init() {}
     
     /// Generates a structured JSON object from a prompt
-    /// Priority: GLM -> Groq -> Gemini (DeepSeek removed - no balance)
+    /// Priority: Gemini 2.5 Flash -> GLM -> Groq
     func generateJSON<T: Decodable>(messages: [ChatMessage], maxTokens: Int = 1024) async throws -> T {
-        // 1. Try GLM First (user preference - confirmed working 2026-02)
+        // 1. Try Gemini 2.5 Flash First (best quality + native JSON mode)
+        if !geminiKey.isEmpty {
+            do {
+                print("🤖 Trying Gemini 2.5 Flash for JSON...")
+                return try await generateJSONWithGemini(messages: messages, maxTokens: maxTokens)
+            } catch {
+                print("⚠️ Gemini JSON Failed (\(error)). Trying GLM...")
+            }
+        }
+
+        // 2. Try GLM (fallback)
         if !glmKey.isEmpty {
             do {
                 print("🤖 Trying GLM for JSON...")
@@ -51,30 +69,14 @@ final class GroqClient: Sendable {
             }
         }
 
-        // 2. Groq Primary Model (LLaMA 3.3)
+        // 3. Groq Primary Model (LLaMA 3.3)
         do {
             return try await generateJSONWithModel(model: primaryModel, messages: messages, maxTokens: maxTokens)
         } catch {
             print("⚠️ Groq Primary Failed (\(error)). Switching to Fallback (\(fallbackModel))....")
 
-            // 3. Fallback to LLaMA 3.1
-            do {
-                return try await generateJSONWithModel(model: fallbackModel, messages: messages, maxTokens: maxTokens)
-            } catch {
-                print("⚠️ Groq Fallback Failed. Trying Gemini...")
-            }
-
-            // 4. Last Resort: Text Mode via Gemini + Aggressive Cleaning
-            let text = try await chat(messages: messages)
-
-            let clean = text.replacingOccurrences(of: "```json", with: "")
-                .replacingOccurrences(of: "```", with: "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard let jsonData = clean.data(using: .utf8) else {
-                throw URLError(.cannotDecodeContentData)
-            }
-            return try JSONDecoder().decode(T.self, from: jsonData)
+            // 4. Fallback to LLaMA 3.1
+            return try await generateJSONWithModel(model: fallbackModel, messages: messages, maxTokens: maxTokens)
         }
     }
     
@@ -143,6 +145,143 @@ final class GroqClient: Sendable {
         }
     }
 
+    // MARK: - Gemini API Response Models
+    
+    private struct GeminiResponse: Decodable {
+        struct Candidate: Decodable {
+            struct Content: Decodable {
+                struct Part: Decodable { 
+                    let text: String? 
+                }
+                let parts: [Part]
+            }
+            let content: Content
+        }
+        let candidates: [Candidate]?
+    }
+
+    // MARK: - Gemini API Methods
+
+    private func chatWithGeminiDirect(messages: [ChatMessage], maxTokens: Int = 1024) async throws -> String {
+        guard !geminiKey.isEmpty else { throw URLError(.userAuthenticationRequired) }
+
+        // Build Gemini-format contents from chat messages
+        var contents: [[String: Any]] = []
+        var systemInstruction: [String: Any]? = nil
+
+        for msg in messages {
+            if msg.role == "system" {
+                systemInstruction = ["parts": [["text": msg.content]]]
+            } else {
+                let role = msg.role == "assistant" ? "model" : "user"
+                contents.append(["role": role, "parts": [["text": msg.content]]])
+            }
+        }
+
+        var requestBody: [String: Any] = [
+            "contents": contents,
+            "generationConfig": [
+                "temperature": 0.7,
+                "maxOutputTokens": maxTokens
+            ]
+        ]
+        if let sys = systemInstruction {
+            requestBody["systemInstruction"] = sys
+        }
+
+        var lastError: Error?
+        for version in ["v1beta", "v1"] {
+            for model in geminiModels {
+                guard let url = URL(string: "\(geminiBaseURL)/\(version)/models/\(model):generateContent?key=\(geminiKey)") else { continue }
+
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+                do {
+                    let (data, response) = try await URLSession.shared.data(for: request)
+                    if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                        let decoded = try JSONDecoder().decode(GeminiResponse.self, from: data)
+                        if let text = decoded.candidates?.first?.content.parts.first?.text {
+                            print("✅ Gemini (\(model)) success")
+                            return text
+                        }
+                    }
+                    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    let errStr = String(data: data, encoding: .utf8) ?? "Unknown"
+                    print("⚠️ Gemini \(version)/\(model) Error (\(statusCode)): \(errStr.prefix(200))")
+                    lastError = NSError(domain: "GeminiClient", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "Gemini Error \(statusCode)"])
+                } catch {
+                    lastError = error
+                }
+            }
+        }
+        throw lastError ?? URLError(.badServerResponse)
+    }
+
+    private func generateJSONWithGemini<T: Decodable>(messages: [ChatMessage], maxTokens: Int = 1024) async throws -> T {
+        guard !geminiKey.isEmpty else { throw URLError(.userAuthenticationRequired) }
+
+        var contents: [[String: Any]] = []
+        var systemInstruction: [String: Any]? = nil
+
+        for msg in messages {
+            if msg.role == "system" {
+                systemInstruction = ["parts": [["text": msg.content]]]
+            } else {
+                let role = msg.role == "assistant" ? "model" : "user"
+                contents.append(["role": role, "parts": [["text": msg.content]]])
+            }
+        }
+
+        var requestBody: [String: Any] = [
+            "contents": contents,
+            "generationConfig": [
+                "temperature": 0.2,
+                "maxOutputTokens": maxTokens,
+                "responseMimeType": "application/json"
+            ]
+        ]
+        if let sys = systemInstruction {
+            requestBody["systemInstruction"] = sys
+        }
+
+        var lastError: Error?
+        for version in ["v1beta", "v1"] {
+            for model in geminiModels {
+                guard let url = URL(string: "\(geminiBaseURL)/\(version)/models/\(model):generateContent?key=\(geminiKey)") else { continue }
+
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+                request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
+
+                do {
+                    let (data, response) = try await URLSession.shared.data(for: request)
+                    if let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) {
+                        let decoded = try JSONDecoder().decode(GeminiResponse.self, from: data)
+                        if let text = decoded.candidates?.first?.content.parts.first?.text {
+                            print("✅ Gemini JSON (\(model)) success")
+                            let cleanJson = cleanJsonString(text)
+                            guard let jsonData = cleanJson.data(using: .utf8) else {
+                                throw URLError(.cannotDecodeContentData)
+                            }
+                            return try JSONDecoder().decode(T.self, from: jsonData)
+                        }
+                    }
+                    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    let errStr = String(data: data, encoding: .utf8) ?? "Unknown"
+                    print("⚠️ Gemini JSON \(version)/\(model) Error (\(statusCode)): \(errStr.prefix(200))")
+                    lastError = NSError(domain: "GeminiClient", code: statusCode, userInfo: [NSLocalizedDescriptionKey: "Gemini JSON Error \(statusCode)"])
+                } catch {
+                    lastError = error
+                }
+            }
+        }
+        throw lastError ?? URLError(.badServerResponse)
+    }
+
     // MARK: - Groq API Methods
 
     private func generateJSONWithModel<T: Decodable>(model: String, messages: [ChatMessage], maxTokens: Int = 1024) async throws -> T {
@@ -181,9 +320,19 @@ final class GroqClient: Sendable {
     }
     
     /// Sends a standard chat prompt and returns string
-    /// Priority: GLM -> Groq -> Gemini (DeepSeek removed - no balance)
+    /// Priority: Gemini 2.5 Flash -> GLM -> Groq
     func chat(messages: [ChatMessage], maxTokens: Int = 1024) async throws -> String {
-        // 1. Try GLM First (user preference)
+        // 1. Try Gemini 2.5 Flash First (best quality for analysis)
+        if !geminiKey.isEmpty {
+            do {
+                print("🤖 Trying Gemini 2.5 Flash...")
+                return try await chatWithGeminiDirect(messages: messages, maxTokens: maxTokens)
+            } catch {
+                print("⚠️ Gemini Chat Failed (\(error)). Trying GLM...")
+            }
+        }
+
+        // 2. Try GLM (fallback)
         if !glmKey.isEmpty {
             do {
                 print("🤖 Trying GLM...")
@@ -193,19 +342,12 @@ final class GroqClient: Sendable {
             }
         }
 
-        // 2. Groq Primary
+        // 3. Groq Primary
         do {
             return try await chatWithModel(model: primaryModel, messages: messages, maxTokens: maxTokens)
         } catch {
             print("⚠️ Groq Chat Primary Failed (\(error)). Switching to Fallback (\(fallbackModel))...")
-            do {
-                return try await chatWithModel(model: fallbackModel, messages: messages, maxTokens: maxTokens)
-            } catch {
-                print("⚠️ Groq Chat Fallback Failed. Trying Gemini...")
-            }
-
-            // 3. Gemini Fallback (last resort)
-            return try await chatWithGemini(messages: messages)
+            return try await chatWithModel(model: fallbackModel, messages: messages, maxTokens: maxTokens)
         }
     }
     
@@ -238,7 +380,7 @@ final class GroqClient: Sendable {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
         }
         await glmLimiter.acquire()
-        defer { glmLimiter.release() }
+        defer { Task { await glmLimiter.release() } }
         
         var lastError: Error?
         for model in glmModels {
@@ -290,7 +432,7 @@ final class GroqClient: Sendable {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
         }
         await glmLimiter.acquire()
-        defer { glmLimiter.release() }
+        defer { Task { await glmLimiter.release() } }
         
         var lastError: Error?
         for model in glmModels {
@@ -327,11 +469,10 @@ final class GroqClient: Sendable {
         throw lastError ?? URLError(.badServerResponse)
     }
 
-    // MARK: - Gemini Fallback
+    // MARK: - Legacy Gemini Fallback (now uses direct Gemini API)
 
     private func chatWithGemini(messages: [ChatMessage]) async throws -> String {
-        let prompt = messages.map { "\($0.role.uppercased()): \($0.content)" }.joined(separator: "\n\n")
-        return try await GeminiClient.shared.generateContent(prompt: prompt)
+        return try await chatWithGeminiDirect(messages: messages)
     }
 
     private func performGLMRequest(body: [String: Any]) async throws -> Data {

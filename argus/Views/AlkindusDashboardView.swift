@@ -1,68 +1,37 @@
 import SwiftUI
 
-// MARK: - Alkindus Dashboard View
-/// Displays calibration statistics and module performance insights.
-/// Phase 1: Shadow Mode - Read-only observation statistics.
-
 struct AlkindusDashboardView: View {
     @State private var stats: AlkindusStats?
     @State private var isLoading = true
     @State private var showDrawer = false
     @StateObject private var deepLinkManager = DeepLinkManager.shared
     
-    // Processing State
     @State private var isProcessing = false
     @State private var processedCount = 0
     @State private var totalToProcess = 0
     @State private var processingResult: ProcessingResult?
     @State private var dbSizeMB: Double = 0
     
-    // Theme
-    private let bgColor = Color(red: 0.02, green: 0.02, blue: 0.04)
-    private let cardBg = Color(red: 0.06, green: 0.08, blue: 0.12)
-    private let cyan = Color(red: 0.0, green: 0.8, blue: 1.0)
-    private let gold = Color(red: 1.0, green: 0.8, blue: 0.2)
-    private let green = Color(red: 0.0, green: 0.8, blue: 0.4)
-    private let red = Color(red: 0.9, green: 0.2, blue: 0.2)
-    
     var body: some View {
         NavigationStack {
             ZStack {
-                bgColor.ignoresSafeArea()
+                InstitutionalTheme.Colors.background.ignoresSafeArea()
                 
                 if isLoading {
                     ProgressView()
-                        .tint(cyan)
+                        .tint(InstitutionalTheme.Colors.primary)
                 } else if let stats = stats {
                     ScrollView {
                         VStack(spacing: 24) {
-                            // Header Card
                             headerCard(stats: stats)
-                            
-                            //  Today's Insights (Phase 2)
                             insightsSection
-                            
-                            // Data Tools (Processing & Cleanup)
                             dataToolsSection
-                            
-                            //  Correlations (Phase 2)
                             correlationsSection
-                            
-                            // Module Calibration Table
                             moduleCalibrationSection(stats: stats)
-                            
-                            // Regime Insights
                             regimeInsightsSection(stats: stats)
-                            
-                            // ⏰ Temporal Insights (Phase 3)
                             AlkindusTimeCard()
-                            
-                            //  Market Comparison (Phase 3)  
                             marketComparisonSection
-                            
-                            // Pending Observations
                             pendingSection(stats: stats)
-                            
                             Spacer(minLength: 50)
                         }
                         .padding()
@@ -84,13 +53,13 @@ struct AlkindusDashboardView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button(action: { showDrawer = true }) {
                         Image(systemName: "line.3.horizontal")
-                            .foregroundColor(cyan)
+                            .foregroundColor(InstitutionalTheme.Colors.primary)
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(action: refresh) {
                         Image(systemName: "arrow.clockwise")
-                            .foregroundColor(cyan)
+                            .foregroundColor(InstitutionalTheme.Colors.primary)
                     }
                 }
             }
@@ -173,82 +142,78 @@ struct AlkindusDashboardView: View {
         )
     }
     
-    // MARK: - Header Card
     private func headerCard(stats: AlkindusStats) -> some View {
         VStack(spacing: 16) {
             HStack {
                 AlkindusAvatarView(size: 24, isThinking: isProcessing, hasIdea: false)
                     .font(.system(size: 40))
-                    .foregroundColor(gold)
+                    .foregroundColor(InstitutionalTheme.Colors.warning)
                 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("ALKINDUS")
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
-                        .foregroundColor(.gray)
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         .tracking(2)
                     Text("Meta-Zeka Kalibrasyon")
-                        .font(.headline)
-                        .foregroundColor(.white)
+                        .font(InstitutionalTheme.Typography.headline)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 }
                 
                 Spacer()
                 
                 VStack(alignment: .trailing) {
                     Text("Shadow Mode")
-                        .font(.caption)
-                        .foregroundColor(cyan)
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.primary)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(cyan.opacity(0.2))
+                        .background(InstitutionalTheme.Colors.primary.opacity(0.2))
                         .cornerRadius(6)
                     
                     Text("\(stats.pendingCount) bekleyen")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 }
             }
             
-            Divider().background(Color.white.opacity(0.1))
+            Divider().background(InstitutionalTheme.Colors.borderSubtle)
             
-            // Top/Weak Module
             HStack(spacing: 20) {
                 if let top = stats.topModule {
-                    miniStat(title: "En İyi Modül", value: top.name.capitalized, rate: top.hitRate, color: green)
+                    miniStat(title: "En İyi Modül", value: top.name.capitalized, rate: top.hitRate, color: InstitutionalTheme.Colors.positive)
                 }
                 
                 if let weak = stats.weakestModule {
-                    miniStat(title: "En Zayıf", value: weak.name.capitalized, rate: weak.hitRate, color: red)
+                    miniStat(title: "En Zayıf", value: weak.name.capitalized, rate: weak.hitRate, color: InstitutionalTheme.Colors.negative)
                 }
             }
         }
         .padding()
-        .background(cardBg)
-        .cornerRadius(16)
+        .institutionalCard(scale: .insight, elevated: false)
     }
     
     private func miniStat(title: String, value: String, rate: Double, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.caption2)
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
             HStack {
                 Text(value)
-                    .font(.headline)
-                    .foregroundColor(.white)
+                    .font(InstitutionalTheme.Typography.bodyStrong)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 Text(String(format: "%.0f%%", rate * 100))
-                    .font(.caption)
+                    .font(InstitutionalTheme.Typography.caption)
                     .foregroundColor(color)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     
-    // MARK: - Module Calibration Section
     private func moduleCalibrationSection(stats: AlkindusStats) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("MODÜL KALİBRASYONU")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 .tracking(1)
             
             ForEach(stats.calibration.modules.sorted(by: { $0.key < $1.key }), id: \.key) { module, cal in
@@ -257,8 +222,8 @@ struct AlkindusDashboardView: View {
             
             if stats.calibration.modules.isEmpty {
                 Text("Henüz veri yok. Kararlar verildikçe burası dolacak.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     .padding()
             }
         }
@@ -267,126 +232,120 @@ struct AlkindusDashboardView: View {
     private func moduleCard(name: String, calibration: ModuleCalibration) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(name.uppercased())
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(.white)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             
             ForEach(calibration.brackets.sorted(by: { $0.key > $1.key }), id: \.key) { bracket, bstats in
                 HStack {
                     Text(bracket)
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .frame(width: 60, alignment: .leading)
                     
                     ProgressView(value: bstats.hitRate)
                         .tint(colorForHitRate(bstats.hitRate))
                     
                     Text(String(format: "%.0f%%", bstats.hitRate * 100))
-                        .font(.caption)
+                        .font(InstitutionalTheme.Typography.caption)
                         .foregroundColor(colorForHitRate(bstats.hitRate))
                         .frame(width: 40)
                     
                     Text("(\(bstats.attempts))")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 }
             }
         }
         .padding()
-        .background(cardBg)
-        .cornerRadius(12)
+        .institutionalCard(scale: .standard, elevated: false)
     }
     
     private func colorForHitRate(_ rate: Double) -> Color {
-        if rate >= 0.6 { return green }
-        if rate >= 0.45 { return .orange }
-        return red
+        if rate >= 0.6 { return InstitutionalTheme.Colors.positive }
+        if rate >= 0.45 { return InstitutionalTheme.Colors.warning }
+        return InstitutionalTheme.Colors.negative
     }
     
-    // MARK: - Regime Insights Section
     private func regimeInsightsSection(stats: AlkindusStats) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("REJİM BAZLI PERFORMANS")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 .tracking(1)
             
             ForEach(stats.calibration.regimes.sorted(by: { $0.key < $1.key }), id: \.key) { regime, insight in
                 VStack(alignment: .leading, spacing: 8) {
                     Text(regime.capitalized)
-                        .font(.headline)
-                        .foregroundColor(.white)
+                        .font(InstitutionalTheme.Typography.bodyStrong)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     
                     ForEach(insight.moduleAttempts.sorted(by: { $0.key < $1.key }), id: \.key) { module, attempts in
                         let rate = insight.hitRate(for: module)
                         HStack {
                             Text(module.capitalized)
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                                .font(InstitutionalTheme.Typography.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
                             Text(String(format: "%.0f%%", rate * 100))
-                                .font(.caption)
+                                .font(InstitutionalTheme.Typography.caption)
                                 .foregroundColor(colorForHitRate(rate))
                         }
                     }
                 }
                 .padding()
-                .background(cardBg)
-                .cornerRadius(12)
+                .institutionalCard(scale: .standard, elevated: false)
             }
             
             if stats.calibration.regimes.isEmpty {
                 Text("Rejim verisi henüz yok.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     .padding()
             }
         }
     }
     
-    // MARK: - Pending Section
     private func pendingSection(stats: AlkindusStats) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("BEKLEYEN GÖZLEMLER")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 .tracking(1)
             
             HStack {
                 Image(systemName: "hourglass")
-                    .foregroundColor(cyan)
+                    .foregroundColor(InstitutionalTheme.Colors.primary)
                 Text("\(stats.pendingCount) karar olgunlaşma bekliyor")
-                    .font(.subheadline)
-                    .foregroundColor(.white)
+                    .font(InstitutionalTheme.Typography.body)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             }
             .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(cardBg)
-            .cornerRadius(12)
+            .institutionalCard(scale: .standard, elevated: false)
         }
     }
     
-    // MARK: - Insights Section (Phase 2)
     @State private var insights: [AlkindusInsightGenerator.Insight] = []
     
     private var insightsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(" BUGÜN ÖĞRENDİKLERİM")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     .tracking(1)
                 Spacer()
                 Button(action: refreshInsights) {
                     Image(systemName: "sparkles")
-                        .foregroundColor(gold)
+                        .foregroundColor(InstitutionalTheme.Colors.warning)
                         .font(.caption)
                 }
             }
             
             if insights.isEmpty {
                 Text("Henüz günlük insight yok. 'Eventlerden Öğren' butonuna bas.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     .padding()
             } else {
                 VStack(spacing: 8) {
@@ -406,18 +365,17 @@ struct AlkindusDashboardView: View {
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(insight.title)
-                    .font(.caption)
+                    .font(InstitutionalTheme.Typography.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 Text(insight.detail)
-                    .font(.caption2)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.micro)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
             Spacer()
         }
         .padding()
-        .background(cardBg)
-        .cornerRadius(10)
+        .institutionalCard(scale: .micro, elevated: false)
     }
     
     private func iconForCategory(_ category: AlkindusInsightGenerator.InsightCategory) -> String {
@@ -434,48 +392,46 @@ struct AlkindusDashboardView: View {
     
     private func colorForImportance(_ importance: AlkindusInsightGenerator.InsightImportance) -> Color {
         switch importance {
-        case .critical: return red
-        case .high: return .orange
-        case .medium: return cyan
-        case .low: return .gray
+        case .critical: return InstitutionalTheme.Colors.negative
+        case .high: return InstitutionalTheme.Colors.warning
+        case .medium: return InstitutionalTheme.Colors.primary
+        case .low: return InstitutionalTheme.Colors.textTertiary
         }
     }
     
-    // MARK: - Correlations Section (Phase 2)
     @State private var topCorrelations: [(key: String, hitRate: Double, attempts: Int)] = []
     
     private var correlationsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(" EN BAŞARILI KOMBİNASYONLAR")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 .tracking(1)
             
             if topCorrelations.isEmpty {
                 Text("Henüz korelasyon verisi yok.")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     .padding()
             } else {
                 VStack(spacing: 8) {
                     ForEach(topCorrelations, id: \.key) { corr in
                         HStack {
                             Text(formatCorrelationKey(corr.key))
-                                .font(.caption)
-                                .foregroundColor(.white)
+                                .font(InstitutionalTheme.Typography.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             Spacer()
                             Text("\(Int(corr.hitRate * 100))%")
-                                .font(.caption)
+                                .font(InstitutionalTheme.Typography.caption)
                                 .fontWeight(.bold)
                                 .foregroundColor(colorForHitRate(corr.hitRate))
                             Text("(\(corr.attempts))")
-                                .font(.caption2)
-                                .foregroundColor(.gray)
+                                .font(InstitutionalTheme.Typography.micro)
+                                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         }
                         .padding(.horizontal)
                         .padding(.vertical, 8)
-                        .background(cardBg)
-                        .cornerRadius(8)
+                        .institutionalCard(scale: .nano, elevated: false)
                     }
                 }
             }
@@ -489,51 +445,49 @@ struct AlkindusDashboardView: View {
             .capitalized
     }
     
-    // MARK: - Market Comparison Section (Phase 3)
     @State private var marketComparison: (bist: Double, global: Double)?
     
     private var marketComparisonSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(" MARKET KARŞILAŞTIRMASI")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 .tracking(1)
             
             if let comparison = marketComparison {
                 HStack(spacing: 20) {
                     VStack(spacing: 4) {
                         Text("BIST")
-                            .font(.caption2)
-                            .foregroundColor(.gray)
+                            .font(InstitutionalTheme.Typography.micro)
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         Text("\(Int(comparison.bist * 100))%")
-                            .font(.title2)
+                            .font(InstitutionalTheme.Typography.title)
                             .fontWeight(.bold)
                             .foregroundColor(colorForHitRate(comparison.bist))
                     }
                     .frame(maxWidth: .infinity)
                     
                     Rectangle()
-                        .fill(Color.gray.opacity(0.3))
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
                         .frame(width: 1, height: 40)
                     
                     VStack(spacing: 4) {
                         Text("GLOBAL")
-                            .font(.caption2)
-                            .foregroundColor(.gray)
+                            .font(InstitutionalTheme.Typography.micro)
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         Text("\(Int(comparison.global * 100))%")
-                            .font(.title2)
+                            .font(InstitutionalTheme.Typography.title)
                             .fontWeight(.bold)
                             .foregroundColor(colorForHitRate(comparison.global))
                     }
                     .frame(maxWidth: .infinity)
                 }
                 .padding()
-                .background(cardBg)
-                .cornerRadius(12)
+                .institutionalCard(scale: .standard, elevated: false)
             } else {
                 Text("Henüz BIST/Global karşılaştırma verisi yok")
-                    .font(.caption)
-                    .foregroundColor(.gray)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     .padding()
             }
         }
@@ -542,75 +496,70 @@ struct AlkindusDashboardView: View {
         }
     }
     
-    // MARK: - Data Tools Section
     private var dataToolsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("VERİ ARAÇLARI")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 .tracking(1)
             
             VStack(spacing: 12) {
-                // Database Size
                 HStack {
                     Image(systemName: "internaldrive")
-                        .foregroundColor(.gray)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Text("Veritabanı Boyutu:")
-                        .font(.caption)
-                        .foregroundColor(.gray)
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Spacer()
                     Text(String(format: "%.1f MB", dbSizeMB))
-                        .font(.caption)
-                        .foregroundColor(dbSizeMB > 100 ? red : .white)
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(dbSizeMB > 100 ? InstitutionalTheme.Colors.negative : InstitutionalTheme.Colors.textPrimary)
                 }
                 
-                // Processing Progress
                 if isProcessing {
                     VStack(spacing: 8) {
                         HStack {
                             ProgressView()
                                 .scaleEffect(0.8)
-                                .tint(cyan)
+                                .tint(InstitutionalTheme.Colors.primary)
                             Text("İşleniyor: \(processedCount)/\(totalToProcess)")
-                                .font(.caption)
-                                .foregroundColor(cyan)
+                                .font(InstitutionalTheme.Typography.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.primary)
                         }
                         ProgressView(value: {
                             let v = totalToProcess > 0 ? Double(processedCount) / Double(totalToProcess) : 0
                             return min(max(v, 0), 1)
                         }())
-                            .tint(cyan)
+                            .tint(InstitutionalTheme.Colors.primary)
                     }
                 }
                 
-                // Processing Result
                 if let result = processingResult {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(green)
+                            .foregroundColor(InstitutionalTheme.Colors.positive)
                         Text("\(result.eventsProcessed) event işlendi, \(result.patternsExtracted) pattern çıkarıldı")
-                            .font(.caption)
-                            .foregroundColor(green)
+                            .font(InstitutionalTheme.Typography.caption)
+                            .foregroundColor(InstitutionalTheme.Colors.positive)
                     }
                     Text("Öğrenilen: \(result.modulesLearned.joined(separator: ", "))")
-                        .font(.caption2)
-                        .foregroundColor(.gray)
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 }
                 
-                Divider().background(Color.white.opacity(0.1))
+                Divider().background(InstitutionalTheme.Colors.borderSubtle)
                 
-                // Buttons
                 HStack(spacing: 12) {
                     Button(action: processEvents) {
                         HStack {
                             AlkindusAvatarView(size: 16, isThinking: false, hasIdea: false)
                             Text("Eventlerden Öğren")
                         }
-                        .font(.caption)
-                        .foregroundColor(.white)
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(cyan.opacity(0.3))
+                        .background(InstitutionalTheme.Colors.primary.opacity(0.3))
                         .cornerRadius(8)
                     }
                     .disabled(isProcessing)
@@ -620,38 +569,35 @@ struct AlkindusDashboardView: View {
                             Image(systemName: "trash")
                             Text("Blob Temizle")
                         }
-                        .font(.caption)
-                        .foregroundColor(.white)
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(red.opacity(0.3))
+                        .background(InstitutionalTheme.Colors.negative.opacity(0.3))
                         .cornerRadius(8)
                     }
                     .disabled(isProcessing)
                 }
             }
             .padding()
-            .background(cardBg)
-            .cornerRadius(12)
+            .institutionalCard(scale: .standard, elevated: false)
         }
     }
     
-    // MARK: - Empty State
     private var emptyState: some View {
         VStack(spacing: 16) {
             AlkindusAvatarView(size: 40, isThinking: true, hasIdea: false)
                 .font(.system(size: 60))
-                .foregroundColor(.gray)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
             Text("Alkindus henüz veri toplamadı")
-                .font(.headline)
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.bodyStrong)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
             Text("Kararlar verildikçe burada istatistikler görünecek.")
-                .font(.caption)
-                .foregroundColor(.gray)
+                .font(InstitutionalTheme.Typography.caption)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
         }
     }
     
-    // MARK: - Actions
     private func loadStats() async {
         isLoading = true
         stats = await AlkindusCalibrationEngine.shared.getCurrentStats()

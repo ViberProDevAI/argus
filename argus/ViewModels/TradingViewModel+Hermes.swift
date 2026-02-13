@@ -26,6 +26,9 @@ extension TradingViewModel {
     @MainActor
     func refreshBistAtmosphere() async {
         await HermesNewsViewModel.shared.refreshBistAtmosphere()
+        let state = HermesNewsViewModel.shared.currentBistAtmosphereState()
+        self.bistAtmosphere = state.decision
+        self.bistAtmosphereLastUpdated = state.lastUpdated
     }
 
     func getHermesHighlights() -> [NewsInsight] {

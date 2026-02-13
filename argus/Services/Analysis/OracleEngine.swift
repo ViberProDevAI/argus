@@ -6,6 +6,11 @@ import SwiftUI
 actor OracleEngine {
     static let shared = OracleEngine()
     
+    private var cachedSignals: [OracleSignal] = []
+    private var lastFetchTime: Date?
+    private var refreshTask: Task<[OracleSignal], Never>?
+    private let cacheValiditySeconds: TimeInterval = 10 * 60
+    
     // MARK: - Types
     
     enum OracleSignalType: String, CaseIterable {
@@ -210,14 +215,16 @@ actor OracleEngine {
         // Basit simülasyon mantığı: Yaz aylarında default pozitif, diğer aylar veriye bağlı.
         if let tourismChange = input.touristArrivalsChangeYoY,
            let tourismTotal = input.touristArrivalsTotal,
-           tourismChange > 10.0 {
+           abs(tourismChange) > 8.0 {
              let signal = OracleSignal(
                 type: .tourismRush,
                 rawValue: tourismTotal, // Milyon Kişi
                 changeYoY: tourismChange,
                 changeMoM: 0,
-                sentiment: .bullish,
-                message: "Turizmde rekor: Gelen turist sayısı %\(String(format: "%.0f", tourismChange)) arttı.",
+                sentiment: tourismChange > 0 ? .bullish : .bearish,
+                message: tourismChange > 0
+                    ? "Turizmde güçlenme: Yıllık değişim %\(String(format: "%.0f", tourismChange))."
+                    : "Turizmde zayıflama: Yıllık değişim %\(String(format: "%.0f", tourismChange)).",
                 effects: [
                     OracleSectorEffect(
                         sectorCode: "XULAS",
@@ -260,12 +267,43 @@ actor OracleEngine {
         return signals
     }
     
+    func getLatestSignals(forceRefresh: Bool = false) async -> [OracleSignal] {
+        if !forceRefresh,
+           !cachedSignals.isEmpty,
+           let lastFetchTime,
+           Date().timeIntervalSince(lastFetchTime) < cacheValiditySeconds {
+            return cachedSignals
+        }
+
+        if !forceRefresh, let refreshTask {
+            return await refreshTask.value
+        }
+
+        let task = Task<[OracleSignal], Never> {
+            let input = await TCMBDataService.shared.getOracleInput(forceRefresh: forceRefresh)
+            return self.analyze(input: input)
+        }
+        refreshTask = task
+        let signals = await task.value
+        refreshTask = nil
+        cachedSignals = signals
+        lastFetchTime = Date()
+        return signals
+    }
+    
     // MARK: - Hisse Bazlı Sinyal
     
-    func getSignals(for symbol: String) -> [OracleSignal] {
-        // TODO: Implement specific stock signal logic based on sectors
-        // For now return empty or basic signals
-        return []
+    func getSignals(for symbol: String, forceRefresh: Bool = false) async -> [OracleSignal] {
+        let cleanSymbol = symbol.uppercased().replacingOccurrences(of: ".IS", with: "")
+        let signals = await getLatestSignals(forceRefresh: forceRefresh)
+        let sectorCode = BistSectorRegistry.sectorCode(for: cleanSymbol)
+
+        return signals.filter { signal in
+            signal.effects.contains { effect in
+                effect.impactedStocks.contains(cleanSymbol) ||
+                (sectorCode != nil && effect.sectorCode == sectorCode)
+            }
+        }
     }
 }
 

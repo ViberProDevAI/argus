@@ -10,10 +10,10 @@ final class ChartPatternEngine {
         APIKeyStore.shared.geminiApiKey
     }
     
-    // Updated 2026-02: Using latest Gemini models
+    // Updated 2026-02: Using Gemini 2.5 Flash
     private let modelCandidates = [
-        "gemini-2.0-flash",
-        "gemini-1.5-flash"
+        "gemini-2.5-flash-preview-05-20",
+        "gemini-2.0-flash"
     ]
     
     // Rate limiting (15 RPM for free tier = 4 sec interval)
