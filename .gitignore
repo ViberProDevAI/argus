@@ -67,6 +67,9 @@ Package.resolved
 # ===========================
 claude-mem/
 .gemini/
+.agent/
+.claude/
+CLAUDE.md
 
 # ===========================
 # Internal Docs (not for public)
@@ -74,6 +77,18 @@ claude-mem/
 REFACTOR_NEXT_STEPS.md
 VIEWMODEL_REFACTOR_PLAN.md
 VIEWMODEL_REFACTOR_VISUAL.md
+ARCHITECTURE_CHECKLIST.md
+MIMARI_OZET.md
+README_MIMARLIK.md
+security_best_practices_report.md
+manual_build.sh
+docs/analysis/
+docs/plans/
+docs/screenshots/
+docs/hermes-eval.md
+docs/MIGRATION_UnifiedDataStore.md
+docs/UI_REDESIGN_SUMMARY.md
+docs/ui-atlas/
 
 # ===========================
 # Archive & Backups

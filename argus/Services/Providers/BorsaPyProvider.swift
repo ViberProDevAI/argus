@@ -227,9 +227,7 @@ actor BorsaPyProvider {
     nonisolated private static let fallbackBaseURLs: [String] = [
         "https://argus-borsapy.onrender.com",
         "http://localhost:8899",
-        "http://127.0.0.1:8899",
-        "http://localhost:8899",
-        "http://localhost:8899"
+        "http://127.0.0.1:8899"
     ]
     nonisolated private static var canUseLocalNetworkFallbacks: Bool {
 #if targetEnvironment(simulator) || targetEnvironment(macCatalyst)
