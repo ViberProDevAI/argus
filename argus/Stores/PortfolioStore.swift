@@ -371,9 +371,18 @@ final class PortfolioStore: ObservableObject {
         trades[index].isPendingSale = true
         scheduleDebouncedSave()
 
-        // Stop Loss tetiklendi
-        print("🛑 PortfolioStore: STOP LOSS tetiklendi for \(trade.symbol) @ \(currentPrice) (SL: \(stopLoss))")
-        sell(tradeId: trade.id, currentPrice: currentPrice, reason: "STOP_LOSS")
+        // Retroaktif gap tespiti: Uygulama kapalıyken fiyat stop'u geçtiyse,
+        // satış her zaman stop fiyatından yapılır (mevcut gap fiyatından değil).
+        let isRetroactiveGap = currentPrice < stopLoss * 0.99 // %1'den fazla gap = retroaktif
+        let sellPrice = stopLoss // Her zaman stop fiyatından sat
+        let reason = isRetroactiveGap ? "STOP_LOSS_RETROACTIVE" : "STOP_LOSS"
+
+        if isRetroactiveGap {
+            print("🛑⏮️ PortfolioStore: STOP LOSS (RETROAKTİF) tetiklendi for \(trade.symbol) — Stop: \(sellPrice), Mevcut: \(currentPrice)")
+        } else {
+            print("🛑 PortfolioStore: STOP LOSS tetiklendi for \(trade.symbol) @ \(sellPrice) (SL: \(stopLoss))")
+        }
+        sell(tradeId: trade.id, currentPrice: sellPrice, reason: reason)
     }
 
     private func checkTakeProfit(for trade: Trade, at index: Int, currentPrice: Double) {
@@ -385,9 +394,18 @@ final class PortfolioStore: ObservableObject {
         trades[index].isPendingSale = true
         scheduleDebouncedSave()
 
-        // Take Profit tetiklendi
-        print("💰 PortfolioStore: TAKE PROFIT tetiklendi for \(trade.symbol) @ \(currentPrice) (TP: \(takeProfit))")
-        sell(tradeId: trade.id, currentPrice: currentPrice, reason: "TAKE_PROFIT")
+        // Retroaktif gap tespiti: Uygulama kapalıyken fiyat take-profit'i geçtiyse,
+        // satış her zaman take-profit fiyatından yapılır (mevcut gap fiyatından değil).
+        let isRetroactiveGap = currentPrice > takeProfit * 1.01 // %1'den fazla gap = retroaktif
+        let sellPrice = takeProfit // Her zaman take-profit fiyatından sat
+        let reason = isRetroactiveGap ? "TAKE_PROFIT_RETROACTIVE" : "TAKE_PROFIT"
+
+        if isRetroactiveGap {
+            print("💰⏮️ PortfolioStore: TAKE PROFIT (RETROAKTİF) tetiklendi for \(trade.symbol) — TP: \(sellPrice), Mevcut: \(currentPrice)")
+        } else {
+            print("💰 PortfolioStore: TAKE PROFIT tetiklendi for \(trade.symbol) @ \(sellPrice) (TP: \(takeProfit))")
+        }
+        sell(tradeId: trade.id, currentPrice: sellPrice, reason: reason)
     }
     
     // MARK: - Sell Operation
