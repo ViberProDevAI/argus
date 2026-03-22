@@ -295,7 +295,7 @@ struct ArgusSanctumView: View {
                         selectedModule = .aether
                         showDrawer = false
                     },
-                    ArgusDrawerView.DrawerItem(title: "Prometheus", subtitle: "Bilimsel fiyat projeksiyonu", icon: "crystal.ball") {
+                    ArgusDrawerView.DrawerItem(title: "Prometheus", subtitle: "Bilimsel fiyat projeksiyonu", icon: "PrometheusIcon") {
                         selectedModule = .prometheus
                         showDrawer = false
                     }
