@@ -84,12 +84,12 @@ final class ExecutionStateViewModel: ObservableObject {
     // MARK: - AutoPilot Control
     
     private func startAutoPilot() {
-        print("🚀 AutoPilot Started: \(selectedEngine.rawValue)")
+        ArgusLogger.info("AutoPilot Started: \(selectedEngine.rawValue)", category: "EXECUTION")
         NotificationCenter.default.post(name: .autoPilotStateChanged, object: nil, userInfo: ["enabled": true])
     }
     
     private func stopAutoPilot() {
-        print("⏹️ AutoPilot Stopped")
+        ArgusLogger.info("AutoPilot Stopped", category: "EXECUTION")
         autoPilotTask?.cancel()
         autoPilotTask = nil
         isScanning = false
@@ -173,18 +173,18 @@ final class ExecutionStateViewModel: ObservableObject {
                 rationale: "Trade Brain Execution",
                 referencePrice: price
             ) else {
-                print("❌ TRADE BRAIN ALIM RED: \(symbol)")
+                ArgusLogger.error("TRADE BRAIN ALIM RED: \(symbol)", category: "EXECUTION")
                 return
             }
 
             if let decision = SignalStateViewModel.shared.grandDecisions[symbol] {
                 _ = PositionPlanStore.shared.createPlan(for: trade, decision: decision)
-                print("🧠 Trade Brain Plan oluşturuldu: \(symbol)")
+                ArgusLogger.info("Trade Brain Plan oluşturuldu: \(symbol)", category: "EXECUTION")
             } else {
-                print("⚠️ Trade Brain Plan atlandı (karar yok): \(symbol)")
+                ArgusLogger.warn("Trade Brain Plan atlandı (karar yok): \(symbol)", category: "EXECUTION")
             }
             
-            print("✅ TRADE BRAIN ALIM: \(symbol) - \(String(format: "%.4f", quantity)) adet @ \(String(format: "%.2f", price))")
+            ArgusLogger.info("TRADE BRAIN ALIM: \(symbol) - \(String(format: "%.4f", quantity)) adet @ \(String(format: "%.2f", price))", category: "EXECUTION")
         }
     }
     
@@ -199,13 +199,24 @@ final class ExecutionStateViewModel: ObservableObject {
            let trade = PortfolioStore.shared.trades.first(where: { $0.id == tradeId }) {
             
             Task { @MainActor in
-                self.sell(
-                    symbol: trade.symbol,
-                    quantity: trade.quantity, // Sell full for now
-                    source: .autoPilot,
-                    reason: reason
-                )
-                print("🚨 TRADE BRAIN SATIŞ: \(trade.symbol) - \(reason)")
+                if let trimPercentage = userInfo["trimPercentage"] as? Double, trimPercentage > 0, trimPercentage < 100 {
+                    let quantity = trade.quantity * (trimPercentage / 100.0)
+                    self.sell(
+                        symbol: trade.symbol,
+                        quantity: quantity,
+                        source: .autoPilot,
+                        reason: reason
+                    )
+                    ArgusLogger.info("TRADE BRAIN SATIŞ(TRIM): \(trade.symbol) %\(Int(trimPercentage)) - \(reason)", category: "EXECUTION")
+                } else {
+                    self.sell(
+                        symbol: trade.symbol,
+                        quantity: trade.quantity,
+                        source: .autoPilot,
+                        reason: reason
+                    )
+                    ArgusLogger.info("TRADE BRAIN SATIŞ: \(trade.symbol) - \(reason)", category: "EXECUTION")
+                }
             }
         }
     }
@@ -230,7 +241,7 @@ final class ExecutionStateViewModel: ObservableObject {
             let err = "Fiyat verisi bulunamadi: \(symbol)"
             lastTradeError = err
             ArgusLogger.error(.portfoy, err)
-            print("❌ TRADE BLOCKED: \(err)")
+            ArgusLogger.error("TRADE BLOCKED: \(err)", category: "EXECUTION")
             return nil
         }
         
@@ -250,7 +261,7 @@ final class ExecutionStateViewModel: ObservableObject {
             let error = validation.error?.localizedDescription ?? "Bilinmeyen hata"
             lastTradeError = error
             ArgusLogger.error(.portfoy, "İŞLEM REDDEDİLDİ: \(error)")
-            print("❌ TRADE BLOCKED (Validation): \(error) | Balance: \(availableBalance) | Price: \(price) | Qty: \(quantity)")
+            ArgusLogger.error("TRADE BLOCKED (Validation): \(error) | Balance: \(availableBalance) | Price: \(price) | Qty: \(quantity)", category: "EXECUTION")
             return nil
         }
         
@@ -268,7 +279,7 @@ final class ExecutionStateViewModel: ObservableObject {
                 let err = "AGORA engelledi: \(snapshot.reasonOneLiner)"
                 lastTradeError = err
                 ArgusLogger.warning(.autopilot, "AGORA BLOCKED BUY: \(snapshot.reasonOneLiner)")
-                print("❌ TRADE BLOCKED (AGORA): \(err)")
+                ArgusLogger.error("TRADE BLOCKED (AGORA): \(err)", category: "EXECUTION")
                 addAgoraSnapshot(snapshot)
                 return nil
             }
@@ -316,7 +327,7 @@ final class ExecutionStateViewModel: ObservableObject {
             let err = "Fiyat verisi bulunamadi: \(symbol)"
             lastTradeError = err
             ArgusLogger.error(.portfoy, err)
-            print("❌ SELL BLOCKED: \(err)")
+            ArgusLogger.error("SELL BLOCKED: \(err)", category: "EXECUTION")
             return
         }
         
@@ -338,7 +349,7 @@ final class ExecutionStateViewModel: ObservableObject {
             let error = validation.error?.localizedDescription ?? "Bilinmeyen hata"
             lastTradeError = error
             ArgusLogger.error(.portfoy, "SATIŞ REDDEDİLDİ: \(error)")
-            print("❌ SELL BLOCKED (Validation): \(error)")
+            ArgusLogger.error("SELL BLOCKED (Validation): \(error)", category: "EXECUTION")
             return
         }
         
@@ -356,7 +367,7 @@ final class ExecutionStateViewModel: ObservableObject {
                  let err = "AGORA engelledi: \(snapshot.reasonOneLiner)"
                  lastTradeError = err
                  ArgusLogger.warning(.autopilot, "AGORA BLOCKED SELL: \(snapshot.reasonOneLiner)")
-                 print("❌ SELL BLOCKED (AGORA): \(err)")
+                 ArgusLogger.error("SELL BLOCKED (AGORA): \(err)", category: "EXECUTION")
                  addAgoraSnapshot(snapshot)
                  return
             }

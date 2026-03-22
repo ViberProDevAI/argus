@@ -11,13 +11,22 @@ struct RiskBudgetConfig: Sendable {
     
     // Time Limits
     nonisolated static let cooldownMinutes: Double = 30 // Min minutes between trades on same symbol
+
+    // Regime thresholds (Aether)
+    nonisolated static let deepRiskOffMaxScore: Double = 25
+    nonisolated static let riskOffMaxScore: Double = 40
+
+    // Forced unwind settings
+    nonisolated static let deepRiskOffTrimPercent: Double = 50
+    nonisolated static let riskOffTrimPercent: Double = 25
     
     // Dynamic Risk Ceiling
     // Aether Safe Mode: < 30 -> 1.5R
     // Aether >= 50 -> UNLIMITED (20.0R) to allow Learning
     nonisolated static func dynamicMaxRiskR(aetherScore: Double) -> Double {
-        if aetherScore >= 50 { return 20.0 }    // Limit Kaldırıldı (Öğrenme Modu)
-        if aetherScore >= 30 { return 2.5 }     // Temkinli
-        return 1.5                             // Ayı/Çöküş
+        if aetherScore <= deepRiskOffMaxScore { return 0.8 } // Hard defense
+        if aetherScore <= riskOffMaxScore { return 1.5 }     // Defensive
+        if aetherScore >= 50 { return 20.0 }                 // Learning mode
+        return 2.5                                            // Cautious
     }
 }

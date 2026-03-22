@@ -33,6 +33,26 @@ actor ExecutionGovernor {
     ) -> ExecutionDecision {
         
         let isRiskReducing = (signal.action == .sell)
+        let aetherScore = scores.aether ?? 50.0
+        let isSafeSymbol: Bool = {
+            guard let type = SafeUniverseService.shared.getUniverseType(for: symbol) else { return false }
+            switch type {
+            case .bond, .cashLike, .gold, .hedge:
+                return true
+            default:
+                return false
+            }
+        }()
+
+        // Regime policy hard gates
+        if !isRiskReducing {
+            if aetherScore <= RiskBudgetConfig.deepRiskOffMaxScore {
+                return .rejected(reason: "Deep Risk-Off aktif (Aether: \(Int(aetherScore))). Yeni alım kapalı.")
+            }
+            if aetherScore <= RiskBudgetConfig.riskOffMaxScore && !isSafeSymbol {
+                return .rejected(reason: "Risk-Off aktif (Aether: \(Int(aetherScore))). Yalnız güvenli varlıklara izin var.")
+            }
+        }
         
         // 1. Cooldown Check (Spam Prevention)
         // Exempt Sells usually, unless we want to prevent panic selling loops? 
@@ -93,7 +113,6 @@ actor ExecutionGovernor {
             }
             
             // DYNAMIC RISK BUDGETING
-            let aetherScore = scores.aether ?? 50.0 // Default to Neutral if missing
             let maxRiskR = RiskBudgetConfig.dynamicMaxRiskR(aetherScore: aetherScore)
             
             if (currentTotalRiskR + tradeRiskR) > maxRiskR {
