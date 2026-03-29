@@ -189,26 +189,39 @@ class TradeBrainExecutor: ObservableObject {
         print("💰 executeBuy: Available Balance = \(availableBalance), isBist = \(isBist)")
         
         // 1. ALLOCATION HESAPLA
+        // Rejim × Aether çarpanı hesapla
+        let regimeAetherScore = MacroRegimeService.shared.getCachedRating()?.numericScore ?? 50
+        let currentRegime = ChironRegimeEngine.shared.globalResult.regime
+        let regimeMultiplier = RegimePositionSizer.multiplier(aetherScore: regimeAetherScore, regime: currentRegime)
+
+        guard regimeMultiplier > 0 else {
+            log("🛑 \(symbol): Rejim bloğu — Aether:\(Int(regimeAetherScore)) Rejim:\(currentRegime.rawValue)")
+            print("🛑 executeBuy: Rejim bloğu — alım durduruldu (Aether:\(Int(regimeAetherScore)), Rejim:\(currentRegime.rawValue))")
+            return
+        }
+
         let allocation: Double
         let minTradeAmount: Double
-        
+
         if isBist {
             let basePercent = 0.05
-            let adjustedPercent = basePercent * profile.allocationMultiplier
+            let adjustedPercent = basePercent * profile.allocationMultiplier * regimeMultiplier
             allocation = availableBalance * adjustedPercent
             minTradeAmount = 1000.0
             print(
                 "💰 executeBuy: BIST Allocation = %\(Int(adjustedPercent * 100)) " +
-                "(\(String(format: "%.2f", profile.allocationMultiplier))x) of ₺\(availableBalance) = ₺\(allocation)"
+                "(\(String(format: "%.2f", profile.allocationMultiplier))x profile, " +
+                "\(String(format: "%.2f", regimeMultiplier))x rejim) of ₺\(availableBalance) = ₺\(allocation)"
             )
         } else {
             let basePercent = 0.10
-            let adjustedPercent = basePercent * profile.allocationMultiplier
+            let adjustedPercent = basePercent * profile.allocationMultiplier * regimeMultiplier
             allocation = availableBalance * adjustedPercent
             minTradeAmount = 50.0
             print(
                 "💰 executeBuy: Global Allocation = %\(Int(adjustedPercent * 100)) " +
-                "(\(String(format: "%.2f", profile.allocationMultiplier))x) of $\(availableBalance) = $\(allocation)"
+                "(\(String(format: "%.2f", profile.allocationMultiplier))x profile, " +
+                "\(String(format: "%.2f", regimeMultiplier))x rejim) of $\(availableBalance) = $\(allocation)"
             )
         }
         
@@ -217,9 +230,9 @@ class TradeBrainExecutor: ObservableObject {
             print("🛑 executeBuy: Yetersiz bakiye - Gereken: \(minTradeAmount), Mevcut: \(allocation)")
             return
         }
-        
+
         var proposedQuantity = allocation / currentPrice
-        
+
         // 2. RİSK KONTROLÜ
         // FIX: portfolioValue sadece aynı pazar trade'lerini içermeli (BIST veya Global ayrı)
         let marketFilteredPortfolio = portfolio.filter { $0.isOpen && SymbolResolver.shared.isBistSymbol($0.symbol) == isBist }
@@ -227,8 +240,21 @@ class TradeBrainExecutor: ObservableObject {
             let price = quotes[trade.symbol]?.currentPrice ?? trade.entryPrice
             return sum + (trade.quantity * price)
         }
-        
+
         let totalEquity = availableBalance + portfolioValue
+
+        // 2B. PORTFÖY ISI KAPISI
+        let heatLevel = PortfolioHeatGate.assess(portfolio: marketFilteredPortfolio, quotes: quotes, equity: totalEquity)
+        let heatMultiplier = PortfolioHeatGate.positionMultiplier(for: heatLevel)
+        guard heatMultiplier > 0 else {
+            log("🔥 \(symbol): Portföy ısı limiti (\(heatLevel.rawValue)) — yeni alım durduruldu")
+            print("🔥 executeBuy: Portföy ısı bloğu (\(heatLevel.rawValue)) — alım iptal")
+            return
+        }
+        if heatMultiplier < 1.0 {
+            proposedQuantity *= heatMultiplier
+            print("🌡️ executeBuy: Portföy ısısı (\(heatLevel.rawValue)) — miktar \(String(format: "%.0f%%", heatMultiplier * 100)) küçültüldü")
+        }
         let marketOpenCount = marketFilteredPortfolio.count
         print("🛡️ executeBuy: \(isBist ? "BIST" : "GLOBAL") açık pozisyon sayısı = \(marketOpenCount)")
         
@@ -318,7 +344,7 @@ class TradeBrainExecutor: ObservableObject {
         let scores = (
             atlas: FundamentalScoreStore.shared.getScore(for: symbol)?.totalScore,
             orion: orionScore as Double?,
-            aether: nil as Double?,
+            aether: MacroRegimeService.shared.getCachedRating()?.numericScore,
             hermes: nil as Double?
         )
         
