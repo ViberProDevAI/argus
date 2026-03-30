@@ -4,6 +4,11 @@
 Secrets.xcconfig
 
 # ===========================
+# Local Working Memory
+# ===========================
+ARGUS_MEMORY.md
+
+# ===========================
 # Xcode
 # ===========================
 ## Build artifacts
