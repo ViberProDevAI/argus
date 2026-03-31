@@ -454,7 +454,44 @@ final class PortfolioStore: ObservableObject {
             exitOrionSnapshot: nil
         )
         TradeLogStore.shared.append(tradeLog)
-        
+
+        // Öğrenme sistemlerine geri besleme — trade kapanınca hepsini tetikle
+        let _symbol       = trade.symbol
+        let _pnlAbsolute  = pnl
+        let _pnlPercent   = trade.profitPercentage
+        let _entryPrice   = trade.entryPrice
+        let _exitPrice    = currentPrice
+        let _entryDate    = trade.entryDate
+        let _holdingDays  = Calendar.current.dateComponents([.day], from: trade.entryDate, to: Date()).day ?? 0
+
+        Task.detached(priority: .background) {
+            // 1. Chiron öğrenmesi — ağırlık optimizasyonu
+            let outcome: ChironLearningSystem.TradeExperience.TradeOutcome
+            if _pnlAbsolute > 0      { outcome = .winner }
+            else if _pnlAbsolute < 0 { outcome = .loser }
+            else                     { outcome = .scratch }
+
+            let weights = await ChironLearningSystem.shared.getCurrentState().weights
+            await ChironLearningSystem.shared.recordTrade(
+                symbol:        _symbol,
+                weights:       weights,
+                outcome:       outcome,
+                duration:      Date().timeIntervalSince(_entryDate),
+                profitPercent: _pnlPercent
+            )
+
+            // 2. TradeBrain öğrenmesi
+            await AutoPilotStore.shared.triggerLearningForClosedTrade(
+                symbol:      _symbol,
+                entryPrice:  _entryPrice,
+                exitPrice:   _exitPrice,
+                holdingDays: _holdingDays
+            )
+
+            // 3. Alkindus olgunlaşma — yeni veri geldi, bekleyen kararları değerlendir
+            await AlkindusCalibrationEngine.shared.periodicMatureCheck()
+        }
+
         // Log Transaction
         var transaction = Transaction(
             id: UUID(),

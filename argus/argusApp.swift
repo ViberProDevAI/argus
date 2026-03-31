@@ -137,6 +137,11 @@ struct argusApp: App {
         Self.maturationTimer?.invalidate()
 
         Task.detached(priority: .background) {
+            // Chiron: geçmiş işlemlerden öğren (soğuk başlangıç kurtarma)
+            await ChironLearningSystem.shared.bootstrapFromHistory()
+        }
+
+        Task.detached(priority: .background) {
             do {
                 try await Task.sleep(nanoseconds: 15_000_000_000)
                 await AlkindusCalibrationEngine.shared.periodicMatureCheck()

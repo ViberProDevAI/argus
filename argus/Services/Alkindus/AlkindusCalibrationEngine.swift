@@ -66,15 +66,16 @@ actor AlkindusCalibrationEngine {
             return prices
         }
 
-        guard !currentPrices.isEmpty else {
-            print("Alkindus: Fiyat verisi henuz yok, 5 dakika sonra tekrar denenecek - maturation atlanıyor")
-            // Note: Could optionally schedule a retry here in the future
-            return
+        // Fiyatı olan kararlar değerlendirilir, olmayanlar atlanır — processMaturedDecisions her
+        // sembol için ayrı kontrol yapıyor (line 96: guard let currentPrice). Eski guard burada
+        // HİÇBİR kararın değerlendirilmesini engelliyordu; kaldırıldı.
+        if currentPrices.isEmpty {
+            print("⚠️ Alkindus: Fiyat verisi henüz yok — olgun kararlar sonraki turda değerlendirilecek")
         }
 
         let evaluatedCount = await processMaturedDecisions(currentPrices: currentPrices)
         let remainingCount = await memoryStore.loadPendingObservations().count
-        print("✅ Alkindus: Maturation check tamamlandı - \(evaluatedCount) değerlendirildi, \(remainingCount) pending")
+        print("✅ Alkindus: Maturation check tamamlandı — \(evaluatedCount) değerlendirildi, \(remainingCount) bekliyor")
     }
 
     // MARK: - Process Matured Decisions (Called periodically)

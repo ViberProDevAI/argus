@@ -101,6 +101,51 @@ actor ChironLearningSystem {
     func getCurrentState() -> LearningState {
         return currentState
     }
+
+    /// Uygulama başlangıcında disk'teki geçmiş işlemleri yükleyerek sistemi uyandırır.
+    /// experienceHistory boşsa (yani soğuk başlangıç) TradeLogStore'u tarar ve
+    /// her kapanan işlemi sanki yeni öğrenilmiş gibi history'ye ekler.
+    func bootstrapFromHistory() async {
+        guard experienceHistory.isEmpty else { return }
+
+        let logs = TradeLogStore.shared.fetchLogs()
+        guard !logs.isEmpty else {
+            print("🧠 CHIRON: Geçmiş işlem bulunamadı, bootstrap atlanıyor")
+            return
+        }
+
+        print("🧠 CHIRON: \(logs.count) geçmiş işlemden öğreniliyor...")
+
+        for log in logs {
+            let outcome: TradeExperience.TradeOutcome
+            if log.pnlAbsolute > 0      { outcome = .winner }
+            else if log.pnlAbsolute < 0 { outcome = .loser }
+            else                        { outcome = .scratch }
+
+            experienceHistory.append(TradeExperience(
+                timestamp:     log.date,
+                symbol:        log.symbol,
+                weights:       currentState.weights,
+                outcome:       outcome,
+                duration:      0,
+                profitPercent: log.pnlPercent
+            ))
+        }
+
+        // History doldu, şimdi ağırlıkları ve sağlığı güncelle
+        await updateHealthScore()
+        await updateRegime()
+
+        currentState = LearningState(
+            weights:           currentState.weights,
+            regime:            currentState.regime,
+            regimeConfidence:  currentState.regimeConfidence,
+            healthScore:       currentState.healthScore,
+            lastUpdated:       Date()
+        )
+
+        print("🧠 CHIRON: Bootstrap tamamlandı — \(experienceHistory.count) deneyim, sağlık: \(Int(currentState.healthScore))")
+    }
     
     func recordTrade(
         symbol: String,
