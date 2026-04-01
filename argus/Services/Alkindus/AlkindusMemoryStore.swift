@@ -15,6 +15,7 @@ actor AlkindusMemoryStore {
     
     private var calibrationPath: URL { basePath.appendingPathComponent("calibration.json") }
     private var pendingPath: URL { basePath.appendingPathComponent("pending_observations.json") }
+    private var verdictsPath: URL { basePath.appendingPathComponent("alkindus_verdicts.json") }
     
     private init() {
         // Ensure directory exists
@@ -53,6 +54,33 @@ actor AlkindusMemoryStore {
         if let encoded = try? JSONEncoder().encode(observations) {
             try? encoded.write(to: pendingPath)
         }
+    }
+
+    // MARK: - Verdicts (Post-Mortem Results)
+
+    func loadVerdicts() async -> [AlkindusVerdict] {
+        guard let data = try? Data(contentsOf: verdictsPath),
+              let decoded = try? JSONDecoder().decode([AlkindusVerdict].self, from: data) else {
+            return []
+        }
+        return decoded
+    }
+
+    func saveVerdict(_ verdict: AlkindusVerdict) async {
+        var verdicts = await loadVerdicts()
+        verdicts.append(verdict)
+        // Keep latest 200 verdicts
+        if verdicts.count > 200 {
+            verdicts = Array(verdicts.suffix(200))
+        }
+        if let encoded = try? JSONEncoder().encode(verdicts) {
+            try? encoded.write(to: verdictsPath)
+        }
+    }
+
+    func loadVerdicts(for symbol: String) async -> [AlkindusVerdict] {
+        let all = await loadVerdicts()
+        return all.filter { $0.symbol == symbol }.sorted { $0.evaluationDate > $1.evaluationDate }
     }
 
     /// Atomically appends a new observation to pending list (prevents race conditions)
@@ -283,6 +311,53 @@ struct RegimeInsight: Codable {
         guard attempts > 0 else { return 0 }
         return Double(correct) / Double(attempts)
     }
+}
+
+// MARK: - Alkindus Verdict (Post-Mortem)
+
+struct AlkindusVerdict: Codable, Identifiable {
+    let id: UUID
+    let symbol: String
+    let action: String          // "BUY" / "SELL"
+    let decisionDate: Date
+    let evaluationDate: Date
+    let horizon: Int            // 7 or 15
+    let wasCorrect: Bool
+    let priceChange: Double     // % change (e.g. +4.2 or -8.3)
+    let regime: String
+    let moduleVerdicts: [ModuleVerdict]
+    let originalReasoning: String
+
+    init(
+        symbol: String,
+        action: String,
+        decisionDate: Date,
+        evaluationDate: Date = Date(),
+        horizon: Int,
+        wasCorrect: Bool,
+        priceChange: Double,
+        regime: String,
+        moduleVerdicts: [ModuleVerdict],
+        originalReasoning: String
+    ) {
+        self.id = UUID()
+        self.symbol = symbol
+        self.action = action
+        self.decisionDate = decisionDate
+        self.evaluationDate = evaluationDate
+        self.horizon = horizon
+        self.wasCorrect = wasCorrect
+        self.priceChange = priceChange
+        self.regime = regime
+        self.moduleVerdicts = moduleVerdicts
+        self.originalReasoning = originalReasoning
+    }
+}
+
+struct ModuleVerdict: Codable {
+    let module: String
+    let score: Double
+    let wasCorrect: Bool
 }
 
 struct PendingObservation: Codable, Identifiable {

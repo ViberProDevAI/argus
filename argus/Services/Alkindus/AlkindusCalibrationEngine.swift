@@ -161,17 +161,34 @@ actor AlkindusCalibrationEngine {
 
                 // Post-mortem: her modülün tezi tutup tutmadığını belirle ve RAG'e kaydet
                 let priceChange = ((currentPrice - observation.priceAtDecision) / max(observation.priceAtDecision, 0.0001)) * 100
-                let isBullish = observation.action == "BUY"
-                var moduleVerdicts: [String] = []
+                var moduleVerdictStructs: [ModuleVerdict] = []
+                var moduleVerdictStrings: [String] = []
                 for (module, score) in observation.moduleScores.sorted(by: { $0.key < $1.key }) {
                     let moduleBullish = score >= 50
                     let moduleCorrect = (moduleBullish && priceChange > 0) || (!moduleBullish && priceChange < 0)
-                    moduleVerdicts.append("\(module.uppercased()) \(Int(score)) \(moduleCorrect ? "✓" : "✗")")
+                    moduleVerdictStructs.append(ModuleVerdict(module: module, score: score, wasCorrect: moduleCorrect))
+                    moduleVerdictStrings.append("\(module.uppercased()) \(Int(score)) \(moduleCorrect ? "✓" : "✗")")
                 }
+
+                // Save structured verdict for UI display
+                let verdict = AlkindusVerdict(
+                    symbol: observation.symbol,
+                    action: observation.action,
+                    decisionDate: observation.decisionDate,
+                    evaluationDate: Date(),
+                    horizon: horizon,
+                    wasCorrect: wasCorrect,
+                    priceChange: priceChange,
+                    regime: observation.regime,
+                    moduleVerdicts: moduleVerdictStructs,
+                    originalReasoning: observation.reasoning.isEmpty ? "Gerekçe kaydedilmemiş" : observation.reasoning
+                )
+                await memoryStore.saveVerdict(verdict)
+
                 let outcomeText = """
                 T+\(horizon) gün sonuç: \(String(format: "%+.1f", priceChange))% | Tez \(wasCorrect ? "DOĞRU" : "YANLIŞ")
                 Rejim: \(observation.regime)
-                Modüller: \(moduleVerdicts.joined(separator: " · "))
+                Modüller: \(moduleVerdictStrings.joined(separator: " · "))
                 """
                 let obsReasoning = observation.reasoning.isEmpty ? "Gerekçe kaydedilmemiş" : observation.reasoning
                 let obsConfidence = (observation.moduleScores.values.reduce(0, +) / Double(max(observation.moduleScores.count, 1))) / 100

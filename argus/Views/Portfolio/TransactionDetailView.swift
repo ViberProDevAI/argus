@@ -102,7 +102,12 @@ struct TransactionDetailView: View {
                         .padding(.horizontal)
                     }
                     
-                    // 3. Execution Detail
+                    // 3. Alkindus Post-Mortem (Satış işlemlerinde)
+                    if transaction.type == .sell {
+                        AlkindusVerdictSection(symbol: transaction.symbol)
+                    }
+
+                    // 4. Execution Detail
                     VStack(alignment: .leading, spacing: 16) {
                         Text("İşlem Detayları")
                             .font(.headline)
