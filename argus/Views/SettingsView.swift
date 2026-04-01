@@ -403,6 +403,9 @@ struct SettingsCortexView: View {
                         NavigationLink(destination: ArgusDataHealthView()) {
                             ArgusTerminalRow(label: "API GECIDI", value: "AYARLAR", icon: "server.rack", color: .indigo)
                         }
+                        NavigationLink(destination: ArgusIntelligenceDiagView()) {
+                            ArgusTerminalRow(label: "SISTEM ZEKASI TANISI", value: "INCELE", icon: "brain.head.profile", color: .purple)
+                        }
                     }
                     
                     TerminalSection(title: "SINIR AGI") {
