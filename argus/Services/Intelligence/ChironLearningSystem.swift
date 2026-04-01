@@ -144,6 +144,9 @@ actor ChironLearningSystem {
             lastUpdated:       Date()
         )
 
+        // Bootstrap ağırlıklarını da karar motoruna aktar
+        ChironRegimeEngine.shared.applyLearningWeights(currentState.weights)
+
         print("🧠 CHIRON: Bootstrap tamamlandı — \(experienceHistory.count) deneyim, sağlık: \(Int(currentState.healthScore))")
     }
     
@@ -187,6 +190,9 @@ actor ChironLearningSystem {
             lastUpdated: Date()
         )
         
+        // Öğrenilen ağırlıkları karar motoruna aktar — artık sonraki kararı etkiler
+        ChironRegimeEngine.shared.applyLearningWeights(currentState.weights)
+
         print("🧠 CHIRON: Trade recorded - \(symbol) (\(outcome.rawValue)) - New health: \(Int(currentState.healthScore))")
     }
     

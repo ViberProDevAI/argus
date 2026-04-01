@@ -125,7 +125,33 @@ final class ChironRegimeEngine: ObservableObject, @unchecked Sendable {
         self.dynamicConfig = config
         saveToDisk()
     }
-    
+
+    /// ChironLearningSystem'in RL ağırlıklarını karar motoruna aktarır.
+    /// recordTrade ve bootstrapFromHistory sonrası çağrılır — öğrenilen her şey artık gerçek kararlara yansır.
+    func applyLearningWeights(_ weights: ChironLearningSystem.OrionWeights) {
+        let w = weights.normalized
+        let newOrion = ChironOptimizationInput.OrionWeights(
+            trend:       w.trend,
+            momentum:    w.momentum,
+            relStrength: w.relativeStrength,
+            volatility:  w.volatility,
+            pullback:    max(0.03, w.structure * 0.15),
+            riskReward:  max(0.03, w.pattern * 0.15)
+        )
+        let existingArgus = dynamicConfig?.newArgusWeights ?? ChironOptimizationInput.ArgusWeights(
+            core:  ModuleWeights(atlas: 0.30, orion: 0.20, aether: 0.20, demeter: 0.10, phoenix: 0.10, hermes: 0.05, athena: 0.05),
+            pulse: ModuleWeights(atlas: 0.25, orion: 0.25, aether: 0.20, demeter: 0.10, phoenix: 0.10, hermes: 0.05, athena: 0.05)
+        )
+        let updated = ChironOptimizationOutput(
+            newArgusWeights:    existingArgus,
+            newOrionWeights:    newOrion,
+            perSymbolOverrides: dynamicConfig?.perSymbolOverrides,
+            learningNotes:      ["RL: \(Date().formatted(date: .abbreviated, time: .shortened))"]
+        )
+        loadDynamicWeights(updated)
+        print("🧠 Chiron RL→Karar: trend=\(String(format: "%.2f", w.trend)) mom=\(String(format: "%.2f", w.momentum)) rs=\(String(format: "%.2f", w.relativeStrength))")
+    }
+
     // MARK: - Persistence
     
     private func saveToDisk() {

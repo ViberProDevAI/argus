@@ -10,6 +10,7 @@ struct ArgusPerformanceDashboard: View {
     @State private var data: PerfData? = nil
     @State private var isLoading = true
     @State private var selectedPeriod: Period = .all
+    @State private var chironState: ChironLearningSystem.LearningState? = nil
 
     enum Period: String, CaseIterable {
         case last30 = "30 Gün"
@@ -46,6 +47,11 @@ struct ArgusPerformanceDashboard: View {
 
                         verdictTimelineCard(d)
                             .padding(.horizontal, 16)
+
+                        if let cs = chironState {
+                            chironWeightsCard(cs)
+                                .padding(.horizontal, 16)
+                        }
                     }
                 }
             }
@@ -328,6 +334,63 @@ struct ArgusPerformanceDashboard: View {
         }
     }
 
+    // MARK: - Chiron RL Weights Card
+
+    @ViewBuilder
+    private func chironWeightsCard(_ cs: ChironLearningSystem.LearningState) -> some View {
+        perfCard(title: "CHİRON RL AĞIRLIKLARI (AKTIF)", icon: "brain.filled.head.profile", color: .mint) {
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(cs.isHealthy ? Color.green : Color.orange)
+                        .frame(width: 7, height: 7)
+                    Text(cs.isHealthy ? "Karar motoruna bağlı ve etkili" : "Yeterli deneyim bekliyor")
+                        .font(.system(size: 12))
+                        .foregroundColor(cs.isHealthy ? .green : .orange)
+                    Spacer()
+                    Text("Sağlık: \(Int(cs.healthScore))/100")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(.gray)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+                .padding(.bottom, 10)
+
+                let w = cs.weights.normalized
+                let bars: [(String, Double)] = [
+                    ("Trend",        w.trend),
+                    ("Momentum",     w.momentum),
+                    ("Rel.Strength", w.relativeStrength),
+                    ("Yapı",         w.structure),
+                    ("Pattern",      w.pattern),
+                    ("Volatilite",   w.volatility),
+                ]
+                ForEach(bars, id: \.0) { name, value in
+                    HStack(spacing: 10) {
+                        Text(name)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.7))
+                            .frame(width: 88, alignment: .leading)
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 3).fill(Color.white.opacity(0.07)).frame(height: 5)
+                                RoundedRectangle(cornerRadius: 3).fill(Color.mint.opacity(0.8)).frame(width: geo.size.width * value, height: 5)
+                            }
+                        }
+                        .frame(height: 5)
+                        Text(String(format: "%.0f%%", value * 100))
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(.mint)
+                            .frame(width: 32, alignment: .trailing)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 5)
+                }
+                .padding(.bottom, 8)
+            }
+        }
+    }
+
     // MARK: - Common Components
 
     @ViewBuilder
@@ -402,9 +465,11 @@ struct ArgusPerformanceDashboard: View {
 
     private func reload() async {
         isLoading = true
+        async let cs = ChironLearningSystem.shared.getCurrentState()
         let verdicts = await AlkindusMemoryStore.shared.loadVerdicts()
         let cal = await AlkindusMemoryStore.shared.loadCalibration()
         let trades = TradeLogStore.shared.fetchLogs()
+        chironState = await cs
 
         let cutoff: Date? = {
             switch selectedPeriod {
