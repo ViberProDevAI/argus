@@ -44,7 +44,7 @@ actor ChironRegretEngine {
     private var regretRecords: [RegretRecord] = []
     
     private var regretFilePath: URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        FileManager.default.documentsURL
             .appendingPathComponent("ChironDataLake/regret_records.json")
     }
     

@@ -7,8 +7,7 @@ actor ReportEngine {
     static let shared = ReportEngine()
 
     private let storagePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("reports")
+        FileManager.default.documentsURL.appendingPathComponent("reports")
     }()
 
     private init() {

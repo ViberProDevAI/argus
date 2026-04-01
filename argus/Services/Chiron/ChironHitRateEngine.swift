@@ -119,7 +119,7 @@ actor ChironHitRateEngine {
         
         // Tüm trade dosyalarını tara
         let fm = FileManager.default
-        let tradesPath = fm.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let tradesPath = fm.documentsURL
             .appendingPathComponent("ChironDataLake/trades")
         
         if let files = try? fm.contentsOfDirectory(atPath: tradesPath.path) {
@@ -212,7 +212,7 @@ actor ChironHitRateEngine {
         var matrix: [String: [String: Double]] = [:]
         
         let fm = FileManager.default
-        let tradesPath = fm.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let tradesPath = fm.documentsURL
             .appendingPathComponent("ChironDataLake/trades")
         
         if let files = try? fm.contentsOfDirectory(atPath: tradesPath.path) {

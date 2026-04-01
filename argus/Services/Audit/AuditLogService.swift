@@ -11,8 +11,7 @@ actor AuditLogService {
     
     private let fileManager = FileManager.default
     private nonisolated var auditDirectory: URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("AuditLogs", isDirectory: true)
+        FileManager.default.documentsURL.appendingPathComponent("AuditLogs", isDirectory: true)
     }
     
     private init() {

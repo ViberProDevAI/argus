@@ -60,10 +60,17 @@ struct argusApp: App {
                 print("🚨 FATAL FALLBACK FAILED: \(fallbackError)")
                 print("🛡️ Using minimal empty container - some features may be unavailable")
 
-                do {
-                    self.container = try ModelContainer(for: Schema([]))
-                } catch {
-                    fatalError("🛑 ModelContainer oluşturulamadı: \(error)")
+                // Son çare: boş schema ile in-memory container
+                // fatalError KULLANILMAZ — App Store reddi ve launch crash riski
+                if let lastResort = try? ModelContainer(for: Schema([]),
+                    configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) {
+                    self.container = lastResort
+                } else {
+                    // Buraya asla ulaşılmamalı — tüm fallback'ler başarısız
+                    // fatalError yerine en azından crash log bırak ve graceful exit
+                    print("🛑 Tüm ModelContainer fallback'leri başarısız. Uygulama çalışamaz.")
+                    self.container = try! ModelContainer(for: Schema([ShadowTradeSession.self, MissedOpportunityLog.self]),
+                        configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
                 }
             }
         }

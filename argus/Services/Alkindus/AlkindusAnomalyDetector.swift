@@ -8,8 +8,7 @@ actor AlkindusAnomalyDetector {
     static let shared = AlkindusAnomalyDetector()
     
     private let filePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("alkindus_memory").appendingPathComponent("rolling_stats.json")
+        FileManager.default.documentsURL.appendingPathComponent("alkindus_memory").appendingPathComponent("rolling_stats.json")
     }()
     
     private init() {

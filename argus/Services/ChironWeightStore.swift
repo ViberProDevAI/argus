@@ -80,8 +80,7 @@ final class ChironWeightStore {
     
     // Persistence path
     private let storePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("ChironWeights.json")
+        FileManager.default.documentsURL.appendingPathComponent("ChironWeights.json")
     }()
     
     init() {

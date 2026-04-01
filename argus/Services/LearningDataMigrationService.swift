@@ -49,7 +49,7 @@ class LearningDataMigrationService {
     private let fileManager = FileManager.default
 
     private var docsPath: URL {
-        fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        fileManager.documentsURL
     }
 
     // MARK: - EXPORT (Eski uygulamada çalışır)

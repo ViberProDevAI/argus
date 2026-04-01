@@ -254,8 +254,7 @@ final class AlkindusEventProcessor {
         )
         
         if let data = try? JSONEncoder().encode(summary) {
-            let docsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            let summaryPath = docsPath.appendingPathComponent("alkindus_learning_summary.json")
+            let summaryPath = FileManager.default.documentsURL.appendingPathComponent("alkindus_learning_summary.json")
             try? data.write(to: summaryPath)
         }
     }

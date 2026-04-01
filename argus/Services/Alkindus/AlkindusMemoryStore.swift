@@ -9,8 +9,7 @@ actor AlkindusMemoryStore {
     
     // MARK: - Paths
     private let basePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("alkindus_memory")
+        FileManager.default.documentsURL.appendingPathComponent("alkindus_memory")
     }()
     
     private var calibrationPath: URL { basePath.appendingPathComponent("calibration.json") }

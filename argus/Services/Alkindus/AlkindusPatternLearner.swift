@@ -8,8 +8,7 @@ final class AlkindusPatternLearner {
     static let shared = AlkindusPatternLearner()
     
     private let filePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("alkindus_memory").appendingPathComponent("pattern_learnings.json")
+        FileManager.default.documentsURL.appendingPathComponent("alkindus_memory").appendingPathComponent("pattern_learnings.json")
     }()
     
     private init() {

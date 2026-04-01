@@ -12,8 +12,7 @@ actor ReportScheduler {
     private var isRunning = false
 
     private let storagePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("report_schedule")
+        FileManager.default.documentsURL.appendingPathComponent("report_schedule")
     }()
 
     private init() {

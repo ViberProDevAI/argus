@@ -13,13 +13,11 @@ actor ChironCouncilLearningService {
     
     // Persistence
     private let recordsPath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("ChironCouncilRecords.json")
+        FileManager.default.documentsURL.appendingPathComponent("ChironCouncilRecords.json")
     }()
-    
+
     private let councilWeightsPath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("ChironCouncilWeights.json")
+        FileManager.default.documentsURL.appendingPathComponent("ChironCouncilWeights.json")
     }()
     
     // symbol -> engine -> weights
