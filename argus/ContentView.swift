@@ -1,7 +1,13 @@
 import SwiftUI
 
+// MİMARİ NOT:
+// coordinator (@EnvironmentObject AppStateCoordinator) → yeni kod için TEK GİRİŞ NOKTASI
+// viewModel  (@EnvironmentObject TradingViewModel)      → LEGACY, yalnızca geriye dönük uyumluluk
+// Yeni view'lar: @EnvironmentObject var coordinator: AppStateCoordinator kullanır
+// Eski view'lar: viewModel.X → zamanla coordinator.X'e migrate edilecek
 struct ContentView: View {
-    @EnvironmentObject var viewModel: TradingViewModel
+    @EnvironmentObject var viewModel: TradingViewModel   // LEGACY — migrate to coordinator
+    @EnvironmentObject var coordinator: AppStateCoordinator // PRIMARY
     @StateObject private var deepLinkManager = DeepLinkManager.shared
     @StateObject private var router = NavigationRouter.shared
     @StateObject private var settingsViewModel = SettingsViewModel()
