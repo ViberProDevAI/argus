@@ -295,8 +295,9 @@ struct PendingObservation: Codable, Identifiable {
     let priceAtDecision: Double
     let horizons: [Int] // [7, 15]
     var evaluatedHorizons: [Int] // Horizons already evaluated
-    
-    init(symbol: String, decisionDate: Date, action: String, moduleScores: [String: Double], regime: String, priceAtDecision: Double, horizons: [Int] = [7, 15], evaluatedHorizons: [Int] = []) {
+    let reasoning: String // Konseyin karar anındaki gerekçesi
+
+    init(symbol: String, decisionDate: Date, action: String, moduleScores: [String: Double], regime: String, priceAtDecision: Double, horizons: [Int] = [7, 15], evaluatedHorizons: [Int] = [], reasoning: String = "") {
         self.id = UUID()
         self.symbol = symbol
         self.decisionDate = decisionDate
@@ -306,6 +307,7 @@ struct PendingObservation: Codable, Identifiable {
         self.priceAtDecision = priceAtDecision
         self.horizons = horizons
         self.evaluatedHorizons = evaluatedHorizons
+        self.reasoning = reasoning
     }
     
     // Check if a horizon is ready to be evaluated

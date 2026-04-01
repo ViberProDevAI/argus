@@ -490,6 +490,21 @@ final class PortfolioStore: ObservableObject {
 
             // 3. Alkindus olgunlaşma — yeni veri geldi, bekleyen kararları değerlendir
             await AlkindusCalibrationEngine.shared.periodicMatureCheck()
+
+            // 4. RAG — tamamlanan trade'i vektör hafızasına kaydet
+            // Gelecekte benzer sembol/koşul sorgulanırsa bu trade örnek olarak çekilir
+            await AlkindusRAGEngine.shared.syncChironTrade(
+                id: UUID().uuidString,
+                symbol: _symbol,
+                engine: "PORTFOLIO",
+                entryPrice: _entryPrice,
+                exitPrice: _exitPrice,
+                pnlPercent: _pnlPercent,
+                holdingDays: _holdingDays,
+                orionScore: nil,
+                atlasScore: nil,
+                regime: ChironRegimeEngine.shared.globalResult.regime.rawValue
+            )
         }
 
         // Log Transaction

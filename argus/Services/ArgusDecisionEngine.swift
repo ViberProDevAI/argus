@@ -528,7 +528,8 @@ struct ArgusDecisionEngine {
                     "phoenix": phoenixOp.score
                 ],
                 regime: chironResult.regime.rawValue,
-                currentPrice: marketData?.price ?? 0
+                currentPrice: marketData?.price ?? 0,
+                reasoning: rationale
             )
         }
         

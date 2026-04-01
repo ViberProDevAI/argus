@@ -19,11 +19,12 @@ actor AlkindusCalibrationEngine {
         action: String,
         moduleScores: [String: Double],
         regime: String,
-        currentPrice: Double
+        currentPrice: Double,
+        reasoning: String = ""
     ) async {
         // Skip HOLD/ABSTAIN - only track actionable decisions
         guard action == "BUY" || action == "SELL" else { return }
-        
+
         let observation = PendingObservation(
             symbol: symbol,
             decisionDate: Date(),
@@ -31,7 +32,8 @@ actor AlkindusCalibrationEngine {
             moduleScores: moduleScores,
             regime: regime,
             priceAtDecision: currentPrice,
-            horizons: [7, 15]
+            horizons: [7, 15],
+            reasoning: reasoning
         )
 
         // Use atomic append to prevent race conditions between observe() calls
@@ -153,9 +155,35 @@ actor AlkindusCalibrationEngine {
                 // Mark this horizon as evaluated
                 observation.evaluatedHorizons.append(horizon)
                 evaluatedCount += 1
-                
+
                 let result = wasCorrect ? "✅ DOĞRU" : "❌ YANLIŞ"
                 print("👁️ Alkindus: T+\(horizon) değerlendirme - \(observation.symbol) \(result)")
+
+                // Post-mortem: her modülün tezi tutup tutmadığını belirle ve RAG'e kaydet
+                let priceChange = ((currentPrice - observation.priceAtDecision) / max(observation.priceAtDecision, 0.0001)) * 100
+                let isBullish = observation.action == "BUY"
+                var moduleVerdicts: [String] = []
+                for (module, score) in observation.moduleScores.sorted(by: { $0.key < $1.key }) {
+                    let moduleBullish = score >= 50
+                    let moduleCorrect = (moduleBullish && priceChange > 0) || (!moduleBullish && priceChange < 0)
+                    moduleVerdicts.append("\(module.uppercased()) \(Int(score)) \(moduleCorrect ? "✓" : "✗")")
+                }
+                let outcomeText = """
+                T+\(horizon) gün sonuç: \(String(format: "%+.1f", priceChange))% | Tez \(wasCorrect ? "DOĞRU" : "YANLIŞ")
+                Rejim: \(observation.regime)
+                Modüller: \(moduleVerdicts.joined(separator: " · "))
+                """
+                let obsReasoning = observation.reasoning.isEmpty ? "Gerekçe kaydedilmemiş" : observation.reasoning
+                let obsConfidence = (observation.moduleScores.values.reduce(0, +) / Double(max(observation.moduleScores.count, 1))) / 100
+                Task.detached(priority: .background) {
+                    await AlkindusRAGEngine.shared.syncDecision(
+                        symbol: observation.symbol,
+                        action: observation.action,
+                        confidence: obsConfidence,
+                        reasoning: obsReasoning,
+                        outcome: outcomeText
+                    )
+                }
             }
             
             pending[i] = observation
