@@ -406,6 +406,9 @@ struct SettingsCortexView: View {
                         NavigationLink(destination: ArgusIntelligenceDiagView()) {
                             ArgusTerminalRow(label: "SISTEM ZEKASI TANISI", value: "INCELE", icon: "brain.head.profile", color: .purple)
                         }
+                        NavigationLink(destination: ArgusPerformanceDashboard()) {
+                            ArgusTerminalRow(label: "PERFORMANS PANELI", value: "INCELE", icon: "chart.bar.xaxis", color: .green)
+                        }
                     }
                     
                     TerminalSection(title: "SINIR AGI") {
