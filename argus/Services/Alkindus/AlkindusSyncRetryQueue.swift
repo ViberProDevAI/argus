@@ -22,7 +22,9 @@ actor AlkindusSyncRetryQueue {
     // MARK: - Properties
 
     private var queue: [FailedSync] = []
-    private let maxRetries = 3
+    private let maxRetries = 10       // ~10 uygulama açılımı boyunca korur
+    private let maxQueueSize = 500    // Pinecone kalıcı down olursa sonsuz büyümeyi önler
+    private let expiryDays: Double = 30 // 30 günden eski başarısız sync'leri temizle
 
     // Fix #1: Safe file path with guard let instead of force-unwrap
     private let queuePath: URL? = {
@@ -57,9 +59,30 @@ actor AlkindusSyncRetryQueue {
     /// Add a failed sync to the retry queue
     func enqueue(_ sync: FailedSync) async {
         await ensureLoaded()
+
+        // Süresi dolmuş eski kayıtları temizle
+        purgeExpiredItems()
+
+        // Queue doluysa en eski başarısız olanı çıkar
+        if queue.count >= maxQueueSize {
+            queue.removeFirst()
+            print("Warning: Alkindus RAG: Queue cap reached, oldest item dropped")
+        }
+
         queue.append(sync)
         await saveToDisk()
         print("Warning: Alkindus RAG: Sync added to queue (\(queue.count) pending)")
+    }
+
+    /// 30 günden eski ve max retry'a ulaşmış öğeleri temizle
+    private func purgeExpiredItems() {
+        let cutoff = Date().addingTimeInterval(-expiryDays * 86400)
+        let before = queue.count
+        queue.removeAll { $0.failedAt < cutoff }
+        let removed = before - queue.count
+        if removed > 0 {
+            print("Info: Alkindus RAG: Purged \(removed) expired sync item(s)")
+        }
     }
 
     /// Process all queued syncs with retry logic
