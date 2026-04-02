@@ -11,6 +11,14 @@ struct RiskBudgetConfig: Sendable {
     
     // Time Limits
     nonisolated static let cooldownMinutes: Double = 30 // Min minutes between trades on same symbol
+
+    // Regime thresholds (Aether)
+    nonisolated static let deepRiskOffMaxScore: Double = 25
+    nonisolated static let riskOffMaxScore: Double = 40
+
+    // Forced unwind settings
+    nonisolated static let deepRiskOffTrimPercent: Double = 50
+    nonisolated static let riskOffTrimPercent: Double = 25
     
     // Dynamic Risk Ceiling
     // Aether >= 70 (Boğa)   -> 10R rahat ama sınırlı

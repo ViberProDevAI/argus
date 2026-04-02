@@ -36,13 +36,13 @@ final class AutoPilotStore: ObservableObject {
     // MARK: - Loop Management
     
     func startAutoPilotLoop() {
-        print("🤖 AutoPilotStore: Starting Loop...")
+        ArgusLogger.info("AutoPilotStore: Starting Loop...", category: "OTOPİLOT")
         self.isAutoPilotEnabled = true // Force enable explicitly
         startTimer()
     }
     
     func stopAutoPilotLoop() {
-        print("🤖 AutoPilotStore: Stopping Loop...")
+        ArgusLogger.info("AutoPilotStore: Stopping Loop...", category: "OTOPİLOT")
         autoPilotTimer?.invalidate()
         autoPilotTimer = nil
     }
@@ -58,9 +58,9 @@ final class AutoPilotStore: ObservableObject {
     private func startTimer() {
         autoPilotTimer?.invalidate()
         
-        print("🚀 AutoPilotStore: Timer başlatılıyor...")
-        print("📊 AutoPilotStore: isAutoPilotEnabled = \(isAutoPilotEnabled)")
-        print("📋 AutoPilotStore: Watchlist count = \(WatchlistStore.shared.items.count)")
+        ArgusLogger.info("AutoPilotStore: Timer başlatılıyor...", category: "OTOPİLOT")
+        ArgusLogger.info("AutoPilotStore: isAutoPilotEnabled = \(isAutoPilotEnabled)", category: "OTOPİLOT")
+        ArgusLogger.info("AutoPilotStore: Watchlist count = \(WatchlistStore.shared.items.count)", category: "OTOPİLOT")
         
         autoPilotTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
             Task { [weak self] in
@@ -78,7 +78,7 @@ final class AutoPilotStore: ObservableObject {
     func runAutoPilot() async {
         guard isAutoPilotEnabled else { return }
         
-        print("🔄 AutoPilotStore: runAutoPilot başlatılıyor...")
+        ArgusLogger.info("AutoPilotStore: runAutoPilot başlatılıyor...", category: "OTOPİLOT")
         
         let symbols = WatchlistStore.shared.items
         
@@ -92,9 +92,9 @@ final class AutoPilotStore: ObservableObject {
         let equity = portfolioStore.getGlobalEquity(quotes: simpleQuotes)
         let bistEquity = portfolioStore.getBistEquity(quotes: simpleQuotes)
         
-        print("💰 AutoPilotStore: Bakiye - Global: $\(balance), BIST: ₺\(bistBalance)")
-        print("💎 AutoPilotStore: Equity - Global: $\(equity), BIST: ₺\(bistEquity)")
-        print("📋 AutoPilotStore: \(symbols.count) sembol taranacak...")
+        ArgusLogger.info("AutoPilotStore: Bakiye - Global: $\(balance), BIST: ₺\(bistBalance)", category: "OTOPİLOT")
+        ArgusLogger.info("AutoPilotStore: Equity - Global: $\(equity), BIST: ₺\(bistEquity)", category: "OTOPİLOT")
+        ArgusLogger.info("AutoPilotStore: \(symbols.count) sembol taranacak...", category: "OTOPİLOT")
         
         // Build Portfolio Map
         var portfolioMap: [String: Trade] = [:]
@@ -138,7 +138,7 @@ final class AutoPilotStore: ObservableObject {
                 let combinedLogs = logs + self.scoutLogs
                 self.scoutLogs = Array(combinedLogs.prefix(100))
                 
-                print("♻️ AutoPilotStore: Updated with \(logs.count) new logs.")
+                ArgusLogger.info("AutoPilotStore: Updated with \(logs.count) new logs.", category: "OTOPİLOT")
                 
                 // Process Buy Signals -> Grand Council -> Executor
                 self.processSignals(signals)
@@ -151,14 +151,14 @@ final class AutoPilotStore: ObservableObject {
                     .sorted()
                     .prefix(5)
                     .joined(separator: " | ")
-                print("🟡 AUTOPILOT-SKIP-SUMMARY: \(topReasons)")
+                ArgusLogger.warn("AUTOPILOT-SKIP-SUMMARY: \(topReasons)", category: "OTOPİLOT")
                 
                 for item in skipLogs.prefix(12) {
-                    print("🟡 AUTOPILOT-SKIP-DETAIL: \(item.symbol) -> [\(item.status)] \(item.reason)")
+                    ArgusLogger.warn("AUTOPILOT-SKIP-DETAIL: \(item.symbol) -> [\(item.status)] \(item.reason)", category: "OTOPİLOT")
                 }
             }
         } else {
-            print("⚠️ AutoPilotStore: Hiç sinyal veya log yok!")
+            ArgusLogger.warn("AutoPilotStore: Hiç sinyal veya log yok!", category: "OTOPİLOT")
         }
     }
     
@@ -167,7 +167,7 @@ final class AutoPilotStore: ObservableObject {
     func analyzeDiscoveryCandidates(_ tickers: [String], source: NewsInsight) async {
         // Simple forward pass to logic if needed, or implement full logic here.
         // For now, we print to show connected.
-        print("🤖 AutoPilotStore: Discovery Analysis for \(tickers.count) candidates from \(source.headline)")
+        ArgusLogger.info("AutoPilotStore: Discovery Analysis for \(tickers.count) candidates from \(source.headline)", category: "OTOPİLOT")
         // Implementation Todo: Move full logic from TVM if complex, or keep shim.
         // Given Phase C requires extraction, we should implement logic eventually.
         // For now, implementing basic loop to satisfy compilation of call from TVM
@@ -175,18 +175,48 @@ final class AutoPilotStore: ObservableObject {
 
     func handleAutoPilotIntent(_ notification: Notification) {
         // Basic Intent Handling (Stub)
-        print("🤖 AutoPilotStore: Intent Received")
+        ArgusLogger.info("AutoPilotStore: Intent Received", category: "OTOPİLOT")
     }
 
     @MainActor
     private func processSignals(_ signals: [TradeSignal]) {
-        print("🔍 AutoPilotStore: Toplam \(signals.count) sinyal işleniyor...")
-        print("📊 Sinyal detayları: \(signals.map { "\($0.symbol): \($0.action)" })")
+        ArgusLogger.info("AutoPilotStore: Toplam \(signals.count) sinyal işleniyor...", category: "OTOPİLOT")
+        ArgusLogger.info("Sinyal detayları: \(signals.map { "\($0.symbol): \($0.action)" })", category: "OTOPİLOT")
         
         Task {
             var decisionsForExecution: [String: ArgusGrandDecision] = [:]
             var buyCount = 0
-            for signal in signals where signal.action == .buy {
+            for signal in signals {
+                if signal.action == .sell {
+                    if let openTrade = self.portfolioStore.trades.first(where: { $0.isOpen && $0.symbol == signal.symbol }),
+                       let currentPrice = MarketDataStore.shared.liveQuotes[signal.symbol]?.currentPrice {
+                        if let trim = signal.trimPercentage, trim > 0, trim < 1 {
+                            let trimPercent = max(1, min(trim * 100, 99))
+                            _ = self.portfolioStore.trim(
+                                tradeId: openTrade.id,
+                                percentage: trimPercent,
+                                currentPrice: currentPrice,
+                                reason: "AUTOPILOT_SIGNAL_TRIM_\(Int(trimPercent))"
+                            )
+                            ArgusLogger.warn(
+                                "AutoPilotStore: SELL sinyali trim uyguladı -> \(signal.symbol) %\(Int(trimPercent))",
+                                category: "OTOPİLOT"
+                            )
+                        } else {
+                            _ = self.portfolioStore.sell(
+                                tradeId: openTrade.id,
+                                currentPrice: currentPrice,
+                                reason: "AUTOPILOT_SIGNAL_LIQUIDATE"
+                            )
+                            ArgusLogger.warn("AutoPilotStore: SELL sinyali tam çıkış uyguladı -> \(signal.symbol)", category: "OTOPİLOT")
+                        }
+                    } else {
+                        ArgusLogger.info("AutoPilotStore: SELL sinyali açık pozisyon bulamadı -> \(signal.symbol)", category: "OTOPİLOT")
+                    }
+                    continue
+                }
+
+                guard signal.action == .buy else { continue }
                 buyCount += 1
                 ArgusLogger.info(.autopilot, "💡 BUY sinyali bulundu: \(signal.symbol) - \(signal.reason)")
                 
@@ -225,11 +255,11 @@ final class AutoPilotStore: ObservableObject {
                 
                 SignalStateViewModel.shared.grandDecisions[signal.symbol] = decision
                 decisionsForExecution[signal.symbol] = decision
-                print("🏛️ AutoPilotStore: Grand Council Decision for \(signal.symbol): \(decision.action.rawValue)")
+                ArgusLogger.info("AutoPilotStore: Grand Council Decision for \(signal.symbol): \(decision.action.rawValue)", category: "OTOPİLOT")
             }
 
             if buyCount == 0 {
-                print("🟡 AutoPilotStore: Bu turda BUY sinyali çıkmadı.")
+                ArgusLogger.warn("AutoPilotStore: Bu turda BUY sinyali çıkmadı.", category: "OTOPİLOT")
             }
 
             // Açık pozisyonlardaki acil likidasyon kararlarını da yürütücüye taşı
@@ -241,7 +271,7 @@ final class AutoPilotStore: ObservableObject {
             }
 
             if decisionsForExecution.isEmpty {
-                print("⚠️ AutoPilotStore: Yürütülecek güncel karar yok (signals/open positions).")
+                ArgusLogger.warn("AutoPilotStore: Yürütülecek güncel karar yok (signals/open positions).", category: "OTOPİLOT")
             }
             
              // Execute Decisions (Trade Brain)
@@ -271,6 +301,7 @@ final class AutoPilotStore: ObservableObject {
                   quotes: simpleQuotes,
                   balance: self.portfolioStore.globalBalance,
                   bistBalance: self.portfolioStore.bistBalance,
+                  macroScore: MacroRegimeService.shared.getCachedRating()?.numericScore,
                   orionScores: orionScoresMap,
                   candles: candlesMap
               )
@@ -428,12 +459,12 @@ final class AutoPilotStore: ObservableObject {
             case .moveStopTo(_), .moveStopByPercent(_), .activateTrailingStop(_), .setBreakeven, .addPercent(_), .addFixed(_), .reevaluate, .doNothing:
                 // Bu aksiyonlar için Store tarafında güvenli mutasyon API'si eksik.
                 // Şimdilik adım işaretlenir, yalnızca bilgilendirme logu bırakılır.
-                print("ℹ️ AutoPilotStore: Plan aksiyonu loglandı, icra edilmedi -> \(trade.symbol): \(action.description)")
+                ArgusLogger.info("AutoPilotStore: Plan aksiyonu loglandı, icra edilmedi -> \(trade.symbol): \(action.description)", category: "OTOPİLOT")
             }
         }
 
         if triggeredCount > 0 {
-            print("🧠 AutoPilotStore: \(triggeredCount) plan tetikleyicisi işlendi.")
+            ArgusLogger.info("AutoPilotStore: \(triggeredCount) plan tetikleyicisi işlendi.", category: "OTOPİLOT")
         }
     }
     
@@ -447,7 +478,7 @@ final class AutoPilotStore: ObservableObject {
     // MARK: - Trade Brain 3.0 Learning Loop
     
     func runDailyLearningCycle() async {
-        print("Trade Brain 3.0: Gunluk ogrenme dongusu baslatiliyor...")
+        ArgusLogger.info("Trade Brain 3.0: Gunluk ogrenme dongusu baslatiliyor...", category: "OTOPİLOT")
         
         let learningService = TradeBrainLearningService.shared
         let confidenceCalibration = ConfidenceCalibrationService.shared
@@ -460,8 +491,8 @@ final class AutoPilotStore: ObservableObject {
         
         let calibrationStats = await confidenceCalibration.getOverallStats()
         
-        print("Trade Brain 3.0: \(processed) karar degerlendirildi, \(stats.pendingCount) bekleyen")
-        print("Trade Brain 3.0: Genel basari: %\(Int(calibrationStats.overallWinRate * 100))")
+        ArgusLogger.info("Trade Brain 3.0: \(processed) karar degerlendirildi, \(stats.pendingCount) bekleyen", category: "OTOPİLOT")
+        ArgusLogger.info("Trade Brain 3.0: Genel basari: %\(Int(calibrationStats.overallWinRate * 100))", category: "OTOPİLOT")
     }
     
     func triggerLearningForClosedTrade(
@@ -480,7 +511,7 @@ final class AutoPilotStore: ObservableObject {
             holdingDays: holdingDays
         )
         
-        print("Trade Brain 3.0: Kapali islem ogrenmesi - \(symbol) \(wasCorrect ? "KAR" : "ZARAR")")
+        ArgusLogger.info("Trade Brain 3.0: Kapali islem ogrenmesi - \(symbol) \(wasCorrect ? "KAR" : "ZARAR")", category: "OTOPİLOT")
     }
     
     private func getCurrentPricesForLearning() async -> [String: Double] {

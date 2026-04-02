@@ -342,10 +342,22 @@ final class ArgusAutoPilotEngine: Sendable {
         
         // 1. Data Quality
         let dqScore = calculateDataQuality(symbol: symbol, candles: candles, atlas: atlasScore, aether: aetherRating, hermes: hermesInsight)
+        let policy = RiskEscapePolicy.from(aetherScore: aetherRating?.numericScore ?? 50)
+        let isSafeSymbol = safeUniverse.getUniverseType(for: symbol).map {
+            switch $0 {
+            case .bond, .cashLike, .gold, .hedge: return true
+            default: return false
+            }
+        } ?? false
         
         // 2. Makro Kalkanı: Aether < 30 → kötü veya çöküş makro, alım yok
         if (aetherRating?.numericScore ?? 50) < 30 {
             return (nil, ScoutLog(symbol: symbol, status: "RED", reason: "Makro Kalkanı: Aether \(Int(aetherRating?.numericScore ?? 0))/100 < 30", score: overallScore))
+        }
+
+        if policy.blockRiskyBuys && !isSafeSymbol {
+            let reason = "Risk-Off policy aktif (\(policy.mode.rawValue)); riskli varlıkta yeni alım yasak."
+            return (nil, ScoutLog(symbol: symbol, status: "POLICY", reason: reason, score: overallScore))
         }
         
         // Context for Argus V3
@@ -407,7 +419,13 @@ final class ArgusAutoPilotEngine: Sendable {
                     let engine: AutoPilotEngine = isAggressive ? .corse : .pulse
                     
                     // Pozisyon boyutu hesapla
-                    let riskPerTrade = AutoPilotConfig.maxRiskPerTradeBase * multiplier
+                    let macroRiskMultiplier: Double
+                    switch policy.mode {
+                    case .deepRiskOff: macroRiskMultiplier = 0.20
+                    case .riskOff: macroRiskMultiplier = 0.45
+                    case .normal: macroRiskMultiplier = 1.0
+                    }
+                    let riskPerTrade = AutoPilotConfig.maxRiskPerTradeBase * multiplier * macroRiskMultiplier
                     let positionValue = equity * riskPerTrade
                     let quantity = positionValue / currentPrice
                     
@@ -428,7 +446,7 @@ final class ArgusAutoPilotEngine: Sendable {
                         trimPercentage: nil
                     )
                     
-                    print("🏛️ REFORM: Konsey kararı direkt uygulanıyor - \(gd.action.rawValue) for \(symbol)")
+                    ArgusLogger.info("KONSEY KARARI doğrudan uygulanıyor: \(gd.action.rawValue) for \(symbol)", category: "AUTOPILOT")
                     return (signal, ScoutLog(symbol: symbol, status: "ONAYLI", reason: reason, score: gd.confidence * 100))
                 }
             } else {
@@ -473,7 +491,7 @@ final class ArgusAutoPilotEngine: Sendable {
         let _ = (hermes?.confidence ?? 50) >= 40
         // Just log if missing, don't block
         if hermes == nil {
-            print("📰 Corse Entry: Hermes nil for \(symbol), proceeding without news confirmation")
+            ArgusLogger.info("Corse Entry: Hermes verisi yok, haber onayı olmadan devam", category: "AUTOPILOT")
         }
         
         // 6. Demeter (Sector) - Optional for now
@@ -562,7 +580,8 @@ final class ArgusAutoPilotEngine: Sendable {
         
         var aetherMult = 1.0
         if aetherScore >= 65 { aetherMult = 1.5 }
-        else if aetherScore < 40 { aetherMult = 0.3 }
+        else if aetherScore < 40 { aetherMult = 0.2 }
+        if aetherScore <= RiskBudgetConfig.deepRiskOffMaxScore { aetherMult = 0.05 }
         
         // 2. Effective Risk
         let baseRisk = AutoPilotConfig.maxRiskPerTradeBase * equity // e.g. $100 on $10k
@@ -581,7 +600,7 @@ final class ArgusAutoPilotEngine: Sendable {
             // SANITY CHECK: Prevent insane Stop Loss due to bad ATR
             // If stop is > 15% of price, clamp it.
             if stopDistance > (price * 0.15) {
-                print("⚠️ Argus Risk: ATR Limit Exceeded (\(String(format:"%.2f", stopDistance))). Clamping to 15%.")
+                ArgusLogger.warn("Argus Risk: ATR limiti aşıldı (\(String(format:"%.2f", stopDistance))). %15'e kırpılıyor.", category: "AUTOPILOT")
                 stopDistance = price * 0.15
             }
         } else {

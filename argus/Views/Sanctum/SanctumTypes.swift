@@ -203,6 +203,7 @@ enum SanctumModuleType: String, CaseIterable {
         case .athena: return "AthenaIcon"
         case .demeter: return "DemeterIcon"
         case .chiron: return "ChironIcon"
+        case .prometheus: return "PrometheusIcon"
         default: return nil
         }
     }
@@ -280,6 +281,7 @@ enum SanctumBistModuleType: String, CaseIterable {
         case .kulis: return "HermesIcon"               // Haber = Hermes
         case .faktor: return "AthenaIcon"              // Faktor = Athena
         case .sektor: return "DemeterIcon"             // Sektor = Demeter
+        case .vektor: return "PrometheusIcon"          // Prometheus = Vektor
         default: return nil
         }
     }
