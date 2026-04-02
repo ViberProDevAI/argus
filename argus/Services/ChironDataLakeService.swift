@@ -7,8 +7,7 @@ actor ChironDataLakeService {
     
     // MARK: - Data Paths
     private let basePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("ChironDataLake", isDirectory: true)
+        FileManager.default.documentsURL.appendingPathComponent("ChironDataLake", isDirectory: true)
     }()
     
     init() {

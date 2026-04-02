@@ -317,7 +317,24 @@ final class AutoPilotStore: ObservableObject {
     
     private func prepareSirkiyeInput(macro: MacroSnapshot) async -> SirkiyeEngine.SirkiyeInput? {
         let quotes = MarketDataStore.shared.liveQuotes
-        guard let usdQuote = quotes["USD/TRY"] else { return nil }
+        // USD/TRY birden fazla sembol adıyla gelebilir: "USD/TRY", "USDTRY=X" (Yahoo), "USDTRY"
+        guard let usdQuote = quotes["USD/TRY"] ?? quotes["USDTRY=X"] ?? quotes["USDTRY"] else {
+            // Fallback: bilinen sabit kur ile devam et (Sirkiye analizi degraded ama çalışır)
+            print("⚠️ AutoPilotStore: USD/TRY kuru bulunamadı, varsayılan kur ile devam ediliyor")
+            return SirkiyeEngine.SirkiyeInput(
+                usdTry: 35.0,
+                usdTryPrevious: 35.0,
+                dxy: macro.dxy,
+                brentOil: macro.brent,
+                globalVix: macro.vix,
+                newsSnapshot: nil,
+                currentInflation: 45.0,
+                policyRate: 50.0,
+                xu100Change: nil,
+                xu100Value: nil,
+                goldPrice: nil
+            )
+        }
 
         // BorsaPy'den canlı makro verileri paralel çek
         async let brentTask = { try? await BorsaPyProvider.shared.getBrentPrice() }()

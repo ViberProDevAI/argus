@@ -46,6 +46,17 @@ struct UnifiedPositionCard: View {
         Calendar.current.dateComponents([.day], from: trade.entryDate, to: Date()).day ?? 0
     }
 
+    private var conviction: ConvictionState? {
+        guard let decision else { return nil }
+        return ConvictionDecayEngine.compute(
+            councilConfidence: decision.confidence,
+            daysHeld: holdingDays,
+            pnlPercent: pnlPercent,
+            action: decision.action,
+            regime: ChironRegimeEngine.shared.lastResult?.regime
+        )
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             headerSection
@@ -66,7 +77,7 @@ struct UnifiedPositionCard: View {
                 noPlanSection
             }
 
-            if let delta {
+            if let delta, delta.significance != .low {
                 deltaBadgeSection(delta)
             }
 
@@ -197,53 +208,48 @@ struct UnifiedPositionCard: View {
     }
 
     private var decisionAndSignalSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let decision {
-                let education = decision.educationStage
+        VStack(alignment: .leading, spacing: 10) {
 
-                HStack {
+            // Konsey: action pill + aether stance — tek satır, sade
+            if let decision {
+                HStack(spacing: 6) {
+                    tagPill(text: decision.action.rawValue, color: actionColor(decision.action))
+                    tagPill(
+                        text: decision.aetherDecision.stance.rawValue,
+                        color: aetherColor(decision.aetherDecision.stance)
+                    )
+                    Spacer()
                     Text("Konsey")
                         .font(InstitutionalTheme.Typography.micro)
                         .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    Spacer()
-                    tagPill(text: education.badgeText, color: education.color)
-                    tagPill(text: decision.action.rawValue, color: actionColor(decision.action))
-                }
-
-                HStack(spacing: 8) {
-                    metricTag(title: "Güven", value: "%\(Int(decision.confidence * 100))")
-                    metricTag(
-                        title: "Aether",
-                        value: decision.aetherDecision.stance.rawValue,
-                        valueColor: aetherColor(decision.aetherDecision.stance)
-                    )
                 }
             }
 
-            if let chimeraSignal {
-                HStack(alignment: .top, spacing: 8) {
+            // Conviction Meter — Güven chip'in yerini alır, çok daha fazla bilgi taşır
+            if let cv = conviction {
+                ConvictionMeterView(conviction: cv)
+            }
+
+            // Chimera — yalnızca medium/high severity'de göster, tek satır kompakt
+            if let cs = chimeraSignal, cs.severity >= 0.35 {
+                HStack(spacing: 6) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(chimeraColor(chimeraSignal.type))
-                        .padding(.top, 2)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(chimeraSignal.title)
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(chimeraColor(chimeraSignal.type))
-                        Text(chimeraSignal.description)
-                            .font(InstitutionalTheme.Typography.micro)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                            .lineLimit(2)
-                    }
-                    Spacer()
-                    Text("%\(Int(chimeraSignal.severity * 100))")
+                        .font(.system(size: 10))
+                        .foregroundColor(chimeraColor(cs.type))
+                    Text(cs.title)
                         .font(InstitutionalTheme.Typography.micro)
-                        .foregroundColor(chimeraColor(chimeraSignal.type))
+                        .foregroundColor(chimeraColor(cs.type))
+                        .lineLimit(1)
+                    Spacer()
+                    Text("%\(Int(cs.severity * 100))")
+                        .font(InstitutionalTheme.Typography.micro)
+                        .foregroundColor(chimeraColor(cs.type))
                 }
-                .padding(10)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(
                     RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                        .fill(chimeraColor(chimeraSignal.type).opacity(0.12))
+                        .fill(chimeraColor(cs.type).opacity(0.10))
                 )
             }
         }
@@ -491,6 +497,12 @@ struct UnifiedPositionCard: View {
             }
         }
         return nil
+    }
+
+    // MARK: - Conviction Meter (inline helper)
+
+    private func convictionMeterView(_ cv: ConvictionState) -> some View {
+        ConvictionMeterView(conviction: cv)
     }
 
     private func triggerDistanceText(_ trigger: ActionTrigger, plan: PositionPlan) -> String? {

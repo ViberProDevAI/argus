@@ -110,7 +110,7 @@ final class ChironLearningJob {
         
         // Get all symbols with trade history
         let fm = FileManager.default
-        let tradesPath = fm.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let tradesPath = fm.documentsURL
             .appendingPathComponent("ChironDataLake/trades")
         
         guard let files = try? fm.contentsOfDirectory(at: tradesPath, includingPropertiesForKeys: nil) else {

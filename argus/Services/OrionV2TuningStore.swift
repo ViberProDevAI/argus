@@ -131,8 +131,7 @@ final class OrionV2TuningStore {
     private let fileURL: URL
     
     private init() {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        fileURL = docs.appendingPathComponent("orion_v2_tuning.json")
+        fileURL = FileManager.default.documentsURL.appendingPathComponent("orion_v2_tuning.json")
         loadFromDisk()
     }
     

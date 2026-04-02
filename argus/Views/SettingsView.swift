@@ -403,6 +403,12 @@ struct SettingsCortexView: View {
                         NavigationLink(destination: ArgusDataHealthView()) {
                             ArgusTerminalRow(label: "API GECIDI", value: "AYARLAR", icon: "server.rack", color: .indigo)
                         }
+                        NavigationLink(destination: ArgusIntelligenceDiagView()) {
+                            ArgusTerminalRow(label: "SISTEM ZEKASI TANISI", value: "INCELE", icon: "brain.head.profile", color: .purple)
+                        }
+                        NavigationLink(destination: ArgusPerformanceDashboard()) {
+                            ArgusTerminalRow(label: "PERFORMANS PANELI", value: "INCELE", icon: "chart.bar.xaxis", color: .green)
+                        }
                     }
                     
                     TerminalSection(title: "SINIR AGI") {
@@ -739,7 +745,7 @@ struct SettingsCodexView: View {
     
     private func exportForwardTests() {
         // Export the ArgusLedger SQLite database directly
-        let docsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let docsPath = FileManager.default.documentsURL
         let dbPath = docsPath.appendingPathComponent("ArgusScience_V1.sqlite")
         
         if FileManager.default.fileExists(atPath: dbPath.path) {
@@ -762,7 +768,7 @@ struct SettingsCodexView: View {
     
     private func exportDecisionEvents() {
         // Export ChironDataLake folder
-        let docsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let docsPath = FileManager.default.documentsURL
         let dataLakePath = docsPath.appendingPathComponent("chiron_datalake")
         
         if FileManager.default.fileExists(atPath: dataLakePath.path) {

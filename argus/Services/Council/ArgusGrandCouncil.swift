@@ -534,14 +534,27 @@ actor ArgusGrandCouncil {
         } else {
             // No Vetoes - Ağırlıklı Oylama Sistemi
 
-            // Modül ağırlıkları (Chiron tarafından dinamik olarak ayarlanabilir)
-            let moduleWeights: [String: Double] = [
-                "Orion": 0.35,       // Teknik analiz
-                "Orion Patterns": 0.10, // Formasyon tespiti
-                "Atlas": 0.25,       // Temel analiz
-                "Aether": 0.20,      // Makro ekonomi
-                "Hermes": 0.10       // Haber analizi
-            ]
+            // Modül ağırlıkları — Aether skoruna göre dinamik
+            // Boğa (≥65): teknik ağırlıklı | Nötr (40-65): makro ağırlığı artar | Ayı (<40): makro hakimiyeti
+            let councilAetherScore = MacroRegimeService.shared.getCachedRating()?.numericScore ?? 50
+            let moduleWeights: [String: Double]
+            switch councilAetherScore {
+            case 65...:
+                moduleWeights = [
+                    "Orion": 0.35, "Orion Patterns": 0.10,
+                    "Atlas": 0.25, "Aether": 0.20, "Hermes": 0.10
+                ]
+            case 40..<65:
+                moduleWeights = [
+                    "Orion": 0.28, "Orion Patterns": 0.08,
+                    "Atlas": 0.22, "Aether": 0.32, "Hermes": 0.10
+                ]
+            default:
+                moduleWeights = [
+                    "Orion": 0.18, "Orion Patterns": 0.07,
+                    "Atlas": 0.18, "Aether": 0.47, "Hermes": 0.10
+                ]
+            }
 
             // Ağırlıklı oyları hesapla
             var totalBuyWeight: Double = 0

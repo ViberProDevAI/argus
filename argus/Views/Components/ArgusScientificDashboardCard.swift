@@ -100,7 +100,7 @@ struct ArgusScientificDashboardCard: View {
         pendingHypotheses = await ArgusValidator.shared.getPendingHypotheses()
         
         // Diskten son sonuçları yükle (Manuel cache erişimi, basitlik için kopyalandı)
-        let resultsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let resultsPath = FileManager.default.documentsURL
             .appendingPathComponent("ArgusScientificResults.json")
         if let data = try? Data(contentsOf: resultsPath),
            let results = try? JSONDecoder().decode([ForwardTestResult].self, from: data) {

@@ -8,8 +8,7 @@ actor AlkindusInsightGenerator {
     static let shared = AlkindusInsightGenerator()
     
     private let filePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("alkindus_memory").appendingPathComponent("insights.json")
+        FileManager.default.documentsURL.appendingPathComponent("alkindus_memory").appendingPathComponent("insights.json")
     }()
     
     private init() {

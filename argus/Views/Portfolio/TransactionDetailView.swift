@@ -87,7 +87,7 @@ struct TransactionDetailView: View {
                                 .foregroundColor(.white)
                             
                             if let reason = transaction.reasonCode {
-                                Text(reason)
+                                Text(TransactionDetailView.humanizedReason(reason))
                                     .font(.body)
                                     .foregroundColor(.gray)
                                     .padding()
@@ -102,7 +102,12 @@ struct TransactionDetailView: View {
                         .padding(.horizontal)
                     }
                     
-                    // 3. Execution Detail
+                    // 3. Alkindus Post-Mortem (Satış işlemlerinde)
+                    if transaction.type == .sell {
+                        AlkindusVerdictSection(symbol: transaction.symbol)
+                    }
+
+                    // 4. Execution Detail
                     VStack(alignment: .leading, spacing: 16) {
                         Text("İşlem Detayları")
                             .font(.headline)
@@ -156,4 +161,18 @@ struct TransactionDetailView: View {
     }
 }
 
+// MARK: - Helpers
+extension TransactionDetailView {
+    static func humanizedReason(_ code: String) -> String {
+        switch code {
+        case "STOP_LOSS":             return "Stop Loss — Belirlenen stop seviyesinde otomatik satış gerçekleşti."
+        case "STOP_LOSS_RETROACTIVE": return "Stop Loss (Gecikmeli) — Uygulama kapalıyken fiyat stop seviyesini geçti. Satış, önceden belirlenen stop fiyatından gerçekleştirildi."
+        case "TAKE_PROFIT":           return "Kar Al — Belirlenen hedef fiyata ulaşıldı, otomatik satış gerçekleşti."
+        case "TAKE_PROFIT_RETROACTIVE": return "Kar Al (Gecikmeli) — Uygulama kapalıyken fiyat hedef seviyesini geçti. Satış, önceden belirlenen hedef fiyatından gerçekleştirildi."
+        default:                      return code
+        }
+    }
+}
+
 // Console Style History Row
+

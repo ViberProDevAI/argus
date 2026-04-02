@@ -21,12 +21,16 @@ struct RiskBudgetConfig: Sendable {
     nonisolated static let riskOffTrimPercent: Double = 25
     
     // Dynamic Risk Ceiling
-    // Aether Safe Mode: < 30 -> 1.5R
-    // Aether >= 50 -> UNLIMITED (20.0R) to allow Learning
+    // Aether >= 70 (Boğa)   -> 10R rahat ama sınırlı
+    // Aether >= 55 (Nötr)   ->  6R temkinli
+    // Aether >= 40 (Dikkat) ->  3R çok küçük
+    // Aether >= 25 (Kötü)   ->  1.5R minimal
+    // Aether  < 25 (Çöküş)  ->  0R yeni giriş yok
     nonisolated static func dynamicMaxRiskR(aetherScore: Double) -> Double {
-        if aetherScore <= deepRiskOffMaxScore { return 0.8 } // Hard defense
-        if aetherScore <= riskOffMaxScore { return 1.5 }     // Defensive
-        if aetherScore >= 50 { return 20.0 }                 // Learning mode
-        return 2.5                                            // Cautious
+        if aetherScore >= 70 { return 10.0 }   // Boğa: rahat ama sınırlı
+        if aetherScore >= 55 { return 6.0 }    // Nötr: temkinli
+        if aetherScore >= 40 { return 3.0 }    // Dikkat: çok küçük
+        if aetherScore >= 25 { return 1.5 }    // Kötü: minimal
+        return 0.0                             // Çöküş: yeni giriş yok
     }
 }

@@ -67,20 +67,27 @@ extension TradingViewModel {
         Task.detached(priority: .utility) { [weak self] in
             // 5 saniye bekle - Kullanıcı UI'ı görsün önce
             try? await Task.sleep(nanoseconds: 5_000_000_000)
-            
+
+            // BorsaPy Warm-Up: Render.com free tier uyku modundan çıkarılıyor
+            // (AutoPilot başlamadan önce yapılırsa BIST verileri hazır olur)
+            Task.detached(priority: .background) {
+                ArgusLogger.phase(.veri, "BorsaPy: Backend ısındırılıyor...")
+                await BorsaPyProvider.shared.warmUp()
+            }
+
             await MainActor.run {
                 guard let self = self else { return }
-                
+
                 // Start Scout Loop
                 ArgusLogger.phase(.autopilot, "Faz 3: Scout döngüsü başlatılıyor...")
                 self.startScoutLoop()
-                
+
                 // Start Watchlist Loop (Polling Backup)
                 self.startWatchlistLoop()
-                
-                // Start Auto-Pilot Loop (Delayed 3s to reduce network burst)
+
+                // Start Auto-Pilot Loop (Delayed 5s - BorsaPy warm-up için ek süre)
                 Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 3_000_000_000)
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
                     AutoPilotStore.shared.startAutoPilotLoop()
                 }
             }

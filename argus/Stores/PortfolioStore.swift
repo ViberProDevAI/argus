@@ -371,9 +371,18 @@ final class PortfolioStore: ObservableObject {
         trades[index].isPendingSale = true
         scheduleDebouncedSave()
 
-        // Stop Loss tetiklendi
-        print("🛑 PortfolioStore: STOP LOSS tetiklendi for \(trade.symbol) @ \(currentPrice) (SL: \(stopLoss))")
-        sell(tradeId: trade.id, currentPrice: currentPrice, reason: "STOP_LOSS")
+        // Retroaktif gap tespiti: Uygulama kapalıyken fiyat stop'u geçtiyse,
+        // satış her zaman stop fiyatından yapılır (mevcut gap fiyatından değil).
+        let isRetroactiveGap = currentPrice < stopLoss * 0.99 // %1'den fazla gap = retroaktif
+        let sellPrice = stopLoss // Her zaman stop fiyatından sat
+        let reason = isRetroactiveGap ? "STOP_LOSS_RETROACTIVE" : "STOP_LOSS"
+
+        if isRetroactiveGap {
+            print("🛑⏮️ PortfolioStore: STOP LOSS (RETROAKTİF) tetiklendi for \(trade.symbol) — Stop: \(sellPrice), Mevcut: \(currentPrice)")
+        } else {
+            print("🛑 PortfolioStore: STOP LOSS tetiklendi for \(trade.symbol) @ \(sellPrice) (SL: \(stopLoss))")
+        }
+        sell(tradeId: trade.id, currentPrice: sellPrice, reason: reason)
     }
 
     private func checkTakeProfit(for trade: Trade, at index: Int, currentPrice: Double) {
@@ -385,9 +394,18 @@ final class PortfolioStore: ObservableObject {
         trades[index].isPendingSale = true
         scheduleDebouncedSave()
 
-        // Take Profit tetiklendi
-        print("💰 PortfolioStore: TAKE PROFIT tetiklendi for \(trade.symbol) @ \(currentPrice) (TP: \(takeProfit))")
-        sell(tradeId: trade.id, currentPrice: currentPrice, reason: "TAKE_PROFIT")
+        // Retroaktif gap tespiti: Uygulama kapalıyken fiyat take-profit'i geçtiyse,
+        // satış her zaman take-profit fiyatından yapılır (mevcut gap fiyatından değil).
+        let isRetroactiveGap = currentPrice > takeProfit * 1.01 // %1'den fazla gap = retroaktif
+        let sellPrice = takeProfit // Her zaman take-profit fiyatından sat
+        let reason = isRetroactiveGap ? "TAKE_PROFIT_RETROACTIVE" : "TAKE_PROFIT"
+
+        if isRetroactiveGap {
+            print("💰⏮️ PortfolioStore: TAKE PROFIT (RETROAKTİF) tetiklendi for \(trade.symbol) — TP: \(sellPrice), Mevcut: \(currentPrice)")
+        } else {
+            print("💰 PortfolioStore: TAKE PROFIT tetiklendi for \(trade.symbol) @ \(sellPrice) (TP: \(takeProfit))")
+        }
+        sell(tradeId: trade.id, currentPrice: sellPrice, reason: reason)
     }
     
     // MARK: - Sell Operation
@@ -436,7 +454,59 @@ final class PortfolioStore: ObservableObject {
             exitOrionSnapshot: nil
         )
         TradeLogStore.shared.append(tradeLog)
-        
+
+        // Öğrenme sistemlerine geri besleme — trade kapanınca hepsini tetikle
+        let _symbol       = trade.symbol
+        let _pnlAbsolute  = pnl
+        let _pnlPercent   = trade.profitPercentage
+        let _entryPrice   = trade.entryPrice
+        let _exitPrice    = currentPrice
+        let _entryDate    = trade.entryDate
+        let _holdingDays  = Calendar.current.dateComponents([.day], from: trade.entryDate, to: Date()).day ?? 0
+
+        Task.detached(priority: .background) {
+            // 1. Chiron öğrenmesi — ağırlık optimizasyonu
+            let outcome: ChironLearningSystem.TradeExperience.TradeOutcome
+            if _pnlAbsolute > 0      { outcome = .winner }
+            else if _pnlAbsolute < 0 { outcome = .loser }
+            else                     { outcome = .scratch }
+
+            let weights = await ChironLearningSystem.shared.getCurrentState().weights
+            await ChironLearningSystem.shared.recordTrade(
+                symbol:        _symbol,
+                weights:       weights,
+                outcome:       outcome,
+                duration:      Date().timeIntervalSince(_entryDate),
+                profitPercent: _pnlPercent
+            )
+
+            // 2. TradeBrain öğrenmesi
+            await AutoPilotStore.shared.triggerLearningForClosedTrade(
+                symbol:      _symbol,
+                entryPrice:  _entryPrice,
+                exitPrice:   _exitPrice,
+                holdingDays: _holdingDays
+            )
+
+            // 3. Alkindus olgunlaşma — yeni veri geldi, bekleyen kararları değerlendir
+            await AlkindusCalibrationEngine.shared.periodicMatureCheck()
+
+            // 4. RAG — tamamlanan trade'i vektör hafızasına kaydet
+            // Gelecekte benzer sembol/koşul sorgulanırsa bu trade örnek olarak çekilir
+            await AlkindusRAGEngine.shared.syncChironTrade(
+                id: UUID().uuidString,
+                symbol: _symbol,
+                engine: "PORTFOLIO",
+                entryPrice: _entryPrice,
+                exitPrice: _exitPrice,
+                pnlPercent: _pnlPercent,
+                holdingDays: _holdingDays,
+                orionScore: nil,
+                atlasScore: nil,
+                regime: ChironRegimeEngine.shared.globalResult.regime.rawValue
+            )
+        }
+
         // Log Transaction
         var transaction = Transaction(
             id: UUID(),

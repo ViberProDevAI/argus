@@ -104,8 +104,7 @@ final class ScoutStoryStore: ObservableObject {
     private let fileURL: URL
     
     private init() {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        fileURL = docs.appendingPathComponent("scout_stories.json")
+        fileURL = FileManager.default.documentsURL.appendingPathComponent("scout_stories.json")
         loadFromDisk()
     }
     

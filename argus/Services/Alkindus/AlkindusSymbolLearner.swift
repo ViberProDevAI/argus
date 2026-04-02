@@ -8,8 +8,7 @@ actor AlkindusSymbolLearner {
     static let shared = AlkindusSymbolLearner()
     
     private let filePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("alkindus_memory").appendingPathComponent("symbols.json")
+        FileManager.default.documentsURL.appendingPathComponent("alkindus_memory").appendingPathComponent("symbols.json")
     }()
     
     private init() {

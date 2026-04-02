@@ -2,6 +2,28 @@ import Foundation
 import Combine
 import SwiftUI
 
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║  LEGACY COMPATIBILITY FACADE — MIGRATION IN PROGRESS                   ║
+// ║                                                                          ║
+// ║  TradingViewModel artık gerçek state sahibi DEĞİL.                      ║
+// ║  Tüm state AppStateCoordinator + domain stores'ta yaşıyor.              ║
+// ║                                                                          ║
+// ║  YENİ KOD YAZARKEN:                                                      ║
+// ║  • State okuma  → AppStateCoordinator.shared.X                          ║
+// ║  • State yazma  → ilgili store (PortfolioStore, ExecutionStateVM, vs.)  ║
+// ║  • @EnvironmentObject olarak coordinator'ı kullan                        ║
+// ║                                                                          ║
+// ║  SORUMLULUK HARİTASI:                                                   ║
+// ║  Quotes/Candles   → MarketDataStore.shared                              ║
+// ║  Portfolio/Trades → PortfolioStore.shared                               ║
+// ║  Signals/Orion    → SignalStateViewModel.shared                         ║
+// ║  Execution/Alerts → ExecutionStateViewModel.shared                      ║
+// ║  Watchlist        → WatchlistViewModel.shared                           ║
+// ║  Koordinasyon     → AppStateCoordinator.shared (TEK GİRİŞ NOKTASI)     ║
+// ║                                                                          ║
+// ║  BU DOSYAYA YENİ @Published EKLEME. AppStateCoordinator'a ekle.        ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
+
 class TradingViewModel: ObservableObject {
     // MARK: - Published Properties
     @Published var watchlist: [String] = [] 
@@ -90,6 +112,7 @@ class TradingViewModel: ObservableObject {
     }
 
     // Terminal Optimized Data Source
+    // MIRROR: AppStateCoordinator.shared.$terminalItems
     @Published var terminalItems: [TerminalItem] = []
     
     func refreshTerminal() {
@@ -247,7 +270,8 @@ class TradingViewModel: ObservableObject {
     }
     // autoPilotTimer REMOVED (Handled by ExecVM)
     var autoPilotLogs: [String] { ExecutionStateViewModel.shared.autoPilotLogs }
-    @Published var lastAction: String = "" // Keep local for now? Or move? Keep for UI feedback.
+    // MIRROR: AppStateCoordinator.shared.$lastAction (kaynak: ExecutionStateViewModel)
+    @Published var lastAction: String = ""
 
     
     // Navigation State
@@ -311,24 +335,23 @@ class TradingViewModel: ObservableObject {
     var scoutingCandidates: [TradeSignal] { AutoPilotStore.shared.scoutingCandidates }
     var scoutLogs: [ScoutLog] { AutoPilotStore.shared.scoutLogs }
     
-    // Trade Brain Plan Execution Alerts
+    // MIRROR: AppStateCoordinator.shared.$planAlerts (kaynak: ExecutionStateViewModel)
     @Published var planAlerts: [TradeBrainAlert] = []
-    
-    // AGORA (Execution Governor V2)
+
+    // MIRROR: AppStateCoordinator.shared.$agoraSnapshots (kaynak: ExecutionStateViewModel)
     @Published var agoraSnapshots: [DecisionSnapshot] = []
 
-    // Last Trade Times delegated to ExecutionStateViewModel
+    // MIRROR: AppStateCoordinator.shared.$lastTradeTimes (kaynak: ExecutionStateViewModel)
     @Published var lastTradeTimes: [String: Date] = [:]
-    
-    // Universe Cache
+
+    // MIRROR: AppStateCoordinator.shared.$universeCache
     @Published var universeCache: [String: UniverseItem] = [:]
 
     @MainActor
     func fetchUniverseDetails(for symbol: String) async {
-        // Access MainActor property on UniverseEngine
-        // Since both are MainActor, this should work.
         if let item = UniverseEngine.shared.universe[symbol] {
-            self.universeCache[symbol] = item
+            // Coordinator'a yaz — mirror subscription aşağıdaki binding aracılığıyla viewModel'e döner
+            AppStateCoordinator.shared.universeCache[symbol] = item
         }
     }
     
@@ -1126,28 +1149,28 @@ class TradingViewModel: ObservableObject {
             }
             .store(in: &cancellables)
             
-        // Sync Execution State
-        ExecutionStateViewModel.shared.$planAlerts
+        // Sync Execution State — kaynak: AppStateCoordinator (o ExecutionStateViewModel'a bağlı)
+        // ARTIK DOĞRUDAN ExecutionStateViewModel'a bağlanmıyoruz — tek kaynak AppStateCoordinator
+        AppStateCoordinator.shared.$planAlerts
             .receive(on: RunLoop.main)
-            .sink { [weak self] alerts in
-                self?.planAlerts = alerts
-            }
-            .store(in: &cancellables)
-            
-        ExecutionStateViewModel.shared.$agoraSnapshots
+            .assign(to: &$planAlerts)
+
+        AppStateCoordinator.shared.$agoraSnapshots
             .receive(on: RunLoop.main)
-            .sink { [weak self] snaps in
-                self?.agoraSnapshots = snaps
-            }
-            .store(in: &cancellables)
-            
-        ExecutionStateViewModel.shared.$lastTradeTimes
+            .assign(to: &$agoraSnapshots)
+
+        AppStateCoordinator.shared.$lastTradeTimes
             .receive(on: RunLoop.main)
-            .sink { [weak self] times in
-                self?.lastTradeTimes = times
-            }
-            .store(in: &cancellables)
-            
+            .assign(to: &$lastTradeTimes)
+
+        AppStateCoordinator.shared.$universeCache
+            .receive(on: RunLoop.main)
+            .assign(to: &$universeCache)
+
+        AppStateCoordinator.shared.$lastAction
+            .receive(on: RunLoop.main)
+            .assign(to: &$lastAction)
+
         // Sync Hermes State (News)
         HermesStateViewModel.shared.$newsBySymbol
             .receive(on: RunLoop.main)

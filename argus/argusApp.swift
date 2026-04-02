@@ -16,6 +16,7 @@ struct argusApp: App {
     // Static timer holder to prevent memory leaks from multiple timer instances
     private static var maturationTimer: Timer?
     private static var cleanupTimer: Timer?
+    private static var ragRetryTimer: Timer?
     
     // Unified Singleton ViewModel (Legacy - Geçiş döneminde korunuyor)
     @StateObject private var tradingViewModel = TradingViewModel()
@@ -59,10 +60,17 @@ struct argusApp: App {
                 print("🚨 FATAL FALLBACK FAILED: \(fallbackError)")
                 print("🛡️ Using minimal empty container - some features may be unavailable")
 
-                do {
-                    self.container = try ModelContainer(for: Schema([]))
-                } catch {
-                    fatalError("🛑 ModelContainer oluşturulamadı: \(error)")
+                // Son çare: boş schema ile in-memory container
+                // fatalError KULLANILMAZ — App Store reddi ve launch crash riski
+                if let lastResort = try? ModelContainer(for: Schema([]),
+                    configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) {
+                    self.container = lastResort
+                } else {
+                    // Buraya asla ulaşılmamalı — tüm fallback'ler başarısız
+                    // fatalError yerine en azından crash log bırak ve graceful exit
+                    print("🛑 Tüm ModelContainer fallback'leri başarısız. Uygulama çalışamaz.")
+                    self.container = try! ModelContainer(for: Schema([ShadowTradeSession.self, MissedOpportunityLog.self]),
+                        configurations: [ModelConfiguration(isStoredInMemoryOnly: true)])
                 }
             }
         }
@@ -137,6 +145,11 @@ struct argusApp: App {
         Self.maturationTimer?.invalidate()
 
         Task.detached(priority: .background) {
+            // Chiron: geçmiş işlemlerden öğren (soğuk başlangıç kurtarma)
+            await ChironLearningSystem.shared.bootstrapFromHistory()
+        }
+
+        Task.detached(priority: .background) {
             do {
                 try await Task.sleep(nanoseconds: 15_000_000_000)
                 await AlkindusCalibrationEngine.shared.periodicMatureCheck()
@@ -146,12 +159,36 @@ struct argusApp: App {
             }
         }
 
+        // RAG Retry: Açılışta bekleyen başarısız sync'leri tekrar dene
+        Task.detached(priority: .background) {
+            do {
+                // Maturation'dan sonra başlasın (20 sn gecikme)
+                try await Task.sleep(nanoseconds: 20_000_000_000)
+                let pending = await AlkindusSyncRetryQueue.shared.queueCount()
+                if pending > 0 {
+                    print("Info: Alkindus RAG: \(pending) bekleyen sync bulundu, yeniden deneniyor...")
+                    await AlkindusSyncRetryQueue.shared.processRetryQueue()
+                }
+            } catch {
+                print("Alkindus RAG retry failed: \(error)")
+            }
+        }
+
         Self.maturationTimer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { _ in
             Task {
-                do {
-                    await AlkindusCalibrationEngine.shared.periodicMatureCheck()
-                } catch {
-                    print("Alkindus hourly maturation check failed: \(error)")
+                await AlkindusCalibrationEngine.shared.periodicMatureCheck()
+                // Saatlik maturation sonrası RAG retry da çalışsın
+                await AlkindusSyncRetryQueue.shared.processRetryQueue()
+            }
+        }
+
+        // RAG Retry: Her 6 saatte bir bağımsız retry (internet geç geldiyse)
+        Self.ragRetryTimer = Timer.scheduledTimer(withTimeInterval: 21600, repeats: true) { _ in
+            Task.detached(priority: .background) {
+                let pending = await AlkindusSyncRetryQueue.shared.queueCount()
+                if pending > 0 {
+                    print("Info: Alkindus RAG: Periyodik retry - \(pending) bekleyen")
+                    await AlkindusSyncRetryQueue.shared.processRetryQueue()
                 }
             }
         }

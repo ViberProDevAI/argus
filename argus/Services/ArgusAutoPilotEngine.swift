@@ -212,15 +212,22 @@ final class ArgusAutoPilotEngine: Sendable {
                              ScoutLog(symbol: symbol, status: "AZALT", reason: reason, score: overallScore))
                  }
                  
-                 // 3. TRAILING STOP (The Safety Net - Loose)
-                 // Only activate after decent profit (> 5%)
-                 // Trail distance: 2.5%
+                 // 3. TRAILING STOP (Rejime göre dinamik)
+                 // Boğa (≥65): geniş (5% kâr → 2.5% trail) | Nötr: orta | Ayı: sıkı (1.5% kâr → 1.0% trail)
+                 let trailAetherScore = aetherRating?.numericScore ?? 50
+                 let (trailPct, profitThreshold): (Double, Double)
+                 switch trailAetherScore {
+                 case 65...:   (trailPct, profitThreshold) = (2.5, 5.0)  // Boğa: geniş trailing
+                 case 40..<65: (trailPct, profitThreshold) = (1.5, 3.0)  // Nötr: sıkı
+                 default:      (trailPct, profitThreshold) = (1.0, 1.5)  // Ayı: çok sıkı
+                 }
+
                  let previousHigh = existingTrade.highWaterMark ?? entryPrice
                  let dropFromPeak = ((previousHigh - currentPrice) / previousHigh) * 100.0
-                 
-                 if pnlPercent > 5.0 {
-                     if dropFromPeak >= 2.5 {
-                          let reason = "Corse İz Süren: Zirveden %\(String(format: "%.1f", dropFromPeak)) Düşüş (Kâr Koruması) 🦅💰"
+
+                 if pnlPercent > profitThreshold {
+                     if dropFromPeak >= trailPct {
+                          let reason = "Corse İz Süren: Zirveden %\(String(format: "%.1f", dropFromPeak)) Düşüş (Kâr Koruması, Eşik: %\(trailPct)) 🦅💰"
                           return (AutoPilotSignal(action: .sell, quantity: existingTrade.quantity, reason: reason, stopLoss: nil, takeProfit: nil, strategy: mode, trimPercentage: nil),
                                   ScoutLog(symbol: symbol, status: "SATIŞ", reason: reason, score: overallScore))
                      }
@@ -343,9 +350,9 @@ final class ArgusAutoPilotEngine: Sendable {
             }
         } ?? false
         
-        // 2. Market Crash Check
-        if (aetherRating?.numericScore ?? 50) < 20 {
-            return (nil, ScoutLog(symbol: symbol, status: "RED", reason: "Piyasa Çöküşü (Aether: \(Int(aetherRating?.numericScore ?? 0)))", score: overallScore))
+        // 2. Makro Kalkanı: Aether < 30 → kötü veya çöküş makro, alım yok
+        if (aetherRating?.numericScore ?? 50) < 30 {
+            return (nil, ScoutLog(symbol: symbol, status: "RED", reason: "Makro Kalkanı: Aether \(Int(aetherRating?.numericScore ?? 0))/100 < 30", score: overallScore))
         }
 
         if policy.blockRiskyBuys && !isSafeSymbol {

@@ -56,8 +56,7 @@ final class OrionV2WeightStore {
     private let fileURL: URL
     
     private init() {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        fileURL = docs.appendingPathComponent("orion_v2_weights.json")
+        fileURL = FileManager.default.documentsURL.appendingPathComponent("orion_v2_weights.json")
         loadFromDisk()
     }
     

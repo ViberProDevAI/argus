@@ -253,7 +253,20 @@ actor BorsaPyProvider {
     private init() {
         // no-op
     }
-    
+
+    // MARK: - Backend Wake-Up
+
+    /// Render.com free tier uyku moduna giriyor. Uygulama açılışında bu methodu çağırarak
+    /// backend'i önceden ısıtırız. Health endpoint hızlı yanıtlar, asıl veri isteklerini hızlandırır.
+    func warmUp() async {
+        do {
+            let _ = try await fetchJSON(path: "/health")
+            print("✅ BorsaPyProvider: Backend ısındı (Render.com uyanık)")
+        } catch {
+            print("⚠️ BorsaPyProvider: Warm-up başarısız (backend uyuyor olabilir) - \(error.localizedDescription)")
+        }
+    }
+
     // MARK: - Public API: Quote
     
     func getBistQuote(symbol: String) async throws -> BistQuote {

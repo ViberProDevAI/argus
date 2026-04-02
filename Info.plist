@@ -35,6 +35,20 @@
     <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>LSRequiresIPhoneOS</key>
     <true/>
+
+    <!-- MARK: Privacy Descriptions (App Store zorunlu) -->
+
+    <!-- Sesli analiz özelliği: Argus sesli komutları ve raporları için mikrofon kullanır -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Argus, sesli komutları dinlemek ve borsa analizini sesli okumak için mikrofonu kullanır.</string>
+
+    <!-- Konuşma tanıma: Sesli komutları metne dönüştürmek için -->
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Argus, sesli komutlarınızı tanımak ve portföy sorgularını anlamak için konuşma tanıma kullanır.</string>
+
+    <!-- Bildirimler: Fiyat alarmları ve sinyal bildirimleri -->
+    <key>NSUserNotificationUsageDescription</key>
+    <string>Argus, fiyat alarmları, stop-loss uyarıları ve önemli piyasa sinyalleri için bildirim gönderir.</string>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

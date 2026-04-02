@@ -8,8 +8,7 @@ final class AlkindusIndicatorLearner {
     static let shared = AlkindusIndicatorLearner()
     
     private let filePath: URL = {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("alkindus_memory").appendingPathComponent("indicator_learnings.json")
+        FileManager.default.documentsURL.appendingPathComponent("alkindus_memory").appendingPathComponent("indicator_learnings.json")
     }()
     
     private init() {

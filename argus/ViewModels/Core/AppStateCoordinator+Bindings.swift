@@ -14,16 +14,17 @@ extension AppStateCoordinator {
     /// we use `.assign(to: &$property)` which creates a direct binding that doesn't
     /// duplicate data - it just connects the publisher to the published property.
     func setupDataBindings() {
-        // Note: We don't bind Portfolio, Market, Signal, Execution, or Diagnostics
-        // because they are already published in their respective stores.
-        // The coordinator provides convenient access to them via computed properties in AppStateCoordinator+Data.swift
-        //
-        // What we DO bind are the UI state properties that multiple sources can affect.
+        setupWatchlistBindings()
+        setupMarketBindings()
+        setupExecutionBindings()
+        setupLoadingAggregation()
+    }
 
-        // MARK: - Watchlist Coordination
-        // When watchlist is updated, load quotes for new symbols
+    // MARK: - Watchlist
+
+    private func setupWatchlistBindings() {
         WatchlistViewModel.shared.$watchlist
-            .dropFirst() // Skip initial value
+            .dropFirst()
             .sink { [weak self] symbols in
                 Task { @MainActor in
                     for symbol in symbols {
@@ -34,36 +35,52 @@ extension AppStateCoordinator {
                 }
             }
             .store(in: &cancellables)
+    }
 
-        // MARK: - Market Data Coordination
-        // When quotes update, propagate to portfolio for SL/TP control
+    // MARK: - Market Data
+
+    private func setupMarketBindings() {
         MarketDataStore.shared.$quotes
             .receive(on: RunLoop.main)
             .sink { [weak self] storeQuotes in
                 self?.portfolio.handleQuoteUpdates(storeQuotes)
             }
             .store(in: &cancellables)
+    }
 
-        // MARK: - UI State Coordination
-        // Sync unlimited positions setting to PortfolioRiskManager
-        // (Already handled by didSet in @Published var)
+    // MARK: - Execution State
+    // AppStateCoordinator is the SINGLE SUBSCRIBER to ExecutionStateViewModel.
+    // TradingViewModel reads these from coordinator (not directly from ExecutionStateViewModel).
 
-        // MARK: - Loading State Aggregation
-        // Monitor all loading states to update parent loading indicator
+    private func setupExecutionBindings() {
+        ExecutionStateViewModel.shared.$planAlerts
+            .receive(on: RunLoop.main)
+            .assign(to: &$planAlerts)
+
+        ExecutionStateViewModel.shared.$agoraSnapshots
+            .receive(on: RunLoop.main)
+            .assign(to: &$agoraSnapshots)
+
+        ExecutionStateViewModel.shared.$lastTradeTimes
+            .receive(on: RunLoop.main)
+            .assign(to: &$lastTradeTimes)
+
+        ExecutionStateViewModel.shared.$lastAction
+            .receive(on: RunLoop.main)
+            .assign(to: &$lastAction)
+    }
+
+    // MARK: - Loading State Aggregation
+
+    private func setupLoadingAggregation() {
         Publishers.CombineLatest4(
             WatchlistViewModel.shared.$isLoading,
             SignalStateViewModel.shared.$isOrionLoading,
             $isLoadingEtf,
             $isLoadingSarTsiBacktest
         )
-        .map { isWatchlistLoading, isOrionLoading, isLoadingEtf, isLoadingSarTsiBacktest in
-            isWatchlistLoading || isOrionLoading || isLoadingEtf || isLoadingSarTsiBacktest
-        }
+        .map { $0 || $1 || $2 || $3 }
         .receive(on: RunLoop.main)
-        .sink { [weak self] isLoading in
-            self?.isGlobalLoading = isLoading
-        }
-        .store(in: &cancellables)
-
+        .assign(to: &$isGlobalLoading)
     }
 }

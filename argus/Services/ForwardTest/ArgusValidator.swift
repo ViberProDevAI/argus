@@ -293,8 +293,7 @@ class ArgusValidator {
     }
     
     private func getResultsFilePath() -> URL {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        return docs.appendingPathComponent("ArgusScientificResults.json")
+        FileManager.default.documentsURL.appendingPathComponent("ArgusScientificResults.json")
     }
     
     // MARK: - UI Helpers
