@@ -143,7 +143,7 @@ struct CenterCoreView: View {
                     viewForGlobalModule(moduleName: moduleName, decision: decision)
                 }
             } else {
-                Text("VERI YOK")
+                Text("VERİ YOK")
                     .font(.system(size: 10, design: .monospaced))
                     .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
@@ -155,43 +155,45 @@ struct CenterCoreView: View {
     
     // MARK: - Council Decision View
     private var councilDecisionView: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 3) {
             Text("KONSEY")
                 .font(.system(size: 8, design: .monospaced))
                 .tracking(2)
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-            
+
             if let decision {
                 let education = decision.educationStage
-                
-                Text(education.badgeText)
-                    .font(.system(size: 16, weight: .bold, design: .monospaced))
-                    .foregroundColor(education.color)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 4)
-                    .minimumScaleFactor(0.8)
-                
-                Text(education.title.uppercased())
-                    .font(.system(size: 8, weight: .semibold, design: .monospaced))
-                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    .minimumScaleFactor(0.8)
 
-                Text("\(Int(decision.confidence * 100))% GUVEN")
+                // Asıl karar aksiyonu — en önemli bilgi
+                Text(decision.action.rawValue)
+                    .font(.system(size: 15, weight: .black, design: .monospaced))
+                    .foregroundColor(actionColor(for: decision.action))
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.75)
+                    .padding(.horizontal, 4)
+
+                // Senaryo seviyesi (ikincil)
+                Text(education.badgeText)
+                    .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                    .foregroundColor(education.color)
+
+                // Güven yüzdesi
+                Text("\(Int(decision.confidence * 100))% GÜVEN")
                     .font(.system(size: 9, design: .monospaced))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
-                
+
                 if !decision.vetoes.isEmpty {
                     HStack(spacing: 4) {
                         Image(systemName: "xmark.shield")
                             .font(.system(size: 8))
-                        Text("CEKINCE")
+                        Text("ÇEKİNCE")
                             .font(.system(size: 8, weight: .bold, design: .monospaced))
                     }
                     .foregroundColor(SanctumTheme.crimsonRed.opacity(0.8))
-                    .padding(.top, 2)
+                    .padding(.top, 1)
                 }
             } else {
-                Text("KARAR BEKLENIYOR")
+                Text("KARAR\nBEKLENİYOR")
                     .font(.system(size: 9, weight: .semibold, design: .monospaced))
                     .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -199,6 +201,16 @@ struct CenterCoreView: View {
             }
         }
         .transition(.scale.combined(with: .opacity))
+    }
+
+    private func actionColor(for action: ArgusAction) -> Color {
+        switch action {
+        case .aggressiveBuy: return SanctumTheme.auroraGreen
+        case .accumulate:    return SanctumTheme.hologramBlue
+        case .neutral:       return SanctumTheme.titanGold
+        case .trim:          return Color.orange
+        case .liquidate:     return SanctumTheme.crimsonRed
+        }
     }
     
     // MARK: - Module Determination
@@ -258,8 +270,8 @@ struct CenterCoreView: View {
     private func moduleSignalLabel(_ action: ProposedAction) -> String {
         switch action {
         case .buy: return "OLUMLU"
-        case .sell: return "RISKLI"
-        case .hold: return "NOTR"
+        case .sell: return "RİSKLİ"
+        case .hold: return "NÖTR"
         }
     }
     
@@ -285,7 +297,7 @@ struct CenterCoreView: View {
             Text(data.action)
                  .font(.system(size: 14, weight: .bold, design: .monospaced))
                  .foregroundColor(data.color)
-            Text(String(format: "%.0f%% GUVEN", data.confidence * 100))
+            Text(String(format: "%.0f%% GÜVEN", data.confidence * 100))
                 .font(.system(size: 8, design: .monospaced))
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         } else {

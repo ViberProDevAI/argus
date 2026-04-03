@@ -59,10 +59,10 @@ extension ArgusGrandDecision {
 
         let title: String
         switch level {
-        case 1: title = "Veri Zayif"
+        case 1: title = "Veri Zayıf"
         case 2: title = "Erken Sinyal"
-        case 3: title = "Karisik Gorunum"
-        case 4: title = "Guclu Senaryo"
+        case 3: title = "Karışık Görünüm"
+        case 4: title = "Güçlü Senaryo"
         default: title = "Teyitli Senaryo"
         }
 
@@ -71,7 +71,7 @@ extension ArgusGrandDecision {
         case .aggressiveBuy, .accumulate:
             scenarioLabel = "Olumlu Senaryo"
         case .neutral:
-            scenarioLabel = "Notr Senaryo"
+            scenarioLabel = "Nötr Senaryo"
         case .trim, .liquidate:
             scenarioLabel = "Temkinli Senaryo"
         }
@@ -126,15 +126,15 @@ extension ArgusGrandDecision {
         vetoes: [ModuleVeto]
     ) -> String {
         if let veto = vetoes.first {
-            return "\(veto.module.uppercased()) cekincesi var: \(cleanText(veto.reason, fallback: "Veto nedeni belirsiz."))"
+            return "\(veto.module.uppercased()) çekincesi var: \(cleanText(veto.reason, fallback: "Veto nedeni belirsiz."))"
         }
         if contributors.count < 3 {
-            return "Tum modullerden yeterli katilim yok; bu asamada senaryo erken olabilir."
+            return "Tüm modüllerden yeterli katılım yok; bu aşamada senaryo erken olabilir."
         }
         if confidence < 0.5 {
-            return "Guven duzeyi dusuk; yeni veri geldikce seviye degisebilir."
+            return "Güven düzeyi düşük; yeni veri geldikçe seviye değişebilir."
         }
-        return "Piyasa kosullari hizli degisebilir; senaryoyu duzenli yeniden degerlendirin."
+        return "Piyasa koşulları hızlı değişebilir; senaryoyu düzenli yeniden değerlendirin."
     }
 
     private static func invalidationText(
@@ -143,18 +143,18 @@ extension ArgusGrandDecision {
         vetoes: [ModuleVeto]
     ) -> String {
         if let veto = vetoes.first {
-            return "Gecersizlik kosulu: \(cleanText(veto.reason, fallback: "\(veto.module) cekincesi devam ediyor."))"
+            return "Geçersizlik koşulu: \(cleanText(veto.reason, fallback: "\(veto.module) çekincesi devam ediyor."))"
         }
 
         switch action {
         case .aggressiveBuy, .accumulate:
             let threshold = max(25, Int(confidence * 100) - 20)
-            return "Guven %\(threshold) altina inerse olumlu senaryo zayiflar."
+            return "Güven %\(threshold) altına inerse olumlu senaryo zayıflar."
         case .neutral:
-            return "Yeni veri olmadan notr senaryo teyitli sayilmaz."
+            return "Yeni veri olmadan nötr senaryo teyitli sayılmaz."
         case .trim, .liquidate:
             let threshold = min(80, Int(confidence * 100) + 15)
-            return "Guven %\(threshold) uzerine toparlanirsa temkinli senaryo zayiflar."
+            return "Güven %\(threshold) üzerine toparlanırsa temkinli senaryo zayıflar."
         }
     }
 
@@ -165,11 +165,11 @@ extension ArgusGrandDecision {
             .map { $0.module.uppercased() }
 
         if topModules.isEmpty {
-            return "Once veri kalitesini artirip moduller arasi tutarliligi kontrol edin."
+            return "Önce veri kalitesini artırıp modüller arası tutarlılığı kontrol edin."
         }
 
         let joined = topModules.joined(separator: " + ")
-        return "Bu asamada \(joined) gerekcelerini kendi planin ve risk sinirinla karsilastir."
+        return "Bu aşamada \(joined) gerekçelerini kendi planın ve risk sınırınla karşılaştır."
     }
 
     private static func cleanText(_ text: String, fallback: String) -> String {
@@ -387,6 +387,7 @@ struct SanctumModuleIconView: View {
         Group {
             if let asset = assetIcon {
                 Image(asset)
+                    .renderingMode(.original)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
