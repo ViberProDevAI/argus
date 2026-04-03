@@ -153,9 +153,9 @@ struct SanctumTradeSheet: View {
         execution.lastTradeError = nil
 
         if action == .buy {
-            viewModel.executeBuy(symbol: symbol, quantity: quantity, price: price)
+            viewModel.buy(symbol: symbol, quantity: quantity)
         } else {
-            viewModel.executeSell(symbol: symbol, quantity: quantity, price: price)
+            viewModel.sell(symbol: symbol, quantity: quantity)
         }
 
         // executeBuy/Sell is async via Task — check result after brief delay

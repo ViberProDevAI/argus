@@ -276,4 +276,29 @@ extension ArgusLogger {
         Swift.print("   ▸ Paket \(batch)/\(totalBatches) (\(processed)/\(total))")
         #endif
     }
+
+    // MARK: - Static convenience with category string (mirrors instance API)
+    static func info(_ message: String, category: String) {
+        #if DEBUG
+        Swift.print("   ℹ️ [\(category)] \(message)")
+        #endif
+    }
+
+    static func warn(_ message: String, category: String) {
+        #if DEBUG
+        Swift.print("   ⚠️ [\(category)] \(message)")
+        #endif
+    }
+
+    static func error(_ message: String, category: String) {
+        #if DEBUG
+        Swift.print("   ❌ [\(category)] \(message)")
+        #endif
+    }
+
+    static func error(_ module: Module, _ error: Error) {
+        #if DEBUG
+        Swift.print("   ❌ [\(module.rawValue)] \(error.localizedDescription)")
+        #endif
+    }
 }

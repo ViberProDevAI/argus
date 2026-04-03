@@ -556,7 +556,7 @@ private struct PerfData {
     }
 
     // Confidence calibration buckets
-    var confidenceBuckets: [ConfidenceBucket] {
+    var confidenceBuckets: [CalibrationBucket] {
         var buckets: [(bracket: String, correct: Double, total: Double, expected: Double)] = []
         let bracketOrder = ["0-40", "40-60", "60-70", "70-80", "80-100"]
 
@@ -575,7 +575,7 @@ private struct PerfData {
         }
 
         return buckets.map {
-            ConfidenceBucket(
+            CalibrationBucket(
                 bracket: $0.bracket + "%",
                 hitRate: $0.total > 0 ? $0.correct / $0.total : 0,
                 expectedRate: $0.expected,
@@ -622,7 +622,7 @@ private struct RegimeStat {
     }
 }
 
-private struct ConfidenceBucket {
+private struct CalibrationBucket {
     let bracket: String
     let hitRate: Double
     let expectedRate: Double
