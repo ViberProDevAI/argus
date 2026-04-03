@@ -45,7 +45,7 @@ struct AlkindusVerdictCard: View {
         case let r where r.contains("bull"): return "↑ Yükselen Piyasa"
         case let r where r.contains("bear"): return "↓ Düşen Piyasa"
         case let r where r.contains("neutral"): return "→ Nötr Piyasa"
-        case let r where r.contains("volatile"), let r where r.contains("volatile"): return "⚡ Volatil"
+        case let r where r.contains("volatile"): return "⚡ Volatil"
         default: return verdict.regime
         }
     }

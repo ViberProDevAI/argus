@@ -506,14 +506,14 @@ private struct PerfData {
         return Double(filteredVerdicts.filter { $0.wasCorrect }.count) / Double(filteredVerdicts.count)
     }
     var overallAccuracyText: String {
-        filteredVerdicts.isEmpty ? "—" : String(format: "%%%.0f", overallAccuracy * 100)
+        filteredVerdicts.isEmpty ? "—" : String(format: "%.0f%%", overallAccuracy * 100)
     }
 
     // Trade stats
     var tradeWinCount: Int { trades.filter { $0.isWin }.count }
     var tradeLossCount: Int { trades.filter { !$0.isWin }.count }
     var tradeWinRate: Double { trades.isEmpty ? 0 : Double(tradeWinCount) / Double(trades.count) }
-    var tradeWinRateText: String { trades.isEmpty ? "—" : String(format: "%%%.0f", tradeWinRate * 100) }
+    var tradeWinRateText: String { trades.isEmpty ? "—" : String(format: "%.0f%%", tradeWinRate * 100) }
 
     // Module stats from verdicts
     var moduleStats: [ModuleStat] {
@@ -576,7 +576,7 @@ private struct PerfData {
 
         return buckets.map {
             ConfidenceBucket(
-                bracket: $0.bracket + "%%",
+                bracket: $0.bracket + "%",
                 hitRate: $0.total > 0 ? $0.correct / $0.total : 0,
                 expectedRate: $0.expected,
                 n: Int($0.total)
@@ -601,7 +601,7 @@ private struct ModuleStat {
     let correct: Int
     let attempts: Int
     var hitRate: Double { attempts == 0 ? 0 : Double(correct) / Double(attempts) }
-    var hitRateText: String { String(format: "%%%.0f", hitRate * 100) }
+    var hitRateText: String { String(format: "%.0f%%", hitRate * 100) }
     var barColor: Color { hitRate >= 0.6 ? .green : hitRate >= 0.45 ? .orange : .red }
 }
 
@@ -610,7 +610,7 @@ private struct RegimeStat {
     let correct: Int
     let total: Int
     var hitRate: Double { total == 0 ? 0 : Double(correct) / Double(total) }
-    var hitRateText: String { String(format: "%%%.0f", hitRate * 100) }
+    var hitRateText: String { String(format: "%.0f%%", hitRate * 100) }
     var regimeLabel: String {
         switch regime.lowercased() {
         case let r where r.contains("bull"):     return "↑ Yükselen"
