@@ -168,7 +168,7 @@ struct ArgusIntelligenceDiagView: View {
             bigStat(value: "\(a.verdictCount)", label: "Tamamlanan Analiz")
             Divider().frame(height: 40).background(Color.white.opacity(0.1))
             bigStat(
-                value: a.verdictCount > 0 ? String(format: "%%%.0f", a.correctRate * 100) : "—",
+                value: a.verdictCount > 0 ? String(format: "%.0f%%", a.correctRate * 100) : "—",
                 label: "Doğruluk",
                 color: a.correctRate >= 0.55 ? .green : a.correctRate >= 0.45 ? .orange : .red
             )
@@ -176,10 +176,10 @@ struct ArgusIntelligenceDiagView: View {
         .padding(.vertical, 8)
 
         if let top = a.topModule {
-            diagRow(label: "En İyi Modül", value: "\(top.name) — %%\(Int(top.hitRate * 100))", valueColor: .green)
+            diagRow(label: "En İyi Modül", value: "\(top.name) — \(Int(top.hitRate * 100))%", valueColor: .green)
         }
         if let weak = a.weakestModule {
-            diagRow(label: "En Zayıf Modül", value: "\(weak.name) — %%\(Int(weak.hitRate * 100))", valueColor: .orange)
+            diagRow(label: "En Zayıf Modül", value: "\(weak.name) — \(Int(weak.hitRate * 100))%", valueColor: .orange)
         }
         diagRow(label: "Son kalibrasyon", value: a.lastCalibration?.formatted(date: .abbreviated, time: .omitted) ?? "Hiç yapılmadı")
 
@@ -428,7 +428,7 @@ private struct TradeStats {
     let lastTradeDate: Date?
     let lastRegime: String?
     var winRate: Double { total == 0 ? 0 : Double(winCount) / Double(total) }
-    var winRateText: String { total == 0 ? "—" : String(format: "%%%.0f", winRate * 100) }
+    var winRateText: String { total == 0 ? "—" : String(format: "%.0f%%", winRate * 100) }
 }
 
 private struct ChironStats {
