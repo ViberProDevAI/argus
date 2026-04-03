@@ -17,14 +17,15 @@ struct SanctumTheme {
     static let ghostGrey = InstitutionalTheme.Colors.textSecondary
     static let crimsonRed = InstitutionalTheme.Colors.negative
     
-    // Module Colors (Mapped to V2)
-    static let orionColor = hologramBlue     // Technical -> Hologram Blue
-    static let atlasColor = hologramBlue     // Fundamental -> Mavi (artık altın yok)
-    static let aetherColor = ghostGrey       // Macro -> Ghost Grey (Neutral base)
-    static let athenaColor = hologramBlue    // Smart Beta -> Mavi
-    static let hermesColor = InstitutionalTheme.Colors.neutral
-    static let demeterColor = auroraGreen    // Sectors -> Aurora Green (Growth)
-    static let chironColor = InstitutionalTheme.Colors.textPrimary
+    // Module Colors — her modül görsel olarak ayırt edilebilir
+    static let orionColor = hologramBlue                                          // Teknik   → Mavi
+    static let atlasColor = Color(red: 0.85, green: 0.62, blue: 0.12)           // Temel    → Altın
+    static let aetherColor = Color(red: 0.55, green: 0.30, blue: 0.85)          // Makro    → Mor
+    static let athenaColor = Color(red: 0.15, green: 0.82, blue: 0.88)          // Smart β  → Turkuaz
+    static let hermesColor = Color(red: 0.95, green: 0.50, blue: 0.15)          // Haberler → Turuncu
+    static let demeterColor = auroraGreen                                         // Sektör   → Yeşil
+    static let chironColor = Color(red: 0.85, green: 0.85, blue: 0.90)          // Eğitim   → Açık gri/beyaz
+    static let prometheusColor = Color(red: 0.70, green: 0.25, blue: 0.90)      // Tahmin   → Eflatun
     
     // Glass Effect
     static let glassMaterial = Material.thickMaterial
@@ -232,7 +233,7 @@ enum SanctumModuleType: String, CaseIterable {
         case .athena: return SanctumTheme.athenaColor
         case .demeter: return SanctumTheme.demeterColor
         case .chiron: return SanctumTheme.chironColor
-        case .prometheus: return SanctumTheme.hologramBlue
+        case .prometheus: return SanctumTheme.prometheusColor
         case .council: return SanctumTheme.titanGold
         }
     }
@@ -387,7 +388,7 @@ struct SanctumModuleIconView: View {
         Group {
             if let asset = assetIcon {
                 Image(asset)
-                    .renderingMode(.original)
+                    .renderingMode(.template)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } else {
