@@ -1,15 +1,16 @@
 import SwiftUI
+
 struct TradeBrainStatusBand: View {
     @ObservedObject var viewModel: TradingViewModel
     let market: TradeMarket
     let openTradeBrain: () -> Void
 
+    // MARK: - Derived
+
     private var filteredOpenTrades: [Trade] {
         switch market {
-        case .global:
-            return viewModel.globalPortfolio.filter { $0.isOpen }
-        case .bist:
-            return viewModel.bistOpenPortfolio.filter { $0.isOpen }
+        case .global: return viewModel.globalPortfolio.filter { $0.isOpen }
+        case .bist:   return viewModel.bistOpenPortfolio.filter { $0.isOpen }
         }
     }
 
@@ -25,10 +26,6 @@ struct TradeBrainStatusBand: View {
         return filteredBalance + value
     }
 
-    private var filteredPlans: [PositionPlan] {
-        filteredOpenTrades.compactMap { PositionPlanStore.shared.getPlan(for: $0.id) }
-    }
-
     private var health: PortfolioRiskManager.PortfolioHealth {
         PortfolioRiskManager.shared.checkPortfolioHealth(
             portfolio: filteredOpenTrades,
@@ -38,101 +35,101 @@ struct TradeBrainStatusBand: View {
         )
     }
 
-    private var dominantDecision: ArgusGrandDecision? {
-        filteredOpenTrades
-            .compactMap { viewModel.grandDecisions[$0.symbol] }
-            .max(by: { $0.confidence < $1.confidence })
-    }
-
-    private var topSignal: ChimeraSignal? {
+    private var dominantSignal: ChimeraSignal? {
         filteredOpenTrades
             .compactMap { SignalStateViewModel.shared.chimeraSignals[$0.symbol] }
             .max(by: { $0.severity < $1.severity })
     }
 
-    private var planCoverage: Double {
-        guard !filteredOpenTrades.isEmpty else { return 0 }
-        return Double(filteredPlans.count) / Double(filteredOpenTrades.count)
-    }
+    // MARK: - Display Helpers
 
-    private var pendingStepCount: Int {
-        filteredPlans.filter { $0.nextPendingStep != nil }.count
-    }
+    /// Kullanıcının anlayacağı portföy durumu cümlesi
+    private var statusSentence: String {
+        let count = filteredOpenTrades.count
+        if count == 0 { return "Açık pozisyon yok — sistem izlemede" }
 
-    private var actionColor: Color {
-        guard let decision = dominantDecision else { return InstitutionalTheme.Colors.textSecondary }
-        switch decision.action {
-        case .aggressiveBuy: return InstitutionalTheme.Colors.positive
-        case .accumulate: return InstitutionalTheme.Colors.primary
-        case .neutral: return InstitutionalTheme.Colors.textSecondary
-        case .trim: return InstitutionalTheme.Colors.warning
-        case .liquidate: return InstitutionalTheme.Colors.negative
+        switch health.status {
+        case .healthy:
+            if let sig = dominantSignal {
+                return "\(sig.symbol): \(localizedSignalTitle(sig))"
+            }
+            return "\(count) pozisyon dengeli seyrediyor"
+        case .warning:
+            if let sig = dominantSignal {
+                return "Dikkat — \(sig.symbol): \(localizedSignalTitle(sig))"
+            }
+            return "\(count) pozisyon var, bazıları izleniyor"
+        case .critical:
+            if let sig = dominantSignal {
+                return "Risk yüksek — \(sig.symbol): \(localizedSignalTitle(sig))"
+            }
+            return "Portföyde yüksek risk var, pozisyonları gözden geçir"
         }
     }
 
-    private var healthColor: Color {
+    private var statusColor: Color {
         switch health.status {
-        case .healthy: return InstitutionalTheme.Colors.positive
-        case .warning: return InstitutionalTheme.Colors.warning
+        case .healthy:  return InstitutionalTheme.Colors.positive
+        case .warning:  return InstitutionalTheme.Colors.warning
         case .critical: return InstitutionalTheme.Colors.negative
         }
     }
 
+    private var statusLabel: String {
+        switch health.status {
+        case .healthy:  return "Dengeli"
+        case .warning:  return "İzleniyor"
+        case .critical: return "Risk Var"
+        }
+    }
+
+    private var statusIcon: String {
+        switch health.status {
+        case .healthy:  return "checkmark.circle.fill"
+        case .warning:  return "exclamationmark.circle.fill"
+        case .critical: return "xmark.octagon.fill"
+        }
+    }
+
+    // MARK: - Body
+
     var body: some View {
         Button(action: openTradeBrain) {
             HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("TRADE BRAIN DURUMU")
-                        .font(InstitutionalTheme.Typography.micro)
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        .tracking(1.0)
+                // Sol: durum ikonu + cümle
+                HStack(spacing: 10) {
+                    Image(systemName: statusIcon)
+                        .font(.system(size: 20))
+                        .foregroundColor(statusColor)
 
-                    if let decision = dominantDecision {
-                        Text("\(decision.symbol) • \(decision.action.rawValue) • %\(Int(decision.confidence * 100)) güven")
-                            .font(InstitutionalTheme.Typography.caption)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(statusSentence)
+                            .font(.system(size: 13, weight: .medium))
                             .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                            .lineLimit(1)
-                    } else {
-                        Text("Açık pozisyon yok, yeni plan oluşmadı")
-                            .font(InstitutionalTheme.Typography.caption)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        Text("\(filteredOpenTrades.count) pozisyon")
+                            .font(.system(size: 11))
                             .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                            .lineLimit(1)
-                    }
-
-                    HStack(spacing: 8) {
-                        Text("%\(Int(planCoverage * 100)) plan")
-                            .font(InstitutionalTheme.Typography.micro)
-                            .foregroundColor(InstitutionalTheme.Colors.primary)
-                        Text("•")
-                            .font(InstitutionalTheme.Typography.micro)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                        Text("\(pendingStepCount) bekleyen adım")
-                            .font(InstitutionalTheme.Typography.micro)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    }
-
-                    if let topSignal {
-                        Text("Sinyal: \(topSignal.title)")
-                            .font(InstitutionalTheme.Typography.micro)
-                            .foregroundColor(chimeraColor(topSignal.type))
-                            .lineLimit(1)
                     }
                 }
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 5) {
-                    Text("Skor \(Int(health.score))")
-                        .font(InstitutionalTheme.Typography.caption)
-                        .foregroundColor(healthColor)
-                    Text("\(filteredOpenTrades.count) pozisyon")
-                        .font(InstitutionalTheme.Typography.micro)
+                // Sağ: durum etiketi + ok
+                HStack(spacing: 6) {
+                    Text(statusLabel)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(statusColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(statusColor.opacity(0.12))
+                        .cornerRadius(8)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 }
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(actionColor)
             }
             .padding(InstitutionalTheme.Spacing.md)
             .background(
@@ -140,23 +137,23 @@ struct TradeBrainStatusBand: View {
                     .fill(InstitutionalTheme.Colors.surface2)
                     .overlay(
                         RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous)
-                            .stroke(actionColor.opacity(0.28), lineWidth: 1)
+                            .stroke(statusColor.opacity(0.22), lineWidth: 1)
                     )
             )
         }
         .buttonStyle(.plain)
     }
 
-    private func chimeraColor(_ type: ChimeraSignalType) -> Color {
-        switch type {
-        case .deepValueBuy: return Color.purple
-        case .bullTrap: return InstitutionalTheme.Colors.warning
-        case .momentumBreakout: return InstitutionalTheme.Colors.positive
-        case .fallingKnife: return InstitutionalTheme.Colors.negative
-        case .sentimentDivergence: return InstitutionalTheme.Colors.primary
-        case .perfectStorm: return InstitutionalTheme.Colors.warning
+    // MARK: - Signal Title Localizer
+
+    private func localizedSignalTitle(_ signal: ChimeraSignal) -> String {
+        switch signal.type {
+        case .deepValueBuy:        return "derin değer fırsatı"
+        case .bullTrap:            return "boğa tuzağı riski"
+        case .momentumBreakout:    return "momentum kırılımı"
+        case .fallingKnife:        return "düşen bıçak — dikkat"
+        case .sentimentDivergence: return "duygu-fiyat ayrışması"
+        case .perfectStorm:        return "mükemmel fırtına sinyali"
         }
     }
 }
-
-// MARK: - History Sheet

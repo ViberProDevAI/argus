@@ -392,9 +392,10 @@ struct GlobalCockpitView: View {
                         NavigationLink(destination: StockDetailView(symbol: symbol, viewModel: viewModel)) {
                             CrystalWatchlistRow(
                                 symbol: symbol,
-                                quote: watchlistVM.quotes[symbol], // Yeni sistem
-                                candles: viewModel.candles[symbol], // Candles hala TradingVM'den
-                                forecast: viewModel.prometheusForecastBySymbol[symbol] // Prometheus
+                                quote: watchlistVM.quotes[symbol],
+                                candles: viewModel.candles[symbol],
+                                forecast: viewModel.prometheusForecastBySymbol[symbol],
+                                signal: viewModel.aiSignals.first(where: { $0.symbol == symbol })
                             )
                             .padding(.horizontal, 16).padding(.vertical, 4)
                         }
