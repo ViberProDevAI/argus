@@ -66,6 +66,9 @@ struct PortfolioView: View {
                             )
                             .padding(.horizontal)
 
+                            DailyAgendaView(viewModel: viewModel, market: selectedMarket)
+                                .padding(.horizontal)
+
                             PortfolioPlanBoard(
                                 viewModel: viewModel,
                                 market: selectedMarket,
