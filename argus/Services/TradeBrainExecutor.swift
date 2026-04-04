@@ -17,6 +17,9 @@ class TradeBrainExecutor: ObservableObject {
     @Published var isEnabled: Bool = true
     @Published var lastMultiHorizonDecisions: [String: MultiHorizonDecision] = [:]
     @Published var lastContradictionAnalyses: [String: ContradictionAnalysis] = [:]
+    @Published var lastCorrelResult: CorrelationHeatGate.CorrelationResult? = nil
+    @Published var lastCrisisOpportunities: [CrisisAlphaScanner.AlphaOpportunity] = []
+    @Published var lastVelocityAnalysis: AetherVelocityEngine.VelocityAnalysis? = nil
     
     private var cancellables = Set<AnyCancellable>()
     private var lastExecutionTime: [String: Date] = [:]
@@ -75,18 +78,21 @@ class TradeBrainExecutor: ObservableObject {
         // ── YENİ: Velocity Engine'e Aether kaydı ──────────────────────────
         await AetherVelocityEngine.shared.record(score: aetherScore)
         let velocityAnalysis = await AetherVelocityEngine.shared.analyze()
+        await MainActor.run { self.lastVelocityAnalysis = velocityAnalysis }
         if let alert = velocityAnalysis.crossingAlert {
             ArgusLogger.info("⚡ Aether Velocity: \(alert.description)", category: "TRADEBRAIN")
         }
 
         // ── YENİ: Kelly profili (async, cache'li) ─────────────────────────
         let kellyProfile = await KellyCache.shared.getSystemProfile()
+        let allVerdicts = await AlkindusMemoryStore.shared.loadVerdicts()
 
         // ── YENİ: Korelasyon bazlı portföy ısısı ──────────────────────────
         let priceHistory: [String: [Double]] = Dictionary(uniqueKeysWithValues:
             candles.map { (sym, cndls) in (sym, cndls.map { $0.close }) }
         )
         let correlResult = CorrelationHeatGate.assess(portfolio: portfolio, priceHistory: priceHistory)
+        await MainActor.run { self.lastCorrelResult = correlResult }
         if correlResult.concentrationRisk != .healthy {
             ArgusLogger.warn("📊 Korelasyon: \(correlResult.concentrationRisk.label) — \(correlResult.rawPositionCount) pozisyon → \(Int(correlResult.effectivePositionCount)) bağımsız risk", category: "TRADEBRAIN")
         }
@@ -124,14 +130,23 @@ class TradeBrainExecutor: ObservableObject {
                Date().timeIntervalSince(lastTime) < cooldownSeconds {
                 skippedCooldown += 1
                 debugSkip(symbol: symbol, reason: "cooldown aktif")
+                if decision.action == .aggressiveBuy || decision.action == .accumulate {
+                    let priceForRecord = quotes[symbol]?.currentPrice ?? symbolCandles.last?.close ?? 0
+                    if priceForRecord > 0 {
+                        await OpportunityCostTracker.shared.recordSkip(
+                            symbol: symbol, price: priceForRecord,
+                            reason: .policyBlock, aetherScore: aetherScore
+                        )
+                    }
+                }
                 continue
             }
-            
+
             let currentPrice = quotes[symbol]?.currentPrice ?? symbolCandles.last?.close ?? 0
-            guard currentPrice > 0 else { 
+            guard currentPrice > 0 else {
                 skippedNoPrice += 1
                 debugSkip(symbol: symbol, reason: "fiyat yok (quote/candle)")
-                continue 
+                continue
             }
             
             let hasOpenPosition = openSymbols.contains(symbol)
@@ -211,6 +226,7 @@ class TradeBrainExecutor: ObservableObject {
                         candles: symbolCandles,
                         profile: profile,
                         kellyProfile: kellyProfile,
+                        verdicts: allVerdicts,
                         velocityAnalysis: velocityAnalysis,
                         correlMultiplier: correlResult.positionMultiplier
                     )
@@ -221,6 +237,12 @@ class TradeBrainExecutor: ObservableObject {
             } else {
                 ArgusLogger.warn("TradeBrainExecutor: \(symbol) - Zaten açık pozisyon var, alım yapılmayacak", category: "TRADEBRAIN")
                 debugSkip(symbol: symbol, reason: "zaten açık pozisyon var")
+                if decision.action == .aggressiveBuy || decision.action == .accumulate {
+                    await OpportunityCostTracker.shared.recordSkip(
+                        symbol: symbol, price: currentPrice,
+                        reason: .portfolioHot, aetherScore: aetherScore
+                    )
+                }
             }
             
             // SATIM KARARLARI (Plan bazlı - Trade Brain)
@@ -274,6 +296,9 @@ class TradeBrainExecutor: ObservableObject {
         }
 
         // ── YENİ: Crisis Alpha — kriz ortamında scalp fırsatları tara
+        if aetherScore >= 35 {
+            await MainActor.run { self.lastCrisisOpportunities = [] }
+        }
         if aetherScore < 35 {
             let crisisContext = CrisisAlphaScanner.CrisisContext(
                 aetherScore: aetherScore,
@@ -286,6 +311,7 @@ class TradeBrainExecutor: ObservableObject {
                 candleHistory: candles,
                 context: crisisContext
             )
+            await MainActor.run { self.lastCrisisOpportunities = alphaOpportunities }
             for opp in alphaOpportunities {
                 ArgusLogger.info("🎯 CrisisAlpha: \(opp.summary)", category: "TRADEBRAIN")
                 guard let decision = decisions[opp.symbol] else { continue }
@@ -309,8 +335,10 @@ class TradeBrainExecutor: ObservableObject {
                     candles: candles[opp.symbol] ?? [],
                     profile: crisisProfile,
                     kellyProfile: nil,
+                    verdicts: allVerdicts,
                     velocityAnalysis: velocityAnalysis,
-                    correlMultiplier: correlResult.positionMultiplier
+                    correlMultiplier: correlResult.positionMultiplier,
+                    isCrisisAlpha: true
                 )
             }
         }
@@ -330,8 +358,10 @@ class TradeBrainExecutor: ObservableObject {
         candles: [Candle],
         profile: SymbolExecutionProfile,
         kellyProfile: KellyCriterionSizer.KellyProfile? = nil,
+        verdicts: [AlkindusVerdict] = [],
         velocityAnalysis: AetherVelocityEngine.VelocityAnalysis? = nil,
-        correlMultiplier: Double = 1.0
+        correlMultiplier: Double = 1.0,
+        isCrisisAlpha: Bool = false
     ) async {
         ArgusLogger.info("executeBuy: \(symbol) - Fiyat: \(currentPrice)", category: "TRADEBRAIN")
 
@@ -353,16 +383,39 @@ class TradeBrainExecutor: ObservableObject {
             ArgusLogger.info("⚡ Velocity: \(vel.signal.rawValue) → çarpan: \(String(format: "%.2f", regimeMultiplier))", category: "TRADEBRAIN")
         }
 
-        // ── YENİ: Kelly çarpanı — Alkindus geçmişine dayalı boyut
-        let kellyMultiplier = kellyProfile?.positionMultiplier ?? 1.0
+        // ── YENİ: Kelly çarpanı — Alkindus geçmişine dayalı boyut (spesifik > sembol > sistem)
+        let effectiveKellyProfile: KellyCriterionSizer.KellyProfile
+        if !verdicts.isEmpty {
+            effectiveKellyProfile = KellyCriterionSizer.specificProfile(
+                symbol: symbol,
+                regime: currentRegime,
+                verdicts: verdicts
+            )
+        } else if let kp = kellyProfile {
+            effectiveKellyProfile = kp
+        } else {
+            effectiveKellyProfile = KellyCriterionSizer.KellyProfile(
+                winRate: 0.5, avgWinPct: 2.0, avgLossPct: 2.0,
+                sampleSize: 0, kellyFraction: 0.25,
+                confidence: .low(reason: "veri yok")
+            )
+        }
+        let kellyMultiplier = effectiveKellyProfile.positionMultiplier
 
         // ── YENİ: Korelasyon çarpanı — portföy konsantrasyonu
-        let finalMultiplier = regimeMultiplier * kellyMultiplier * correlMultiplier
-        ArgusLogger.info("📐 Çarpanlar: Rejim×\(String(format: "%.2f", regimeMultiplier)) Kelly×\(String(format: "%.2f", kellyMultiplier)) Korel×\(String(format: "%.2f", correlMultiplier)) → Final×\(String(format: "%.2f", finalMultiplier))", category: "TRADEBRAIN")
+        // CrisisAlpha: rejim bloğunu atla, profile.allocationMultiplier (0.15-0.40) direk kullan
+        let finalMultiplier: Double
+        if isCrisisAlpha {
+            finalMultiplier = 1.0  // profile.allocationMultiplier zaten küçük (0.15-0.40)
+            ArgusLogger.info("🎯 CrisisAlpha bypass: rejim bloğu atlandı, profile çarpanı geçerli", category: "TRADEBRAIN")
+        } else {
+            finalMultiplier = regimeMultiplier * kellyMultiplier * correlMultiplier
+            ArgusLogger.info("📐 Çarpanlar: Rejim×\(String(format: "%.2f", regimeMultiplier)) Kelly×\(String(format: "%.2f", kellyMultiplier)) Korel×\(String(format: "%.2f", correlMultiplier)) → Final×\(String(format: "%.2f", finalMultiplier))", category: "TRADEBRAIN")
 
-        guard finalMultiplier > 0 else {
-            log("🛑 \(symbol): Rejim bloğu — Aether:\(Int(regimeAetherScore)) Rejim:\(currentRegime.rawValue)")
-            return
+            guard finalMultiplier > 0 else {
+                log("🛑 \(symbol): Rejim bloğu — Aether:\(Int(regimeAetherScore)) Rejim:\(currentRegime.rawValue)")
+                return
+            }
         }
 
         let allocation: Double

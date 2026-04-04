@@ -18,7 +18,7 @@ struct CorrelationHeatGate {
         let groups: [CorrelationGroup]      // Gruplandırılmış pozisyonlar
         let positionMultiplier: Double      // Yeni alıma uygulanacak çarpan
 
-        enum ConcentrationLevel {
+        enum ConcentrationLevel: Equatable {
             case healthy    // Gerçek çeşitlendirme var
             case moderate   // Orta konsantrasyon
             case high       // Yüksek konsantrasyon
@@ -109,7 +109,7 @@ struct CorrelationHeatGate {
                 let symA = symbols[i]
                 let symB = symbols[j]
                 guard let histA = history[symA], let histB = history[symB],
-                      histA.count >= 5, histB.count >= 5 else {
+                      histA.count >= 11, histB.count >= 11 else {  // min 11 fiyat → 10 getiri → güvenilir Pearson
                     matrix[i][j] = 0.5
                     matrix[j][i] = 0.5
                     continue
@@ -133,7 +133,7 @@ struct CorrelationHeatGate {
 
     private static func pearsonCorrelation(_ a: [Double], _ b: [Double]) -> Double {
         let n = min(a.count, b.count)
-        guard n >= 3 else { return 0.5 }
+        guard n >= 10 else { return 0.5 }  // < 10 günlük veri → güvenilmez, nötr döndür
 
         let ax = Array(a.prefix(n))
         let bx = Array(b.prefix(n))
