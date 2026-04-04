@@ -272,6 +272,48 @@ class TradeBrainExecutor: ObservableObject {
                 bistBalance: bistBalance
             )
         }
+
+        // ── YENİ: Crisis Alpha — kriz ortamında scalp fırsatları tara
+        if aetherScore < 35 {
+            let crisisContext = CrisisAlphaScanner.CrisisContext(
+                aetherScore: aetherScore,
+                isActiveCrisis: true
+            )
+            let watchlistSymbols = Array(decisions.keys.filter { !openSymbols.contains($0) })
+            let alphaOpportunities = CrisisAlphaScanner.scan(
+                symbols: watchlistSymbols,
+                quotes: quotes,
+                candleHistory: candles,
+                context: crisisContext
+            )
+            for opp in alphaOpportunities {
+                ArgusLogger.info("🎯 CrisisAlpha: \(opp.summary)", category: "TRADEBRAIN")
+                guard let decision = decisions[opp.symbol] else { continue }
+                let crisisProfile = SymbolExecutionProfile(
+                    symbol: opp.symbol,
+                    tier: .defensive,
+                    allocationMultiplier: opp.positionSizeMultiplier,
+                    cooldownMultiplier: 1.0,
+                    minDecisionConfidence: 0.3,
+                    notes: ["CrisisAlpha: \(opp.opportunityType.rawValue)"]
+                )
+                await executeBuy(
+                    symbol: opp.symbol,
+                    decision: decision,
+                    currentPrice: opp.suggestedEntry,
+                    balance: balance,
+                    bistBalance: bistBalance,
+                    portfolio: portfolio,
+                    quotes: quotes,
+                    orionScore: 50,
+                    candles: candles[opp.symbol] ?? [],
+                    profile: crisisProfile,
+                    kellyProfile: nil,
+                    velocityAnalysis: velocityAnalysis,
+                    correlMultiplier: correlResult.positionMultiplier
+                )
+            }
+        }
     }
     
     // MARK: - Buy Execution

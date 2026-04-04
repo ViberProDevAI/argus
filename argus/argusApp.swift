@@ -192,11 +192,14 @@ struct argusApp: App {
                 }
 
                 // Opportunity Cost değerlendirmesi — 7 günü geçen bekleyen kayıtları değerlendir
-                let quotes = AppStateCoordinator.shared.agoraSnapshots
-                let prices = Dictionary(uniqueKeysWithValues: quotes.compactMap { snap -> (String, Double)? in
-                    guard snap.currentPrice > 0 else { return nil }
-                    return (snap.symbol, snap.currentPrice)
-                })
+                let prices: [String: Double] = await MainActor.run {
+                    Dictionary(uniqueKeysWithValues:
+                        MarketDataViewModel.shared.quotes.compactMap { (sym, q) -> (String, Double)? in
+                            guard q.currentPrice > 0 else { return nil }
+                            return (sym, q.currentPrice)
+                        }
+                    )
+                }
                 if !prices.isEmpty {
                     await OpportunityCostTracker.shared.evaluateMatureOpportunities(currentPrices: prices)
                     let signal = await OpportunityCostTracker.shared.calibrationSignal()
