@@ -190,6 +190,18 @@ struct argusApp: App {
                     print("Info: Alkindus RAG: Periyodik retry - \(pending) bekleyen")
                     await AlkindusSyncRetryQueue.shared.processRetryQueue()
                 }
+
+                // Opportunity Cost değerlendirmesi — 7 günü geçen bekleyen kayıtları değerlendir
+                let quotes = AppStateCoordinator.shared.agoraSnapshots
+                let prices = Dictionary(uniqueKeysWithValues: quotes.compactMap { snap -> (String, Double)? in
+                    guard snap.currentPrice > 0 else { return nil }
+                    return (snap.symbol, snap.currentPrice)
+                })
+                if !prices.isEmpty {
+                    await OpportunityCostTracker.shared.evaluateMatureOpportunities(currentPrices: prices)
+                    let signal = await OpportunityCostTracker.shared.calibrationSignal()
+                    print("💰 Opportunity Cost Kalibrasyon: \(signal.description)")
+                }
             }
         }
     }
