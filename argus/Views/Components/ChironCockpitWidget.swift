@@ -1,134 +1,52 @@
 import SwiftUI
 
 // MARK: - Chiron Cockpit Widget
-/// Shows recent learning events and Chiron status in Cockpit
+/// Sistemin öğrenme durumunu tek satırda gösterir.
+/// Geliştiriciye yönelik "weight update / rule change" logları UI'a sızmaz.
 struct ChironCockpitWidget: View {
-    @State private var recentEvents: [ChironLearningEvent] = []
+    @State private var recentEventCount: Int = 0
     @State private var showChironDetail = false
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header
-            HStack {
-                Image(systemName: "brain.head.profile")
-                    .foregroundColor(.green)
-                
-                Text("CHİRON ÖĞRENİYOR")
-                    .font(.caption)
-                    .bold()
-                    .foregroundColor(Theme.textSecondary)
-                
-                Spacer()
-                
-                Button(action: { showChironDetail = true }) {
-                    HStack(spacing: 4) {
-                        Text("Detaylar")
-                            .font(.caption2)
-                        Image(systemName: "chevron.right")
-                            .font(.caption2)
-                    }
-                    .foregroundColor(Theme.tint)
-                }
-            }
-            .padding(.horizontal)
-            
-            // Content
-            if recentEvents.isEmpty {
-                // Empty State
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Sistem Öğrenmeye Hazır")
-                            .font(.subheadline)
-                            .foregroundColor(.white)
-                        Text("Trade'ler kapandıkça Chiron öğrenecek ve ağırlıkları optimize edecek.")
-                            .font(.caption2)
-                            .foregroundColor(.gray)
-                    }
-                    
+        // Öğrenme verisi yoksa widget'ı hiç gösterme
+        if recentEventCount == 0 { return AnyView(EmptyView()) }
+
+        return AnyView(
+            Button(action: { showChironDetail = true }) {
+                HStack(spacing: 10) {
+                    Circle()
+                        .fill(Color.green.opacity(0.85))
+                        .frame(width: 7, height: 7)
+
+                    Text("Sistem son \(recentEventCount) işlemi analiz etti")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.6))
+
                     Spacer()
-                    
-                    // Animated Brain
-                    ZStack {
-                        Circle()
-                            .fill(Color.green.opacity(0.1))
-                            .frame(width: 50, height: 50)
-                        Image(systemName: "brain")
-                            .font(.title2)
-                            .foregroundColor(.green)
-                    }
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10))
+                        .foregroundColor(.gray)
                 }
-                .padding()
-                .background(Color.green.opacity(0.05))
-                .cornerRadius(12)
-                .padding(.horizontal)
-            } else {
-                // Recent Events
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(recentEvents.prefix(5)) { event in
-                            ChironEventChip(event: event)
-                        }
-                    }
-                    .padding(.horizontal)
-                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.white.opacity(0.04))
+                .cornerRadius(10)
             }
-        }
-        .task {
-            recentEvents = await ChironDataLakeService.shared.loadLearningEvents()
-        }
-        .sheet(isPresented: $showChironDetail) {
-            ChironDetailView()
-        }
+            .buttonStyle(.plain)
+            .task {
+                let events = await ChironDataLakeService.shared.loadLearningEvents()
+                recentEventCount = events.count
+            }
+            .sheet(isPresented: $showChironDetail) {
+                ChironDetailView()
+            }
+        )
     }
 }
 
-// MARK: - Event Chip
+// MARK: - Backward compat shell (referenced elsewhere but no longer used in UI)
 struct ChironEventChip: View {
     let event: ChironLearningEvent
-    
-    var chipColor: Color {
-        switch event.eventType {
-        case .weightUpdate: return .blue
-        case .ruleAdded: return .green
-        case .ruleRemoved: return .red
-        case .analysisCompleted: return .cyan
-        case .anomalyDetected: return .orange
-        case .forwardTest: return .purple
-        }
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                if let symbol = event.symbol {
-                    Text(symbol)
-                        .font(.caption)
-                        .bold()
-                        .foregroundColor(.white)
-                }
-                
-                if let engine = event.engine {
-                    Text(engine == .corse ? "" : "⚡")
-                        .font(.caption)
-                }
-            }
-            
-            Text(event.description)
-                .font(.caption2)
-                .foregroundColor(.white.opacity(0.8))
-                .lineLimit(2)
-            
-            Text(event.date, style: .relative)
-                .font(.caption2)
-                .foregroundColor(.gray)
-        }
-        .padding(12)
-        .frame(width: 160)
-        .background(chipColor.opacity(DesignTokens.Opacity.glassCard))
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(chipColor.opacity(0.3), lineWidth: 1)
-        )
-    }
+    var body: some View { EmptyView() }
 }

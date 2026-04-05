@@ -2,311 +2,296 @@ import SwiftUI
 
 struct SignalsView: View {
     @ObservedObject var viewModel: TradingViewModel
-    @ObservedObject private var localization = LocalizationManager.shared // Observe
     @State private var isScanning = false
-    
+
     var body: some View {
         NavigationView {
             ScrollView {
-                VStack(spacing: 24) {
-                    // Header Info
-                    HStack {
-                        Image(systemName: "antenna.radiowaves.left.and.right")
-                            .foregroundColor(Theme.tint)
-                        Text("ai_signals_header".localized())
-                            .font(.headline)
-                        Spacer()
-                        
-                        if isScanning {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            HStack(spacing: 16) {
-                                // Live Tracker Journal
-                                NavigationLink(destination: SignalJournalView()) {
-                                    Image(systemName: "list.bullet.clipboard")
-                                        .foregroundColor(Theme.tint)
-                                }
-                                
-                                Button(action: scan) {
-                                    Image(systemName: "arrow.clockwise")
-                                        .foregroundColor(Theme.tint)
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top)
-                    
-                    // Macro Warning Banner
+                VStack(spacing: 20) {
+
+                    // ── Makro durum bandı ────────────────────────────────
                     if let macro = viewModel.macroRating {
-                        HStack(spacing: 12) {
-                            Image(systemName: macro.regime == .riskOn ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
-                                .font(.title2)
-                                .foregroundColor(macro.regime == .riskOn ? .green : (macro.regime == .neutral ? .yellow : .red))
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("ARGUS AETHER: \(macro.letterGrade) – \(macro.regime.displayName)")
-                                    .font(.subheadline)
-                                    .bold()
-                                    .foregroundColor(Theme.textPrimary)
-                                
-                                Text(macro.summary)
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textSecondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                        }
-                        .padding()
-                        .background(
-                            (macro.regime == .riskOn ? Theme.positive : (macro.regime == .neutral ? Theme.warning : Theme.negative))
-                                .opacity(DesignTokens.Opacity.glassCard)
-                        )
-                        .cornerRadius(12)
-                        .padding(.horizontal)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(macro.regime == .riskOn ? Theme.positive : (macro.regime == .neutral ? Theme.warning : Theme.negative), lineWidth: 1)
-                                .padding(.horizontal)
-                                .opacity(0.3)
-                        )
+                        MacroStatusBanner(macro: macro)
+                            .padding(.horizontal)
                     }
-                    
+
                     if viewModel.aiSignals.isEmpty {
                         SignalsEmptyStateView(action: scan, isScanning: isScanning)
                     } else {
-                        // 1. GÜÇLÜ AL SİNYALLERİ (Skor > 85)
-                        let strongBuySignals = viewModel.aiSignals.filter { $0.action == .buy && $0.confidenceScore >= 85 }
-                        if !strongBuySignals.isEmpty {
-                            SignalSection(title: "strong_buy_signals".localized(), signals: strongBuySignals, color: Theme.positive, viewModel: viewModel)
+                        // Güçlü Al
+                        let strongBuy = viewModel.aiSignals.filter { $0.action == .buy && $0.confidenceScore >= 85 }
+                        if !strongBuy.isEmpty {
+                            SignalSection(title: "Güçlü Al", signals: strongBuy, color: .green, viewModel: viewModel)
                         }
-                        
-                        // 2. AL SİNYALLERİ (Skor 70-85)
-                        let buySignals = viewModel.aiSignals.filter { $0.action == .buy && $0.confidenceScore < 85 }
-                        if !buySignals.isEmpty {
-                            SignalSection(title: "buy_signals".localized(), signals: buySignals, color: .green, viewModel: viewModel)
+
+                        // Al
+                        let buy = viewModel.aiSignals.filter { $0.action == .buy && $0.confidenceScore < 85 }
+                        if !buy.isEmpty {
+                            SignalSection(title: "Al", signals: buy, color: Color(red: 0.3, green: 0.85, blue: 0.4), viewModel: viewModel)
                         }
-                        
-                        // 3. SAT SİNYALLERİ
-                        let sellSignals = viewModel.aiSignals.filter { $0.action == .sell }
-                        if !sellSignals.isEmpty {
-                            SignalSection(title: "sell_signals".localized(), signals: sellSignals, color: Theme.negative, viewModel: viewModel)
+
+                        // Sat
+                        let sell = viewModel.aiSignals.filter { $0.action == .sell }
+                        if !sell.isEmpty {
+                            SignalSection(title: "Sat", signals: sell, color: Theme.negative, viewModel: viewModel)
                         }
                     }
                 }
-                .padding(.bottom, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 30)
             }
-            .navigationTitle("signals_title".localized())
+            .navigationTitle("Sinyaller")
+            .navigationBarTitleDisplayMode(.large)
             .background(Theme.background)
-            .onAppear {
-                // Eğer sinyal yoksa otomatik tara
-                if viewModel.aiSignals.isEmpty {
-                    scan()
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: SignalJournalView()) {
+                        Image(systemName: "list.bullet.clipboard")
+                            .foregroundColor(Theme.tint)
+                    }
+                    if isScanning {
+                        ProgressView().scaleEffect(0.8)
+                    } else {
+                        Button(action: scan) {
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(Theme.tint)
+                        }
+                    }
                 }
+            }
+            .onAppear {
+                if viewModel.aiSignals.isEmpty { scan() }
             }
         }
     }
-    
+
     private func scan() {
         isScanning = true
         Task {
-            // ViewModel üzerinden sinyal üretimini tetikle
             await viewModel.generateAISignals()
             isScanning = false
         }
     }
 }
 
-// MARK: - Subviews
+// MARK: - Macro Status Banner
+
+private struct MacroStatusBanner: View {
+    let macro: MacroRating
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: bannerIcon)
+                .font(.system(size: 18))
+                .foregroundColor(bannerColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(bannerTitle)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.white)
+                Text(macro.summary)
+                    .font(.system(size: 12))
+                    .foregroundColor(.white.opacity(0.7))
+                    .lineLimit(2)
+            }
+
+            Spacer()
+        }
+        .padding(12)
+        .background(bannerColor.opacity(0.10))
+        .cornerRadius(12)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(bannerColor.opacity(0.25), lineWidth: 1))
+    }
+
+    private var bannerTitle: String {
+        switch macro.regime {
+        case .riskOn:  return "Piyasa ortamı elverişli"
+        case .neutral: return "Piyasa ortamı karışık"
+        case .riskOff: return "Piyasa ortamı olumsuz"
+        }
+    }
+
+    private var bannerIcon: String {
+        switch macro.regime {
+        case .riskOn:  return "checkmark.shield.fill"
+        case .neutral: return "minus.circle.fill"
+        case .riskOff: return "exclamationmark.shield.fill"
+        }
+    }
+
+    private var bannerColor: Color {
+        switch macro.regime {
+        case .riskOn:  return .green
+        case .neutral: return .yellow
+        case .riskOff: return .red
+        }
+    }
+}
+
+// MARK: - Signal Section
 
 struct SignalSection: View {
     let title: String
     let signals: [AISignal]
     let color: Color
     @ObservedObject var viewModel: TradingViewModel
-    
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.title3)
-                .bold()
-                .foregroundColor(color)
-                .padding(.horizontal)
-            
+        VStack(alignment: .leading, spacing: 10) {
+            // Bölüm başlığı — sade
+            HStack(spacing: 6) {
+                Circle().fill(color).frame(width: 8, height: 8)
+                Text(title)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(color)
+                Text("(\(signals.count))")
+                    .font(.system(size: 12))
+                    .foregroundColor(.gray)
+            }
+            .padding(.horizontal, 16)
+
             ForEach(signals) { signal in
                 NavigationLink(destination: StockDetailView(symbol: signal.symbol, viewModel: viewModel)) {
                     AISignalCard(signal: signal, orion: viewModel.orionScores[signal.symbol])
                 }
+                .buttonStyle(.plain)
             }
         }
     }
 }
 
+// MARK: - AI Signal Card (skor dairesi yok, aksiyon + neden ön planda)
+
 struct AISignalCard: View {
     let signal: AISignal
-    // Optional Orion Result (passed via environment or view model lookup in parent)
     var orion: OrionScoreResult? = nil
-    
+
     var body: some View {
-        HStack(spacing: 16) {
-            // Score Circle (Orion or AI Confidence)
-            ZStack {
-                Circle()
-                    .stroke(lineWidth: 3)
-                    .foregroundColor(displayColor.opacity(0.3))
-                
-                Circle()
-                    .trim(from: 0, to: CGFloat(displayScore) / 100.0)
-                    .stroke(style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .foregroundColor(displayColor)
-                    .rotationEffect(.degrees(-90))
-                
-                VStack(spacing: 0) {
-                    Text("\(Int(displayScore))")
-                        .font(.caption)
-                        .bold()
-                        .foregroundColor(displayColor)
-                    if let o = orion {
-                        Text(orionGrade(o.score))
-                            .font(.system(size: 8))
-                            .bold()
-                            .foregroundColor(displayColor)
-                    }
-                }
-            }
-            .frame(width: 50, height: 50)
-            
-            // Info
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
+        HStack(spacing: 14) {
+            // Logo
+            CompanyLogoView(symbol: signal.symbol, size: 40, cornerRadius: 20)
+                .overlay(Circle().stroke(Color.white.opacity(0.08), lineWidth: 1))
+
+            // Orta: sembol + neden
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 8) {
                     Text(signal.symbol)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Text(signal.action.rawValue)
-                        .font(.caption)
-                        .bold()
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(displayColor.opacity(0.2))
-                        .foregroundColor(displayColor)
-                        .cornerRadius(4)
-                    
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.white)
+
+                    // Aksiyon pill
+                    Text(localizedAction)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(actionColor)
+                        .cornerRadius(6)
+
                     Spacer()
-                    
+
                     Text(timeAgo(signal.timestamp))
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
                 }
-                
-                if let o = orion {
-                    // Orion Summary
-                    HStack(spacing: 8) {
-                        Text("Orion Tech: \(orionGrade(o.score))")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                        // Removed invalid fundamental/aether references
-                    }
-                } else {
-                    Text(signal.strategyName)
-                        .font(.caption)
-                        .bold()
-                        .foregroundColor(.secondary)
-                }
-                
-                Text(orion != nil ? "\(orion!.verdict): \(orion!.components.trendDesc)" : signal.reason)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+
+                // Birincil neden — büyük ve net
+                Text(primaryReason)
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.8))
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
             }
-            
-            Spacer()
-            
+
             Image(systemName: "chevron.right")
-                .foregroundColor(.secondary)
-                .font(.caption)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.gray)
         }
-        .padding()
+        .padding(14)
         .background(Theme.secondaryBackground)
-        .cornerRadius(12)
-        .padding(.horizontal)
-        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .cornerRadius(14)
+        .padding(.horizontal, 16)
     }
-    
-    var displayScore: Double {
-        return orion?.score ?? signal.confidenceScore
-    }
-    
-    var displayColor: Color {
-        if let o = orion {
-            return Theme.colorForScore(o.score)
-        }
-        return actionColor(signal.action)
-    }
-    
-    func actionColor(_ action: SignalAction) -> Color {
-        switch action {
-        case .buy: return Theme.positive
-        case .sell: return Theme.negative
-        case .hold: return .gray
-        case .wait: return .gray
-        case .skip: return .gray
+
+    // MARK: - Helpers
+
+    private var localizedAction: String {
+        switch signal.action {
+        case .buy:  return "AL"
+        case .sell: return "SAT"
+        case .hold: return "BEKLE"
+        case .wait: return "İZLE"
+        case .skip: return "PAS"
         }
     }
-    
-    func orionGrade(_ score: Double) -> String {
-        switch score {
-        case 90...100: return "A+"
-        case 80..<90: return "A"
-        case 70..<80: return "B"
-        case 60..<70: return "C"
-        case 50..<60: return "D"
-        default: return "F"
+
+    private var actionColor: Color {
+        switch signal.action {
+        case .buy:  return .green
+        case .sell: return .red
+        case .hold: return Color(white: 0.4)
+        case .wait: return Color(white: 0.4)
+        case .skip: return Color(white: 0.4)
         }
     }
-    
-    func timeAgo(_ date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .abbreviated
-        return formatter.localizedString(for: date, relativeTo: Date())
+
+    /// Orion varsa onun net yorumunu, yoksa signal.reason'ı göster
+    private var primaryReason: String {
+        if let o = orion, !o.verdict.isEmpty {
+            return o.verdict
+        }
+        return signal.reason.isEmpty ? signal.strategyName : signal.reason
+    }
+
+    private func timeAgo(_ date: Date) -> String {
+        let diff = Int(Date().timeIntervalSince(date))
+        if diff < 60 { return "şimdi" }
+        if diff < 3600 { return "\(diff / 60) dk" }
+        if diff < 86400 { return "\(diff / 3600) sa" }
+        return "\(diff / 86400) gün"
     }
 }
+
+// MARK: - Empty State
 
 struct SignalsEmptyStateView: View {
     let action: () -> Void
     let isScanning: Bool
-    
+
     var body: some View {
         VStack(spacing: 20) {
             Image(systemName: "waveform.path.ecg")
-                .font(.system(size: 60))
-                .foregroundColor(.secondary.opacity(0.5))
-            
-            Text(isScanning ? "scanning".localized() : "no_signals".localized())
-                .font(.headline)
-                .foregroundColor(.secondary)
-            
-            Text(isScanning ? "Stratejiler geçmiş veriler üzerinde test ediliyor.\nLütfen bekleyin." : "İzleme listendeki hisseler için güçlü bir sinyal bulunamadı.\nTekrar taramak için butona bas.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-            
+                .font(.system(size: 52))
+                .foregroundColor(.gray.opacity(0.4))
+
+            VStack(spacing: 6) {
+                Text(isScanning ? "Taranıyor..." : "Sinyal bulunamadı")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(.gray)
+                Text(isScanning
+                    ? "İzleme listendeki hisseler analiz ediliyor."
+                    : "Şu an güçlü bir sinyal yok. Tekrar taramayı dene.")
+                    .font(.system(size: 13))
+                    .foregroundColor(.gray.opacity(0.7))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
+            }
+
             if !isScanning {
                 Button(action: action) {
-                    HStack {
+                    HStack(spacing: 6) {
                         Image(systemName: "magnifyingglass")
-                        Text("scan_market".localized())
+                        Text("Tara")
                     }
-                    .bold()
-                    .padding()
-                    .background(Theme.tint)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(.white)
-                    .cornerRadius(10)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 12)
+                    .background(Theme.tint)
+                    .cornerRadius(12)
                 }
             }
         }
-        .padding(.top, 50)
+        .padding(.top, 60)
     }
 }

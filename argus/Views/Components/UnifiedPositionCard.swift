@@ -210,40 +210,34 @@ struct UnifiedPositionCard: View {
     private var decisionAndSignalSection: some View {
         VStack(alignment: .leading, spacing: 10) {
 
-            // Konsey: action pill + aether stance — tek satır, sade
+            // Argus görüşü — aksiyon + piyasa durumu, sade Türkçe
             if let decision {
                 HStack(spacing: 6) {
-                    tagPill(text: decision.action.rawValue, color: actionColor(decision.action))
+                    tagPill(text: humanAction(decision.action), color: actionColor(decision.action))
                     tagPill(
-                        text: decision.aetherDecision.stance.rawValue,
+                        text: humanStance(decision.aetherDecision.stance),
                         color: aetherColor(decision.aetherDecision.stance)
                     )
                     Spacer()
-                    Text("Konsey")
-                        .font(InstitutionalTheme.Typography.micro)
-                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 }
             }
 
-            // Conviction Meter — Güven chip'in yerini alır, çok daha fazla bilgi taşır
+            // Conviction — güven çürümesi göstergesi
             if let cv = conviction {
                 ConvictionMeterView(conviction: cv)
             }
 
-            // Chimera — yalnızca medium/high severity'de göster, tek satır kompakt
-            if let cs = chimeraSignal, cs.severity >= 0.35 {
-                HStack(spacing: 6) {
+            // Chimera sinyali — yalnızca belirgin olunca, düz Türkçe
+            if let cs = chimeraSignal, cs.severity >= 0.45 {
+                HStack(spacing: 8) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 10))
                         .foregroundColor(chimeraColor(cs.type))
-                    Text(cs.title)
+                    Text(humanChimeraSignal(cs))
                         .font(InstitutionalTheme.Typography.micro)
                         .foregroundColor(chimeraColor(cs.type))
                         .lineLimit(1)
                     Spacer()
-                    Text("%\(Int(cs.severity * 100))")
-                        .font(InstitutionalTheme.Typography.micro)
-                        .foregroundColor(chimeraColor(cs.type))
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
@@ -343,25 +337,19 @@ struct UnifiedPositionCard: View {
     }
 
     private func deltaBadgeSection(_ delta: PositionDeltaTracker.PositionDelta) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text("Delta")
-                    .font(InstitutionalTheme.Typography.micro)
-                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                Spacer()
-                Text(delta.significance.rawValue)
-                    .font(InstitutionalTheme.Typography.micro)
-                    .foregroundColor(significanceColor(delta.significance))
-            }
-
+        HStack(spacing: 8) {
+            Image(systemName: delta.significance == .critical ? "exclamationmark.triangle.fill" : "arrow.triangle.2.circlepath")
+                .font(.system(size: 11))
+                .foregroundColor(significanceColor(delta.significance))
             Text(delta.summaryText)
                 .font(InstitutionalTheme.Typography.micro)
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .lineLimit(1)
+            Spacer()
         }
         .padding(.horizontal, InstitutionalTheme.Spacing.md)
-        .padding(.vertical, InstitutionalTheme.Spacing.sm)
-        .background(significanceColor(delta.significance).opacity(0.10))
+        .padding(.vertical, 8)
+        .background(significanceColor(delta.significance).opacity(0.07))
     }
 
     private var actionButtonsSection: some View {
@@ -446,6 +434,38 @@ struct UnifiedPositionCard: View {
         case .medium: return InstitutionalTheme.Colors.primary
         case .high: return InstitutionalTheme.Colors.warning
         case .critical: return InstitutionalTheme.Colors.negative
+        }
+    }
+
+    // MARK: - Human-readable translations (no internal jargon in UI)
+
+    private func humanAction(_ action: ArgusAction) -> String {
+        switch action {
+        case .aggressiveBuy: return "Güçlü al"
+        case .accumulate:    return "Kademeli al"
+        case .neutral:       return "Tut"
+        case .trim:          return "Bir kısmını sat"
+        case .liquidate:     return "Çık"
+        }
+    }
+
+    private func humanStance(_ stance: MacroStance) -> String {
+        switch stance {
+        case .riskOn:    return "Piyasa olumlu"
+        case .cautious:  return "Temkinli"
+        case .defensive: return "Savunmacı"
+        case .riskOff:   return "Piyasa olumsuz"
+        }
+    }
+
+    private func humanChimeraSignal(_ cs: ChimeraSignal) -> String {
+        switch cs.type {
+        case .deepValueBuy:        return "Değer fırsatı görülüyor"
+        case .bullTrap:            return "Boğa tuzağı riski"
+        case .momentumBreakout:    return "Momentum kırılımı"
+        case .fallingKnife:        return "Düşen bıçak — dikkat"
+        case .sentimentDivergence: return "Duygu-fiyat ayrışması"
+        case .perfectStorm:        return "Çoklu sinyal çakışması"
         }
     }
 

@@ -12,6 +12,11 @@ struct ArgusIntelligenceDiagView: View {
     @State private var isFlushingRAG = false
     @State private var lastRefresh = Date()
 
+    // Yeni sistemler
+    @State private var velocityData: VelocityDiagData? = nil
+    @State private var kellyData: KellyDiagData? = nil
+    @State private var oppCostData: OppCostDiagData? = nil
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -40,6 +45,23 @@ struct ArgusIntelligenceDiagView: View {
                     }
                     diagSection("RAG SYNC KUYRUĞU", icon: "arrow.clockwise.icloud", color: .cyan) {
                         ragSection(s.rag)
+                    }
+
+                    // ─── Yeni İstihbarat Sistemleri ───────────────────────
+                    diagSection("AETHER HIZ ANALİZİ", icon: "speedometer", color: .mint) {
+                        velocitySection()
+                    }
+                    diagSection("KELLY POZİSYON BOYUTU", icon: "chart.pie.fill", color: .indigo) {
+                        kellySection()
+                    }
+                    diagSection("PORTFÖY KORELASYON ISISI", icon: "network", color: .teal) {
+                        correlSection()
+                    }
+                    diagSection("KRİZ ALFA FIRSAT", icon: "bolt.fill", color: .red) {
+                        crisisSection()
+                    }
+                    diagSection("FIRSATÇILIK MALİYETİ", icon: "dollarsign.arrow.circlepath", color: .orange) {
+                        oppCostSection()
                     }
                 }
             }
@@ -323,9 +345,15 @@ struct ArgusIntelligenceDiagView: View {
         async let chironStats = loadChironStats()
         async let alkindusStats = loadAlkindusStats()
         async let ragStats = loadRAGStats()
+        async let velData = loadVelocityData()
+        async let klyData = loadKellyData()
+        async let ocData = loadOppCostData()
 
         let (t, c, a, r) = await (tradeStats, chironStats, alkindusStats, ragStats)
         snapshot = DiagSnapshot(trade: t, chiron: c, alkindus: a, rag: r)
+        velocityData = await velData
+        kellyData = await klyData
+        oppCostData = await ocData
         lastRefresh = Date()
         isLoading = false
     }
@@ -372,6 +400,251 @@ struct ArgusIntelligenceDiagView: View {
     private func loadRAGStats() async -> RAGStats2 {
         let count = await AlkindusSyncRetryQueue.shared.queueCount()
         return RAGStats2(pendingCount: count)
+    }
+
+    private func loadVelocityData() async -> VelocityDiagData {
+        let analysis = await AetherVelocityEngine.shared.analyze()
+        return VelocityDiagData(
+            signal: analysis.signal.rawValue,
+            velocity: analysis.velocity,
+            currentScore: analysis.currentScore,
+            crossingAlert: analysis.crossingAlert?.description,
+            signalColor: velocitySignalColor(analysis.signal)
+        )
+    }
+
+    private func loadKellyData() async -> KellyDiagData {
+        let profile = await KellyCache.shared.getSystemProfile()
+        let confText: String
+        switch profile.confidence {
+        case .low(let r): confText = "Düşük (\(r))"
+        case .medium:     confText = "Orta"
+        case .high:       confText = "Yüksek"
+        }
+        return KellyDiagData(
+            winRate: profile.winRate,
+            kellyFraction: profile.kellyFraction,
+            effectiveFraction: profile.effectiveFraction,
+            positionMultiplier: profile.positionMultiplier,
+            sampleSize: profile.sampleSize,
+            confidence: confText,
+            avgWinPct: profile.avgWinPct,
+            avgLossPct: profile.avgLossPct
+        )
+    }
+
+    private func loadOppCostData() async -> OppCostDiagData {
+        let summary = await OpportunityCostTracker.shared.getSummary(lastNDays: 30)
+        let signal = await OpportunityCostTracker.shared.calibrationSignal()
+        return OppCostDiagData(
+            totalMissed: summary.totalMissed,
+            goodSkips: summary.goodSkips,
+            missedGains: summary.missedGains,
+            avgMissedReturn: summary.avgMissedReturn,
+            skipAccuracy: summary.skipAccuracy,
+            calibrationSignal: signal.description,
+            isTooCautious: summary.isTooCautious,
+            isWellCalibrated: summary.isWellCalibrated
+        )
+    }
+
+    // MARK: - New Intelligence Sections
+
+    @ViewBuilder
+    private func velocitySection() -> some View {
+        if let v = velocityData {
+            HStack(spacing: 0) {
+                bigStat(
+                    value: String(format: "%.1f", v.currentScore),
+                    label: "Mevcut Aether",
+                    color: v.currentScore >= 55 ? .green : v.currentScore >= 35 ? .orange : .red
+                )
+                Divider().frame(height: 40).background(Color.white.opacity(0.1))
+                bigStat(
+                    value: String(format: "%+.1f/gün", v.velocity),
+                    label: "Hız",
+                    color: v.velocity > 0 ? .green : v.velocity < 0 ? .red : .gray
+                )
+            }
+            .padding(.vertical, 8)
+
+            diagRow(label: "Sinyal", value: v.signal, valueColor: v.signalColor)
+            if let alert = v.crossingAlert {
+                diagRow(label: "Eşik Uyarısı", value: alert, valueColor: .yellow)
+            } else {
+                diagRow(label: "Eşik Uyarısı", value: "Yok", valueColor: .gray)
+            }
+        } else {
+            emptyState("Henüz Aether kaydı yok — sistem çalışmaya başlayınca dolacak")
+        }
+    }
+
+    @ViewBuilder
+    private func kellySection() -> some View {
+        if let k = kellyData {
+            HStack(spacing: 0) {
+                bigStat(
+                    value: String(format: "%.0f%%", k.winRate * 100),
+                    label: "Kazanma Oranı",
+                    color: k.winRate >= 0.55 ? .green : k.winRate >= 0.45 ? .orange : .red
+                )
+                Divider().frame(height: 40).background(Color.white.opacity(0.1))
+                bigStat(
+                    value: String(format: "%.2f", k.kellyFraction),
+                    label: "Kelly f*",
+                    color: .white
+                )
+                Divider().frame(height: 40).background(Color.white.opacity(0.1))
+                bigStat(
+                    value: String(format: "%.2fx", k.positionMultiplier),
+                    label: "Pozisyon Çarpanı",
+                    color: k.positionMultiplier >= 1.0 ? .green : k.positionMultiplier >= 0.5 ? .orange : .red
+                )
+            }
+            .padding(.vertical, 8)
+
+            diagRow(label: "Güven", value: k.confidence,
+                    valueColor: k.confidence.contains("Yüksek") ? .green : k.confidence.contains("Orta") ? .orange : .red)
+            diagRow(label: "Örneklem", value: "\(k.sampleSize) verdict")
+            diagRow(label: "Ort. Kazanç / Kayıp", value: String(format: "%.1f%% / %.1f%%", k.avgWinPct, k.avgLossPct))
+            if k.sampleSize < 10 {
+                warningBadge("Yeterli veri yok — \(k.sampleSize) örnek. Kelly güvenilir olmak için 10+ gerektirir")
+            }
+        } else {
+            emptyState("Yükleniyor...")
+        }
+    }
+
+    @ViewBuilder
+    private func correlSection() -> some View {
+        if let cr = TradeBrainExecutor.shared.lastCorrelResult {
+            HStack(spacing: 0) {
+                bigStat(
+                    value: "\(cr.rawPositionCount)",
+                    label: "Ham Pozisyon"
+                )
+                Divider().frame(height: 40).background(Color.white.opacity(0.1))
+                bigStat(
+                    value: String(format: "%.1f", cr.effectivePositionCount),
+                    label: "Bağımsız Risk",
+                    color: cr.rawPositionCount == 0 ? .gray :
+                           cr.effectivePositionCount / Double(max(1, cr.rawPositionCount)) < 0.5 ? .red : .green
+                )
+            }
+            .padding(.vertical, 8)
+
+            diagRow(
+                label: "Konsantrasyon",
+                value: cr.concentrationRisk.label,
+                valueColor: cr.concentrationRisk == .healthy ? .green :
+                            cr.concentrationRisk == .moderate ? .yellow :
+                            cr.concentrationRisk == .high ? .orange : .red
+            )
+            diagRow(
+                label: "Yeni Alım Çarpanı",
+                value: String(format: "%.0f%%", cr.positionMultiplier * 100),
+                valueColor: cr.positionMultiplier >= 1.0 ? .green : cr.positionMultiplier > 0 ? .orange : .red
+            )
+            if !cr.groups.isEmpty {
+                diagRow(label: "Gruplar", value: cr.groups.map { "\($0.label) (\($0.symbols.count))" }.joined(separator: ", "))
+            }
+            if cr.concentrationRisk == .critical {
+                warningBadge("Kritik: Tüm pozisyonlar aynı risk grubunda — yeni alım engellendi")
+            }
+        } else {
+            emptyState("Henüz korelasyon analizi yapılmadı — bir sonraki karar döngüsünde hesaplanacak")
+        }
+    }
+
+    @ViewBuilder
+    private func crisisSection() -> some View {
+        let opps = TradeBrainExecutor.shared.lastCrisisOpportunities
+        if opps.isEmpty {
+            emptyState("Aktif kriz fırsatı yok — Aether < 35 olduğunda sistem otomatik tarar")
+        } else {
+            ForEach(Array(opps.enumerated()), id: \.offset) { _, opp in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(opp.symbol)
+                            .font(.system(size: 13, weight: .bold, design: .monospaced))
+                            .foregroundColor(.white)
+                        Spacer()
+                        Text(opp.opportunityType.rawValue)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.red.opacity(0.15))
+                            .cornerRadius(6)
+                    }
+                    HStack {
+                        Text(String(format: "Güven: %.0f%%", opp.confidence * 100))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.orange)
+                        Spacer()
+                        Text(String(format: "Boyut: %.0f%%", opp.positionSizeMultiplier * 100))
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(.yellow)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                Divider().background(Color.white.opacity(0.05)).padding(.horizontal, 16)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func oppCostSection() -> some View {
+        if let oc = oppCostData {
+            if oc.totalMissed == 0 {
+                emptyState("Henüz değerlendirilen atlanan fırsat yok (7 günlük pencere bekleniyor)")
+            } else {
+                HStack(spacing: 0) {
+                    bigStat(value: "\(oc.totalMissed)", label: "Toplam Atlama")
+                    Divider().frame(height: 40).background(Color.white.opacity(0.1))
+                    bigStat(
+                        value: "\(oc.goodSkips)",
+                        label: "Haklı Atlama",
+                        color: .green
+                    )
+                    Divider().frame(height: 40).background(Color.white.opacity(0.1))
+                    bigStat(
+                        value: "\(oc.missedGains)",
+                        label: "Kaçırılan Fırsat",
+                        color: .red
+                    )
+                }
+                .padding(.vertical, 8)
+
+                diagRow(
+                    label: "Atlama Doğruluğu",
+                    value: String(format: "%.0f%%", oc.skipAccuracy * 100),
+                    valueColor: oc.isWellCalibrated ? .green : oc.isTooCautious ? .orange : .yellow
+                )
+                diagRow(label: "Ort. Kaçırılan Getiri", value: String(format: "%+.1f%%", oc.avgMissedReturn),
+                        valueColor: oc.avgMissedReturn > 5 ? .red : .gray)
+                diagRow(label: "Kalibrasyon", value: oc.calibrationSignal,
+                        valueColor: oc.isWellCalibrated ? .green : oc.isTooCautious ? .orange : .yellow)
+
+                if oc.isTooCautious {
+                    warningBadge("Sistem çok temkinli: Fırsatların büyük çoğunluğu kaçırılıyor — eşikler gözden geçirilmeli")
+                }
+            }
+        } else {
+            emptyState("Yükleniyor...")
+        }
+    }
+
+    // MARK: - Velocity Color Helper
+
+    private func velocitySignalColor(_ signal: AetherVelocityEngine.VelocitySignal) -> Color {
+        switch signal {
+        case .recoveringFast: return .green
+        case .recovering:     return Color(red: 0.5, green: 0.9, blue: 0.3)
+        case .stable:         return .gray
+        case .deteriorating:  return .orange
+        case .deterioratingFast: return .red
+        }
     }
 }
 
@@ -457,4 +730,34 @@ private struct HealthStatus {
     let subtitle: String
     let icon: String
     let color: Color
+}
+
+private struct VelocityDiagData {
+    let signal: String
+    let velocity: Double
+    let currentScore: Double
+    let crossingAlert: String?
+    let signalColor: Color
+}
+
+private struct KellyDiagData {
+    let winRate: Double
+    let kellyFraction: Double
+    let effectiveFraction: Double
+    let positionMultiplier: Double
+    let sampleSize: Int
+    let confidence: String
+    let avgWinPct: Double
+    let avgLossPct: Double
+}
+
+private struct OppCostDiagData {
+    let totalMissed: Int
+    let goodSkips: Int
+    let missedGains: Int
+    let avgMissedReturn: Double
+    let skipAccuracy: Double
+    let calibrationSignal: String
+    let isTooCautious: Bool
+    let isWellCalibrated: Bool
 }
