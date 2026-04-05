@@ -18,7 +18,7 @@ struct ArgusDecisionCardView: View {
 
                 VStack(alignment: .leading, spacing: 3) {
                     // Güven: bar
-                    ConfidenceBar(value: decision.finalScoreCore / 100.0, color: actionColor)
+                    DecisionConfidenceBar(value: decision.finalScoreCore / 100.0, color: actionColor)
                         .frame(width: 120, height: 6)
 
                     Text(confidenceLabel)
@@ -176,7 +176,7 @@ struct ArgusDecisionCardView: View {
 
 // MARK: - Confidence Bar (thin, reusable)
 
-private struct ConfidenceBar: View {
+private struct DecisionConfidenceBar: View {
     let value: Double    // 0..1
     let color: Color
 
