@@ -301,6 +301,7 @@ class PositionPlanStore: ObservableObject {
                     trigger: step.trigger,
                     currentPrice: currentPrice,
                     entryPrice: entryPrice,
+                    highestPrice: max(plan.highestPrice, entryPrice),
                     pnlPercent: pnlPercent,
                     daysHeld: daysHeld,
                     grandDecision: grandDecision
@@ -320,6 +321,7 @@ class PositionPlanStore: ObservableObject {
         trigger: ActionTrigger,
         currentPrice: Double,
         entryPrice: Double,
+        highestPrice: Double,
         pnlPercent: Double,
         daysHeld: Int,
         grandDecision: ArgusGrandDecision?
@@ -373,10 +375,11 @@ class PositionPlanStore: ObservableObject {
             
         // ADVANCED - Bu tetikleyiciler daha fazla veri gerektirir (snapshot, vb.)
         case .trailingStop(let pct):
-            // FAZE 2.2: Trailing stop implementasyonu
-            // Note: Bu fonksiyona currentPrice geliyor ama plan'ın highestPrice'i de lazım
-            // Şimdilik basit trailing stop logic:
-            let stopLevel = entryPrice * (1 - pct)
+            // highestPrice: giriş tarihinden bu yana görülen tepe fiyat.
+            // Dur noktası bu tepeden hesaplanır → kazançlar kilitlenir.
+            // highestPrice == entryPrice ise henüz yükselmedi → giriş fiyatı kullan.
+            let peakPrice = max(highestPrice, entryPrice)
+            let stopLevel = peakPrice * (1 - pct)
             return currentPrice < stopLevel
 
         case .atrMultiple(let multiplier):

@@ -106,7 +106,7 @@ actor ArgusGrandCouncil {
     
     // MARK: - Cache
     private var decisionCache: [String: (decision: ArgusGrandDecision, timestamp: Date)] = [:]
-    private let cacheTTL: TimeInterval = 300 // 5 Minutes
+    private let cacheTTL: TimeInterval = 120 // 2 dakika — rejim dönüşlerini daha hızlı yakala
     
     // MARK: - Public API
     

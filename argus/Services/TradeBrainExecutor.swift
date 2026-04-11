@@ -20,7 +20,11 @@ class TradeBrainExecutor: ObservableObject {
     @Published var lastCorrelResult: CorrelationHeatGate.CorrelationResult? = nil
     @Published var lastCrisisOpportunities: [CrisisAlphaScanner.AlphaOpportunity] = []
     @Published var lastVelocityAnalysis: AetherVelocityEngine.VelocityAnalysis? = nil
-    
+
+    // Momentum seviyesi takibi — fade tespiti için önceki döngünün değeri
+    private var prevGlobalMomentumLevel: MarketMomentumGate.MomentumSignal.Level = .neutral
+    private var prevBistMomentumLevel:   MarketMomentumGate.MomentumSignal.Level = .neutral
+
     private var cancellables = Set<AnyCancellable>()
     private var lastExecutionTime: [String: Date] = [:]
     
@@ -106,6 +110,36 @@ class TradeBrainExecutor: ObservableObject {
         if bistMomentum.isActive {
             ArgusLogger.info("🚀 BistMomentum: \(bistMomentum.summary)", category: "TRADEBRAIN")
         }
+
+        // ── Momentum Fade Exit ────────────────────────────────────────────
+        // Önceki döngüde momentum aktifti, şimdi neutral → momentum pozisyonlarını %50 trim et.
+        // Hedef: rally bitişinde hızlı kısmi çıkış; tam çıkış plan trigger'larına bırakılır.
+        let globalFaded = prevGlobalMomentumLevel != .neutral && globalMomentum.level == .neutral
+        let bistFaded   = prevBistMomentumLevel   != .neutral && bistMomentum.level   == .neutral
+        if globalFaded || bistFaded {
+            for trade in openTrades where trade.isOpen {
+                let isBistTrade = SymbolResolver.shared.isBistSymbol(trade.symbol)
+                let faded = isBistTrade ? bistFaded : globalFaded
+                guard faded else { continue }
+                guard trade.rationale?.hasPrefix("MOMENTUM:") == true else { continue }
+                guard let currentPrice = quotes[trade.symbol]?.currentPrice, currentPrice > 0 else { continue }
+                ArgusLogger.warn("📉 MomentumFade: \(trade.symbol) → %50 trim", category: "TRADEBRAIN")
+                log("📉 \(trade.symbol): Momentum soldu — %50 kısmi çıkış")
+                NotificationCenter.default.post(
+                    name: .tradeBrainSellOrder,
+                    object: nil,
+                    userInfo: [
+                        "tradeId": trade.id.uuidString,
+                        "price": currentPrice,
+                        "trimPercentage": 50.0,
+                        "reason": "MomentumFade: breadth düştü → %50 trim"
+                    ]
+                )
+            }
+        }
+        // Seviyeyi güncelle (bu döngü sonunda referans olur)
+        prevGlobalMomentumLevel = globalMomentum.level
+        prevBistMomentumLevel   = bistMomentum.level
 
         // ── YENİ: Kelly profili (async, cache'li) ─────────────────────────
         let kellyProfile = await KellyCache.shared.getSystemProfile()
@@ -640,17 +674,24 @@ class TradeBrainExecutor: ObservableObject {
         // Not: TradingViewModel.shared kullanılamıyor, NotificationCenter ile çözüyoruz
         ArgusLogger.info("executeBuy: Notification gönderiliyor - Symbol: \(symbol), Qty: \(proposedQuantity), Price: \(currentPrice)", category: "TRADEBRAIN")
         
+        // Momentum floor ile açılan girişleri "MOMENTUM:" önekiyle işaretle.
+        // Bu rationale, fade exit logiğinde pozisyonu tanımlamak için kullanılır.
+        let rationale = momentumFloor > 0
+            ? "MOMENTUM: \(decision.reasoning)"
+            : decision.reasoning
+
         NotificationCenter.default.post(
             name: .tradeBrainBuyOrder,
             object: nil,
             userInfo: [
                 "symbol": symbol,
                 "quantity": proposedQuantity,
-                "price": currentPrice
+                "price": currentPrice,
+                "rationale": rationale
             ]
         )
-        
-        log("✅ \(symbol): ALIM - \(String(format: "%.2f", proposedQuantity)) adet @ \(String(format: "%.2f", currentPrice))")
+
+        log("✅ \(symbol): ALIM - \(String(format: "%.2f", proposedQuantity)) adet @ \(String(format: "%.2f", currentPrice))\(momentumFloor > 0 ? " [MOMENTUM]" : "")")
         log("   📋 Karar: \(decision.action.rawValue) (\(String(format: "%.0f", decision.confidence * 100))%)")
         
         ArgusLogger.info("executeBuy: ALIM EMRİ GÖNDERİLDİ - \(symbol): \(proposedQuantity) @ \(currentPrice)", category: "TRADEBRAIN")

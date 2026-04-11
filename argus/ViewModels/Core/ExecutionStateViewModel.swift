@@ -161,7 +161,9 @@ final class ExecutionStateViewModel: ObservableObject {
               let symbol = userInfo["symbol"] as? String,
               let quantity = userInfo["quantity"] as? Double,
               let price = userInfo["price"] as? Double else { return }
-        
+
+        let rationale = userInfo["rationale"] as? String ?? "Trade Brain Execution"
+
         Task { @MainActor in
             guard let trade = self.buy(
                 symbol: symbol,
@@ -170,7 +172,7 @@ final class ExecutionStateViewModel: ObservableObject {
                 engine: .pulse,
                 stopLoss: nil,
                 takeProfit: nil,
-                rationale: "Trade Brain Execution",
+                rationale: rationale,
                 referencePrice: price
             ) else {
                 ArgusLogger.error("TRADE BRAIN ALIM RED: \(symbol)", category: "EXECUTION")
