@@ -66,21 +66,45 @@ class TradeBrainExecutor: ObservableObject {
         candles: [String: [Candle]]
     ) async {
         guard isEnabled else { return }
-        
+
         ArgusLogger.info("TradeBrainExecutor: \(decisions.count) karar değerlendiriliyor...", category: "TRADEBRAIN")
-        
+
         let openTrades = portfolio.filter { $0.isOpen }
         let openSymbols = Set(openTrades.map { $0.symbol })
         let openTradeMap = Dictionary(uniqueKeysWithValues: openTrades.map { ($0.symbol, $0) })
         let aetherScore = macroScore ?? 50
         let policy = RiskEscapePolicy.from(aetherScore: aetherScore)
 
-        // ── YENİ: Velocity Engine'e Aether kaydı ──────────────────────────
+        // ── Velocity Engine'e Aether kaydı ────────────────────────────────
         await AetherVelocityEngine.shared.record(score: aetherScore)
         let velocityAnalysis = await AetherVelocityEngine.shared.analyze()
         await MainActor.run { self.lastVelocityAnalysis = velocityAnalysis }
         if let alert = velocityAnalysis.crossingAlert {
             ArgusLogger.info("⚡ Aether Velocity: \(alert.description)", category: "TRADEBRAIN")
+        }
+
+        // ── BIST-özel Türkiye makro skoru (SirkiyeAether) ─────────────────
+        // Global Aether Türkiye makrosunu yansıtmaz. BIST sembolleri için
+        // SirkiyeAetherEngine'i kullan (TCMB verisi, önbellekli).
+        let bistAetherScore: Double = await {
+            let score = await SirkiyeAetherEngine.shared.analyze().overallScore
+            ArgusLogger.info("🇹🇷 SirkiyeAether: \(Int(score))", category: "TRADEBRAIN")
+            return score
+        }()
+
+        // ── Piyasa Momentum Kapısı: breadth tabanlı hızlı sinyal ──────────
+        // Rally başladığında Aether hâlâ düşük / rejim hâlâ riskOff olabilir.
+        // Breadth (fiyat+hacim) bunu saatler içinde tespit eder.
+        let watchlistSymbols = Array(decisions.keys)
+        let globalMomentum = await MarketMomentumGate.shared.assessGlobal(
+            quotes: quotes, candles: candles, watchlistSymbols: watchlistSymbols)
+        let bistMomentum = await MarketMomentumGate.shared.assessBist(
+            quotes: quotes, candles: candles, watchlistSymbols: watchlistSymbols)
+        if globalMomentum.isActive {
+            ArgusLogger.info("🚀 GlobalMomentum: \(globalMomentum.summary)", category: "TRADEBRAIN")
+        }
+        if bistMomentum.isActive {
+            ArgusLogger.info("🚀 BistMomentum: \(bistMomentum.summary)", category: "TRADEBRAIN")
         }
 
         // ── YENİ: Kelly profili (async, cache'li) ─────────────────────────
@@ -214,6 +238,7 @@ class TradeBrainExecutor: ObservableObject {
                         continue
                     }
                     ArgusLogger.info("TradeBrainExecutor: ALIM yapılıyor: \(symbol)", category: "TRADEBRAIN")
+                    let isBistSym = SymbolResolver.shared.isBistSymbol(symbol)
                     await executeBuy(
                         symbol: symbol,
                         decision: decision,
@@ -228,7 +253,9 @@ class TradeBrainExecutor: ObservableObject {
                         kellyProfile: kellyProfile,
                         verdicts: allVerdicts,
                         velocityAnalysis: velocityAnalysis,
-                        correlMultiplier: correlResult.positionMultiplier
+                        correlMultiplier: correlResult.positionMultiplier,
+                        aetherOverride: isBistSym ? bistAetherScore : nil,
+                        momentumFloor: isBistSym ? bistMomentum.aetherFloor : globalMomentum.aetherFloor
                     )
                 } else {
                     ArgusLogger.warn("TradeBrainExecutor: \(symbol) - Action \(decision.action.rawValue) alım için değil", category: "TRADEBRAIN")
@@ -323,6 +350,7 @@ class TradeBrainExecutor: ObservableObject {
                     minDecisionConfidence: 0.3,
                     notes: ["CrisisAlpha: \(opp.opportunityType.rawValue)"]
                 )
+                let isCrisisBist = SymbolResolver.shared.isBistSymbol(opp.symbol)
                 await executeBuy(
                     symbol: opp.symbol,
                     decision: decision,
@@ -338,7 +366,9 @@ class TradeBrainExecutor: ObservableObject {
                     verdicts: allVerdicts,
                     velocityAnalysis: velocityAnalysis,
                     correlMultiplier: correlResult.positionMultiplier,
-                    isCrisisAlpha: true
+                    isCrisisAlpha: true,
+                    aetherOverride: isCrisisBist ? bistAetherScore : nil,
+                    momentumFloor: isCrisisBist ? bistMomentum.aetherFloor : globalMomentum.aetherFloor
                 )
             }
         }
@@ -361,7 +391,9 @@ class TradeBrainExecutor: ObservableObject {
         verdicts: [AlkindusVerdict] = [],
         velocityAnalysis: AetherVelocityEngine.VelocityAnalysis? = nil,
         correlMultiplier: Double = 1.0,
-        isCrisisAlpha: Bool = false
+        isCrisisAlpha: Bool = false,
+        aetherOverride: Double? = nil,    // BIST: SirkiyeAether; Global: nil → MacroRegimeService
+        momentumFloor: Double = 0         // MarketMomentumGate'den gelen breadth tabanı
     ) async {
         ArgusLogger.info("executeBuy: \(symbol) - Fiyat: \(currentPrice)", category: "TRADEBRAIN")
 
@@ -371,13 +403,15 @@ class TradeBrainExecutor: ObservableObject {
         ArgusLogger.info("executeBuy: Available Balance = \(availableBalance), isBist = \(isBist)", category: "TRADEBRAIN")
 
         // 1. ALLOCATION HESAPLA
-        let regimeAetherScore = MacroRegimeService.shared.getCachedRating()?.numericScore ?? 50
+        // BIST sembolleri için SirkiyeAether kullan (Türkiye makrosu), globallar için MacroRegimeService
+        let regimeAetherScore = aetherOverride ?? MacroRegimeService.shared.getCachedRating()?.numericScore ?? 50
         let currentRegime = ChironRegimeEngine.shared.globalResult.regime
 
-        // Temel rejim çarpanı
-        var regimeMultiplier = RegimePositionSizer.multiplier(aetherScore: regimeAetherScore, regime: currentRegime)
+        // Temel rejim çarpanı — momentumFloor ile riskOff bloğu aşılabilir
+        var regimeMultiplier = RegimePositionSizer.multiplier(
+            aetherScore: regimeAetherScore, regime: currentRegime, momentumFloor: momentumFloor)
 
-        // ── YENİ: Velocity düzeltmesi — kriz'den çıkışta veya bozulmada ayar
+        // Velocity düzeltmesi — kriz'den çıkışta veya bozulmada ayar
         if let vel = velocityAnalysis {
             regimeMultiplier = await AetherVelocityEngine.shared.velocityAdjustedMultiplier(base: regimeMultiplier)
             ArgusLogger.info("⚡ Velocity: \(vel.signal.rawValue) → çarpan: \(String(format: "%.2f", regimeMultiplier))", category: "TRADEBRAIN")

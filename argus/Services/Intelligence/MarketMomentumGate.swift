@@ -1,0 +1,165 @@
+import Foundation
+
+// MARK: - Market Momentum Gate
+/// Fiyat/hacim verilerinden saatlik bazlı hızlı rejim değişimi tespiti.
+/// Yavaş güncellenen Aether (haftalık) üzerinde oturan breadth katmanı.
+/// Rally başlarken rejim hâlâ riskOff kalabilir — bu gate o boşluğu kapatır.
+///
+/// Mimari:
+///   Global watchlist (non-.IS) → globalSignal
+///   BIST watchlist (.IS)       → bistSignal
+/// Her iki sinyalin sonucu RegimePositionSizer'a momentumFloor olarak geçer.
+
+actor MarketMomentumGate {
+    static let shared = MarketMomentumGate()
+
+    private init() {}
+
+    // MARK: - Momentum Signal
+
+    struct MomentumSignal: Sendable {
+        enum Level: String, Sendable {
+            case neutral  = "NEUTRAL"   // breadth <40%  → floor=0 (hiçbir etkisi yok)
+            case building = "BUILDING"  // breadth 40–60% → floor=35
+            case strong   = "STRONG"    // breadth 60–75% → floor=45
+            case extreme  = "EXTREME"   // breadth >75%   → floor=55
+        }
+
+        let level: Level
+        let breadthPct: Double   // Rally kriterini karşılayan sembol yüzdesi
+        let aetherFloor: Double  // RegimePositionSizer'a geçecek minimum Aether değeri
+        let symbolCount: Int     // Hesaba katılan sembol sayısı
+        let rallyCount: Int      // Rally kriterini geçen sembol sayısı
+        let timestamp: Date
+
+        /// Momentum sinyali aktif mi? (floor uygulanmalı mı?)
+        var isActive: Bool { level != .neutral }
+
+        static let neutral = MomentumSignal(
+            level: .neutral, breadthPct: 0, aetherFloor: 0,
+            symbolCount: 0, rallyCount: 0, timestamp: .distantPast
+        )
+
+        var summary: String {
+            "\(level.rawValue) — %\(Int(breadthPct)) breadth (\(rallyCount)/\(symbolCount)) floor=\(Int(aetherFloor))"
+        }
+    }
+
+    // MARK: - Cache (4 saatlik bozulma)
+
+    private var globalSignal: MomentumSignal = .neutral
+    private var bistSignal: MomentumSignal   = .neutral
+    private let cacheLifespan: TimeInterval  = 4 * 3600   // 4 saat
+
+    // MARK: - Public API
+
+    /// Global piyasa breadth analizi (non-.IS sembolleri: S&P, Nasdaq bileşenleri vb.)
+    func assessGlobal(
+        quotes: [String: Quote],
+        candles: [String: [Candle]],
+        watchlistSymbols: [String]
+    ) -> MomentumSignal {
+        // Cache geçerliyse döndür
+        if globalSignal.isActive,
+           Date().timeIntervalSince(globalSignal.timestamp) < cacheLifespan {
+            return globalSignal
+        }
+        let symbols = watchlistSymbols.filter { !$0.hasSuffix(".IS") }
+        let signal = computeBreadth(symbols: symbols, quotes: quotes, candles: candles)
+        globalSignal = signal
+        return signal
+    }
+
+    /// BIST breadth analizi (.IS sembolleri)
+    func assessBist(
+        quotes: [String: Quote],
+        candles: [String: [Candle]],
+        watchlistSymbols: [String]
+    ) -> MomentumSignal {
+        // Cache geçerliyse döndür
+        if bistSignal.isActive,
+           Date().timeIntervalSince(bistSignal.timestamp) < cacheLifespan {
+            return bistSignal
+        }
+        let symbols = watchlistSymbols.filter { $0.hasSuffix(".IS") }
+        let signal = computeBreadth(symbols: symbols, quotes: quotes, candles: candles)
+        bistSignal = signal
+        return signal
+    }
+
+    /// Cache'i sıfırla (test / zorla yenileme için)
+    func resetCache() {
+        globalSignal = .neutral
+        bistSignal   = .neutral
+    }
+
+    // MARK: - Core Breadth Hesabı
+
+    /// Rally kriteri:
+    ///   1. Günlük değişim > +1.5%
+    ///   2. Hacim, son 20 günlük ortalamanın ≥ 1.2x üzerinde
+    /// İki kriter birden gerekli — sadece fiyat yetmez, hacim teyit etmeli.
+    private func computeBreadth(
+        symbols: [String],
+        quotes: [String: Quote],
+        candles: [String: [Candle]]
+    ) -> MomentumSignal {
+        guard symbols.count >= 5 else { return .neutral }
+
+        var rallyCount = 0
+        var validCount = 0
+
+        for symbol in symbols {
+            guard let quote = quotes[symbol], quote.currentPrice > 0 else { continue }
+
+            // Fiyat kanalı: +1.5% üzeri artış
+            let changePercent = quote.percentChange
+            let isUp = changePercent > 1.5
+
+            // Hacim teyidi: bugünkü hacim ortalama ≥ 1.2x
+            let isHighVolume: Bool
+            if let symbolCandles = candles[symbol], symbolCandles.count >= 10 {
+                let recentCandles = symbolCandles.suffix(20)
+                let avgVolume = recentCandles.map { $0.volume }.reduce(0, +) / Double(recentCandles.count)
+                let todayVolume: Double
+                if let todayVol = quote.volume, todayVol > 0 {
+                    todayVolume = todayVol
+                } else {
+                    todayVolume = symbolCandles.last?.volume ?? 0
+                }
+                isHighVolume = avgVolume > 0 && todayVolume >= avgVolume * 1.2
+            } else {
+                // Mum verisi yoksa yalnızca fiyat kriterini kullan (daha az güvenilir)
+                isHighVolume = true
+            }
+
+            validCount += 1
+            if isUp && isHighVolume {
+                rallyCount += 1
+            }
+        }
+
+        guard validCount >= 5 else { return .neutral }
+
+        let breadthPct = Double(rallyCount) / Double(validCount) * 100.0
+
+        let level: MomentumSignal.Level
+        let floor: Double
+
+        switch breadthPct {
+        case 75...:      level = .extreme;  floor = 55
+        case 60..<75:    level = .strong;   floor = 45
+        case 40..<60:    level = .building; floor = 35
+        default:         level = .neutral;  floor = 0
+        }
+
+        return MomentumSignal(
+            level: level,
+            breadthPct: breadthPct,
+            aetherFloor: floor,
+            symbolCount: validCount,
+            rallyCount: rallyCount,
+            timestamp: Date()
+        )
+    }
+}
