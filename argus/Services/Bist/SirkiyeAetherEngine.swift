@@ -9,7 +9,15 @@ actor SirkiyeAetherEngine {
     static let shared = SirkiyeAetherEngine()
     
     private init() {}
-    
+
+    // MARK: - Sonuç Cache
+    // TradeBrainExecutor her 60 saniyede bir analyze() çağırıyor.
+    // TCMB verisi 20 dakika cached olsa da analiz hesapları her seferinde tekrar çalışıyor.
+    // 5 dakikalık sonuç cache'i gereksiz CPU kullanımını önler.
+    private var cachedScore: TurkeyMacroScore? = nil
+    private var cacheTimestamp: Date = .distantPast
+    private let resultCacheTTL: TimeInterval = 5 * 60  // 5 dakika
+
     // MARK: - Türkiye Makro Skoru
     
     struct TurkeyMacroScore: Sendable {
@@ -139,6 +147,13 @@ actor SirkiyeAetherEngine {
     // MARK: - Ana Analiz
     
     func analyze(forceRefresh: Bool = false) async -> TurkeyMacroScore {
+        // Sonuç cache'i — forceRefresh yoksa ve TTL dolmamışsa direk döndür
+        if !forceRefresh,
+           let cached = cachedScore,
+           Date().timeIntervalSince(cacheTimestamp) < resultCacheTTL {
+            return cached
+        }
+
         let snapshot = await TCMBDataService.shared.getMacroSnapshot(forceRefresh: forceRefresh)
 
         var components: [ScoreComponent] = []
@@ -201,7 +216,7 @@ actor SirkiyeAetherEngine {
         )
         insights.append(contentsOf: standardInsights)
         
-        return TurkeyMacroScore(
+        let result = TurkeyMacroScore(
             overallScore: min(100, max(0, overallScore)),
             monetaryStance: monetaryStance,
             growthMomentum: growthMomentum,
@@ -211,6 +226,9 @@ actor SirkiyeAetherEngine {
             insights: insights,
             timestamp: Date()
         )
+        cachedScore = result
+        cacheTimestamp = Date()
+        return result
     }
     
     // MARK: - Bileşen Analizleri

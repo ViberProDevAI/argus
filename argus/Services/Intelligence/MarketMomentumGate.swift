@@ -45,11 +45,16 @@ actor MarketMomentumGate {
         }
     }
 
-    // MARK: - Cache (4 saatlik bozulma)
+    // MARK: - Cache (15 dakikalık — fade tespiti için kısa, noise için yeterli uzun)
+    // NOT: Cache koşulunda isActive kullanmıyoruz.
+    // Önceki implementasyonda `globalSignal.isActive && age < 4h` kontrolü vardı;
+    // bu, sinyal BUILDING iken breadth gerçekten düşse bile 4 saat boyunca eski
+    // BUILDING sonucunu döndürüyor, fade exit'in ateşlenmesini engelliyordu.
+    // Düzeltme: Sinyal aktif olsun ya da olmasın, 15 dakika sonra yeniden hesapla.
 
     private var globalSignal: MomentumSignal = .neutral
     private var bistSignal: MomentumSignal   = .neutral
-    private let cacheLifespan: TimeInterval  = 4 * 3600   // 4 saat
+    private let cacheLifespan: TimeInterval  = 15 * 60   // 15 dakika
 
     // MARK: - Public API
 
@@ -59,9 +64,8 @@ actor MarketMomentumGate {
         candles: [String: [Candle]],
         watchlistSymbols: [String]
     ) -> MomentumSignal {
-        // Cache geçerliyse döndür
-        if globalSignal.isActive,
-           Date().timeIntervalSince(globalSignal.timestamp) < cacheLifespan {
+        // Sinyal aktif/pasif ayrımı yapmadan süresi dolmuşsa yeniden hesapla
+        if Date().timeIntervalSince(globalSignal.timestamp) < cacheLifespan {
             return globalSignal
         }
         let symbols = watchlistSymbols.filter { !$0.hasSuffix(".IS") }
@@ -76,9 +80,7 @@ actor MarketMomentumGate {
         candles: [String: [Candle]],
         watchlistSymbols: [String]
     ) -> MomentumSignal {
-        // Cache geçerliyse döndür
-        if bistSignal.isActive,
-           Date().timeIntervalSince(bistSignal.timestamp) < cacheLifespan {
+        if Date().timeIntervalSince(bistSignal.timestamp) < cacheLifespan {
             return bistSignal
         }
         let symbols = watchlistSymbols.filter { $0.hasSuffix(".IS") }
