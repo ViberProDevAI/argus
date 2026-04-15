@@ -124,12 +124,50 @@ struct FeedbackSheet: View {
     // MARK: - Contact
 
     private var contactSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             sectionHeader("İLETİŞİM")
 
-            Text("Acil sorunlar için: destek@argus.app")
-                .font(.caption)
-                .foregroundColor(Theme.textSecondary)
+            Button {
+                openInstagramDM()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 36, height: 36)
+                        .background(
+                            LinearGradient(
+                                colors: [Color(red: 0.85, green: 0.15, blue: 0.45), Color(red: 0.95, green: 0.45, blue: 0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Instagram'dan DM at")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                        Text("@sigarayib1rak")
+                            .font(.caption)
+                            .foregroundColor(Theme.textSecondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundColor(Theme.textSecondary)
+                }
+                .padding(12)
+                .background(Color.white.opacity(0.05))
+                .cornerRadius(Theme.Radius.medium)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.medium)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+            }
 
             Text("Geri bildirimler genellikle 24-48 saat içinde değerlendirilir.")
                 .font(.caption)
@@ -160,6 +198,16 @@ struct FeedbackSheet: View {
                     errorMessage = error.localizedDescription
                 }
             }
+        }
+    }
+
+    private func openInstagramDM() {
+        let appURL = URL(string: "instagram://user?username=sigarayib1rak")!
+        let webURL = URL(string: "https://ig.me/m/sigarayib1rak")!
+        if UIApplication.shared.canOpenURL(appURL) {
+            UIApplication.shared.open(appURL)
+        } else {
+            UIApplication.shared.open(webURL)
         }
     }
 
