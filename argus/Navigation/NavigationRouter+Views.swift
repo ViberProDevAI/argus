@@ -111,9 +111,6 @@ extension NavigationRouter {
             SignalJournalView()
 
         // MARK: - Labs
-        case .argusLab:
-            ArgusLabView()
-
         case .chronosLab:
             ChronosLabView(viewModel: ChronosLabViewModel())
 

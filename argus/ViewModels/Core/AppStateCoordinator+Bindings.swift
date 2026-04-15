@@ -65,9 +65,7 @@ extension AppStateCoordinator {
             .receive(on: RunLoop.main)
             .assign(to: &$lastTradeTimes)
 
-        ExecutionStateViewModel.shared.$lastAction
-            .receive(on: RunLoop.main)
-            .assign(to: &$lastAction)
+        // lastAction not published by ExecutionStateViewModel; managed locally
     }
 
     // MARK: - Loading State Aggregation

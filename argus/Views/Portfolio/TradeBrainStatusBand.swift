@@ -35,10 +35,13 @@ struct TradeBrainStatusBand: View {
         )
     }
 
-    private var dominantSignal: ChimeraSignal? {
+    private var dominantSignal: (symbol: String, signal: ChimeraSignal)? {
         filteredOpenTrades
-            .compactMap { SignalStateViewModel.shared.chimeraSignals[$0.symbol] }
-            .max(by: { $0.severity < $1.severity })
+            .compactMap { trade -> (String, ChimeraSignal)? in
+                guard let sig = SignalStateViewModel.shared.chimeraSignals[trade.symbol] else { return nil }
+                return (trade.symbol, sig)
+            }
+            .max(by: { $0.1.severity < $1.1.severity })
     }
 
     // MARK: - Display Helpers
@@ -50,18 +53,18 @@ struct TradeBrainStatusBand: View {
 
         switch health.status {
         case .healthy:
-            if let sig = dominantSignal {
-                return "\(sig.symbol): \(localizedSignalTitle(sig))"
+            if let (symbol, sig) = dominantSignal {
+                return "\(symbol): \(localizedSignalTitle(sig))"
             }
             return "\(count) pozisyon dengeli seyrediyor"
         case .warning:
-            if let sig = dominantSignal {
-                return "Dikkat — \(sig.symbol): \(localizedSignalTitle(sig))"
+            if let (symbol, sig) = dominantSignal {
+                return "Dikkat — \(symbol): \(localizedSignalTitle(sig))"
             }
             return "\(count) pozisyon var, bazıları izleniyor"
         case .critical:
-            if let sig = dominantSignal {
-                return "Risk yüksek — \(sig.symbol): \(localizedSignalTitle(sig))"
+            if let (symbol, sig) = dominantSignal {
+                return "Risk yüksek — \(symbol): \(localizedSignalTitle(sig))"
             }
             return "Portföyde yüksek risk var, pozisyonları gözden geçir"
         }

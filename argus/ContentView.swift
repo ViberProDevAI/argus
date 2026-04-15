@@ -93,7 +93,6 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("OpenAlkindusDashboard"))) { _ in
             deepLinkManager.navigate(to: .home)
             router.popToRoot()
-            router.navigate(to: .argusLab)
         }
         .onAppear {
             applyLaunchTabOverrideIfNeeded()

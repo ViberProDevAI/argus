@@ -84,9 +84,11 @@ struct MiniPantheonOrb: View {
                 
                 if icon.hasSuffix("Icon") {
                     Image(icon)
+                        .renderingMode(.template)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(width: iconSize + 4, height: iconSize + 4)
+                        .foregroundColor(color)
                 } else {
                     Image(systemName: icon)
                         .font(.system(size: iconSize, weight: .semibold))

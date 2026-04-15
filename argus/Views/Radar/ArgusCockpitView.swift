@@ -601,11 +601,11 @@ struct TerminalStockRow: View {
 
     func councilLabel(_ action: ArgusAction) -> String {
         switch action {
-        case .aggressiveBuy: return "KONSEY HUCUM"
+        case .aggressiveBuy: return "KONSEY HÜCUM"
         case .accumulate: return "KONSEY TOPLA"
-        case .neutral: return "KONSEY GOZLE"
+        case .neutral: return "KONSEY GÖZLE"
         case .trim: return "KONSEY AZALT"
-        case .liquidate: return "KONSEY CIK"
+        case .liquidate: return "KONSEY ÇIK"
         }
     }
     

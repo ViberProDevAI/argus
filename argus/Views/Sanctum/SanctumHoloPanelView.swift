@@ -774,39 +774,6 @@ struct HoloPanelView: View {
                     )
                 }
                 
-                // ARGUS LAB Button (Navigation)
-                Button {
-                    router.navigate(to: .argusLab)
-                } label: {
-                    HStack {
-                        Image(systemName: "flask.fill")
-                            .font(.title3)
-                            .foregroundColor(SanctumTheme.hologramBlue)
-                        
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Argus Lab")
-                                .font(.subheadline)
-                                .bold()
-                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                            Text("İşlem Geçmişi & Öğrenmeler")
-                                .font(.caption2)
-                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        }
-                        
-                        Spacer()
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    }
-                    .padding()
-                    .background(SanctumTheme.hologramBlue.opacity(0.1))
-                    .cornerRadius(12)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(SanctumTheme.hologramBlue.opacity(0.3), lineWidth: 1)
-                    )
-                }
             }
             
         case .prometheus:

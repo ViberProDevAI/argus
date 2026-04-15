@@ -77,7 +77,7 @@ struct SignalsView: View {
 // MARK: - Macro Status Banner
 
 private struct MacroStatusBanner: View {
-    let macro: MacroRating
+    let macro: MacroEnvironmentRating
 
     var body: some View {
         HStack(spacing: 12) {

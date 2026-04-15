@@ -53,7 +53,7 @@ struct UnifiedPositionCard: View {
             daysHeld: holdingDays,
             pnlPercent: pnlPercent,
             action: decision.action,
-            regime: ChironRegimeEngine.shared.lastResult?.regime
+            regime: ChironRegimeEngine.shared.lastResult.regime
         )
     }
 
