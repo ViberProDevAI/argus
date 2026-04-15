@@ -46,8 +46,7 @@ enum NavigationRoute: Hashable, Identifiable {
     case hermesFeed
     case journalSignals
 
-    // MARK: - Labs (Previously Orphaned)
-    case argusLab
+    // MARK: - Labs
     case chronosLab
     case orionLab
     case athenaLab
