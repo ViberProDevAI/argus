@@ -34,13 +34,13 @@ actor ChironCouncilLearningService {
     /// Record a council decision (called when trade opens)
     func recordDecision(_ record: CouncilVotingRecord) {
         pendingRecords[record.id] = record
-        print("🧠 Chiron: Konsey kararı kaydedildi - \(record.symbol) (\(record.id.uuidString.prefix(8)))")
+        ArgusLogger.info(.chiron, "Konsey kararı kaydedildi: \(record.symbol) (\(record.id.uuidString.prefix(8)))")
     }
     
     /// Update a record with trade outcome (called when trade closes)
     func updateOutcome(recordId: UUID, outcome: TradeOutcome, pnlPercent: Double) async {
         guard var record = pendingRecords.removeValue(forKey: recordId) else {
-            print("⚠️ Chiron: Kayıt bulunamadı - \(recordId.uuidString.prefix(8))")
+            ArgusLogger.warning(.chiron, "Kayıt bulunamadı: \(recordId.uuidString.prefix(8))")
             return
         }
         
@@ -48,7 +48,7 @@ actor ChironCouncilLearningService {
         record.pnlPercent = pnlPercent
         completedRecords.append(record)
         
-        print("🧠 Chiron: Trade sonucu güncellendi - \(record.symbol) | \(outcome.rawValue) | %\(String(format: "%.1f", pnlPercent))")
+        ArgusLogger.info(.chiron, "Trade sonucu güncellendi: \(record.symbol) | \(outcome.rawValue) | %\(String(format: "%.1f", pnlPercent))")
         
         // Learn from this outcome
         await learnFromRecord(record)
@@ -67,7 +67,7 @@ actor ChironCouncilLearningService {
         // Find most recent pending record for this symbol
         guard let record = pendingRecords.values.first(where: { $0.symbol == symbol }) else {
             // No pending record - just log and learn from outcome anyway
-            print("🧠 Chiron: \(symbol) için kayıt yok, genel öğrenme uygulanıyor")
+            ArgusLogger.info(.chiron, "\(symbol) için kayıt yok, genel öğrenme uygulanıyor")
             await learnFromSimpleOutcome(symbol: symbol, outcome: outcome, pnlPercent: pnlPercent)
             return
         }
@@ -80,7 +80,7 @@ actor ChironCouncilLearningService {
     private func learnFromSimpleOutcome(symbol: String, outcome: ChironTradeOutcome, pnlPercent: Double) async {
         // Just log - detailed learning requires council records
         let pnlStr = String(format: "%.2f", pnlPercent)
-        print("   → \(outcome.rawValue) | PnL: \(pnlStr)%")
+        ArgusLogger.info(.chiron, "Sonuç: \(outcome.rawValue) | PnL: \(pnlStr)%")
         await saveToDisk()
     }
     
@@ -252,8 +252,8 @@ actor ChironCouncilLearningService {
         // artık gerçekten Council kararlarında kullanılır.
         persistWeightsCache(symbol: symbol, engine: engine, weights: weights)
 
-        print("🧠 Chiron Öğrendi: \(symbol) | PnL: %\(String(format: "%.1f", pnl)) | Reward: \(String(format: "%.2f", reward))")
-        print("   Trend: \(String(format: "%.0f", weights.trendMaster * 100))%, Momentum: \(String(format: "%.0f", weights.momentumMaster * 100))%, Structure: \(String(format: "%.0f", weights.structureMaster * 100))%, Pattern: \(String(format: "%.0f", weights.patternMaster * 100))%, Price: \(String(format: "%.0f", weights.priceMaster * 100))%")
+        ArgusLogger.info(.chiron, "Öğrendi: \(symbol) | PnL: %\(String(format: "%.1f", pnl)) | Reward: \(String(format: "%.2f", reward))")
+        ArgusLogger.info(.chiron, "Trend: \(String(format: "%.0f", weights.trendMaster * 100))%, Momentum: \(String(format: "%.0f", weights.momentumMaster * 100))%, Structure: \(String(format: "%.0f", weights.structureMaster * 100))%, Pattern: \(String(format: "%.0f", weights.patternMaster * 100))%, Price: \(String(format: "%.0f", weights.priceMaster * 100))%")
     }
     
     private func updateMemberWeight(_ weights: CouncilMemberWeights, memberId: String, delta: Double) -> CouncilMemberWeights {
@@ -295,9 +295,9 @@ actor ChironCouncilLearningService {
             let weightsData = try JSONEncoder().encode(serializable)
             try weightsData.write(to: councilWeightsPath)
             
-            print("💾 ChironCouncilLearning: Saved \(completedRecords.count) records")
+            ArgusLogger.info(.chiron, "ChironCouncilLearning: Saved \(completedRecords.count) records")
         } catch {
-            print("❌ ChironCouncilLearning: Save failed - \(error)")
+            ArgusLogger.error(.chiron, "ChironCouncilLearning: Save failed - \(error)")
         }
     }
     
@@ -307,9 +307,9 @@ actor ChironCouncilLearningService {
             do {
                 let data = try Data(contentsOf: recordsPath)
                 completedRecords = try JSONDecoder().decode([CouncilVotingRecord].self, from: data)
-                print("📂 ChironCouncilLearning: Loaded \(completedRecords.count) records")
+                ArgusLogger.info(.chiron, "ChironCouncilLearning: Loaded \(completedRecords.count) records")
             } catch {
-                print("❌ ChironCouncilLearning: Records load failed - \(error)")
+                ArgusLogger.error(.chiron, "ChironCouncilLearning: Records load failed - \(error)")
             }
         }
         
@@ -327,9 +327,9 @@ actor ChironCouncilLearningService {
                         }
                     }
                 }
-                print("📂 ChironCouncilLearning: Loaded weights for \(councilWeightsMatrix.count) symbols")
+                ArgusLogger.info(.chiron, "ChironCouncilLearning: Loaded weights for \(councilWeightsMatrix.count) symbols")
             } catch {
-                print("❌ ChironCouncilLearning: Weights load failed - \(error)")
+                ArgusLogger.error(.chiron, "ChironCouncilLearning: Weights load failed - \(error)")
             }
         }
     }

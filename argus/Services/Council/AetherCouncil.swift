@@ -22,11 +22,11 @@ actor AetherCouncil {
     func convene(macro: MacroSnapshot) async -> AetherDecision {
         let timestamp = Date()
         
-        print("🏛️ Aether Konseyi Toplanıyor")
-        
+        ArgusLogger.info(.aether, "Konsey toplanıyor")
+
         // 1. Collect proposals
         let proposals = await collectProposals(macro: macro)
-        print("   📋 \(proposals.count) öneri toplandı")
+        ArgusLogger.info(.aether, "\(proposals.count) öneri toplandı")
         
         // 2. Default stance based on market mode
         let defaultStance: MacroStance
@@ -57,7 +57,7 @@ actor AetherCouncil {
         
         // 4. Best proposal
         let bestProposal = proposals.max(by: { $0.confidence < $1.confidence })!
-        print("   🎯 En iyi öneri: \(bestProposal.proposerName) → \(bestProposal.stance.rawValue)")
+        ArgusLogger.info(.aether, "En iyi öneri: \(bestProposal.proposerName) -> \(bestProposal.stance.rawValue)")
         
         // 5. Voting
         let votes = conductVoting(proposal: bestProposal, macro: macro)
@@ -70,7 +70,7 @@ actor AetherCouncil {
             timestamp: timestamp
         )
         
-        print("   📊 Sonuç: \(decision.summary)")
+        ArgusLogger.info(.aether, "Sonuç: \(decision.summary)")
         
         return decision
     }
@@ -109,7 +109,7 @@ actor AetherCouncil {
             )
             
             votes.append(vote)
-            print("      \(vote.decision.emoji) \(vote.voterName): \(vote.decision.rawValue) - \(vote.reasoning ?? "")")
+            ArgusLogger.info(.aether, "Oy: \(vote.voterName): \(vote.decision.rawValue) - \(vote.reasoning ?? "")")
         }
         
         return votes
