@@ -591,20 +591,20 @@ struct StockDetailV5Body: View {
         return base
     }
 
+    /// Konsey oy sayımı — gerçek action'a göre filtreler. Eskiden modül adı
+    /// "orion/atlas/aether/hermes" stringini içerip içermediğine bakıyordu;
+    /// Aether SAT oyu verse bile "aether" geçtiği için AL sayılıyordu →
+    /// kullanıcının ekranda "2 AL · 0 SAT" görüp "Konsey Kararsız" verdict
+    /// almasının doğrudan sebebi bu yanlış sayımdı. Artık action-aware.
+    /// Veto sayısı SAT'a eklenir (hard veto kesin satış sinyalidir).
     private var councilBreakdown: (buy: String, wait: String, sell: String)? {
         guard let d = decision else { return nil }
-        let buyCount = d.contributors.filter { c in
-            c.module.lowercased().contains("orion") ||
-            c.module.lowercased().contains("atlas") ||
-            c.module.lowercased().contains("aether") ||
-            c.module.lowercased().contains("hermes") ||
-            c.module.lowercased().contains("promet")
-        }.count
-        let waitCount = 0
-        let sellCount = d.vetoes.count
+        let buyCount = d.contributors.filter { $0.action == .buy }.count
+        let holdCount = d.contributors.filter { $0.action == .hold }.count
+        let sellCount = d.contributors.filter { $0.action == .sell }.count + d.vetoes.count
         return (
             "\(buyCount) AL",
-            "\(waitCount) BEKLE",
+            "\(holdCount) BEKLE",
             "\(sellCount) SAT"
         )
     }

@@ -741,40 +741,59 @@ actor ArgusGrandCouncil {
             // - Eski sürüm 0.15 eşiği + yakın Hold toleransıyla 2-3 modül konsensüsünü
             //   (tipik 0.10–0.14 ağırlık) "neutral"a düşürüyordu. Sessiz sinyal kaybının
             //   en büyük sebebiydi. Eşik 0.10'a indirildi; agresif kademeler sabit tutuldu.
+            //
+            // Tutarlılık için her verdict reasoning'i sayım + ağırlık + neden ile
+            // dürüst olmalı. Eskiden "Konsey Kararsız" kuruydu, kullanıcı "2 AL
+            // varken nasıl kararsız?" diye haklı olarak şikayet ediyordu.
+            let weightSummary = String(
+                format: "AL %.0f%% · SAT %.0f%% · BEKLE %.0f%%",
+                totalBuyWeight * 100, totalSellWeight * 100, totalHoldWeight * 100
+            )
+            let voteSummary = "\(buyVoters.count) AL · \(sellVoters.count) SAT"
+
             if totalBuyWeight > 0.10 && (maxWeight == totalBuyWeight || buyLead >= -0.05) {
                 // Alım kararı
                 if totalBuyWeight > 0.45 && buyVoters.count >= 3 {
                     finalAction = .aggressiveBuy
                     strength = .strong
-                    reasoning = "Güçlü Konsey Mutabakatı: \(buyVoters.joined(separator: ", "))"
+                    reasoning = "Güçlü Konsey Mutabakatı (\(voteSummary), \(weightSummary)): \(buyVoters.joined(separator: ", "))"
                 } else if totalBuyWeight > 0.30 && buyVoters.count >= 2 {
                     finalAction = .aggressiveBuy
                     strength = .normal
-                    reasoning = "Konsey Çoğunluğu Alım: \(buyVoters.joined(separator: ", "))"
+                    reasoning = "Konsey Çoğunluğu Alım (\(voteSummary), \(weightSummary)): \(buyVoters.joined(separator: ", "))"
                 } else {
                     finalAction = .accumulate
                     strength = .normal
-                    reasoning = "Kademeli Alım Önerisi: \(buyVoters.joined(separator: ", "))"
+                    reasoning = "Kademeli Alım (\(voteSummary), \(weightSummary)): \(buyVoters.joined(separator: ", "))"
                 }
             } else if isStrongOrion && totalBuyWeight >= 0.09 && totalSellWeight < 0.12 {
                 finalAction = .accumulate
                 strength = .normal
-                reasoning = "Orion öncülüğünde kademeli alım (yakın oy farkı)."
+                reasoning = "Orion öncülüğünde kademeli alım — yakın oy farkı (\(weightSummary))."
             } else if maxWeight == totalSellWeight && totalSellWeight > 0.15 {
                 // Satış kararı
                 if totalSellWeight > 0.40 && sellVoters.count >= 2 {
                     finalAction = .liquidate
                     strength = .strong
-                    reasoning = "Güçlü Satış Sinyali: \(sellVoters.joined(separator: ", "))"
+                    reasoning = "Güçlü Satış Sinyali (\(voteSummary), \(weightSummary)): \(sellVoters.joined(separator: ", "))"
                 } else {
                     finalAction = .trim
                     strength = .normal
-                    reasoning = "Kar Al Önerisi: \(sellVoters.joined(separator: ", "))"
+                    reasoning = "Kar Al Önerisi (\(voteSummary), \(weightSummary)): \(sellVoters.joined(separator: ", "))"
                 }
             } else {
-                // Hold veya yetersiz sinyal
+                // Hold veya yetersiz sinyal — sayım > 0 olsa bile ağırlık eşiği
+                // aşılmamış demektir. Reasoning'de bunu açıkça söyle.
                 finalAction = .neutral
-                reasoning = "Konsey Kararsız - Bekle ve Gör"
+                let reason: String
+                if buyVoters.count > 0 && totalBuyWeight <= 0.10 {
+                    reason = "\(voteSummary) ama AL ağırlığı %10 eşiğini aşmadı (\(weightSummary))"
+                } else if sellVoters.count > 0 && totalSellWeight <= 0.15 {
+                    reason = "\(voteSummary) ama SAT ağırlığı %15 eşiğini aşmadı (\(weightSummary))"
+                } else {
+                    reason = "Yeterli sinyal yok (\(voteSummary), \(weightSummary))"
+                }
+                reasoning = "Konsey Kararsız — \(reason)"
             }
         }
 
