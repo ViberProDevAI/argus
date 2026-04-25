@@ -324,6 +324,42 @@ final class AutoPilotService: Sendable {
                         signals.append(s)
                         ArgusLogger.success(.autopilot, "Sinyal Tespit Edildi: \(s.symbol) -> \(s.action.rawValue.uppercased())")
                         print("✅ AutoPilotService: Sinyal - \(s.symbol) -> \(s.action.rawValue) (\(s.reason))")
+
+                        // D — Decision Engine audit. Sinyal üretilen sembolün
+                        // skorları + action + reason kayda geçer; trade gerçekten
+                        // açılsa da açılmasa da (governor reject vs) decision
+                        // patikası geri-izlenebilir.
+                        let signalAction: SignalAction = {
+                            switch s.action {
+                            case .buy:  return .buy
+                            case .sell: return .sell
+                            default:    return .hold
+                            }
+                        }()
+                        var moduleScores: [String: Double] = [:]
+                        if let ad = argus {
+                            moduleScores["Orion"]  = ad.orionScore
+                            moduleScores["Atlas"]  = ad.atlasScore
+                            moduleScores["Aether"] = ad.aetherScore
+                        }
+                        let auditSymbol = s.symbol
+                        let auditReason = s.reason
+                        let auditScore  = argus?.finalScoreCore ?? 0.0
+                        Task { @MainActor in
+                            await AuditLogService.shared.recordDecision(
+                                symbol: auditSymbol,
+                                candidateSource: "AutoPilot",
+                                moduleScores: moduleScores,
+                                moduleOpinions: [:],
+                                chironWeights: nil,
+                                debateSummary: auditReason,
+                                riskApproved: true,
+                                riskReason: nil,
+                                finalAction: signalAction,
+                                finalScore: auditScore,
+                                executionPlan: nil
+                            )
+                        }
                     }
                     if let l = log {
                         logs.append(l)

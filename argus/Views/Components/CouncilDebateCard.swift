@@ -201,6 +201,168 @@ struct AtlasDebateCard: View {
     }
 }
 
+// MARK: - Grand Council Debate Card
+//
+// ArgusGrandDecision için karar patikası kartı: kim oy verdi, hangi yönde,
+// hangi modül veto etti, danışmanlar ne dedi. Konsey kararının "neden bu
+// çıktı" sorusunun cevabı tek ekranda görünür. Eskiden bu bilgi yalnız
+// reasoning string'inde sıkışıyordu.
+struct GrandCouncilDebateCard: View {
+    let decision: ArgusGrandDecision
+    @State private var isExpanded: Bool = true
+
+    private var votes: [(name: String, decision: VoteDecision, reasoning: String?, weight: Double)] {
+        decision.contributors.map { contrib in
+            let voteDecision: VoteDecision
+            switch contrib.action {
+            case .buy:  voteDecision = .approve
+            case .sell: voteDecision = .veto
+            case .hold: voteDecision = .abstain
+            }
+            return (
+                name: contrib.module,
+                decision: voteDecision,
+                reasoning: contrib.reasoning,
+                weight: contrib.confidence
+            )
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "person.3.sequence.fill")
+                    .foregroundColor(InstitutionalTheme.Colors.holo)
+                Text("KARAR PATİKASI")
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .tracking(1.4)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Spacer()
+                Text(decision.action.rawValue)
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .foregroundColor(actionColor(decision.action))
+                Button(action: { withAnimation { isExpanded.toggle() } }) {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                }
+            }
+
+            // Reasoning özet (zaten zenginleşti — sayım+ağırlık+eşik içerir)
+            Text(decision.reasoning)
+                .font(.system(size: 11))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            if isExpanded {
+                Divider().background(InstitutionalTheme.Colors.border)
+
+                // Oy listesi
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("OYLAR (\(votes.count) modül)")
+                        .font(.system(size: 9, weight: .bold, design: .monospaced))
+                        .tracking(1)
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    ForEach(Array(votes.enumerated()), id: \.offset) { _, vote in
+                        DebateVoteRow(
+                            name: vote.name,
+                            decision: vote.decision,
+                            reasoning: vote.reasoning,
+                            weight: vote.weight
+                        )
+                    }
+                }
+
+                // Hard vetolar (varsa) ayrı bölümde
+                if !decision.vetoes.isEmpty {
+                    Divider().background(InstitutionalTheme.Colors.border)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("VETO (\(decision.vetoes.count))")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .tracking(1)
+                            .foregroundColor(InstitutionalTheme.Colors.crimson)
+                        ForEach(Array(decision.vetoes.enumerated()), id: \.offset) { _, veto in
+                            HStack(spacing: 6) {
+                                Image(systemName: "hand.raised.fill")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(InstitutionalTheme.Colors.crimson)
+                                Text(veto.module)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                                Text("·").foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                                Text(veto.reason)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                                    .lineLimit(2)
+                            }
+                        }
+                    }
+                }
+
+                // Danışman notları (Phoenix, Prometheus, Athena/Chimera vb.)
+                if !decision.advisors.isEmpty {
+                    Divider().background(InstitutionalTheme.Colors.border)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("DANIŞMAN NOTLARI (\(decision.advisors.count))")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .tracking(1)
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        ForEach(Array(decision.advisors.enumerated()), id: \.offset) { _, note in
+                            HStack(alignment: .top, spacing: 6) {
+                                Image(systemName: noteIcon(for: note.tone))
+                                    .font(.system(size: 9))
+                                    .foregroundColor(noteColor(for: note.tone))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(note.module)
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                                    Text(note.advice)
+                                        .font(.system(size: 10))
+                                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .background(InstitutionalTheme.Colors.surface1)
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(InstitutionalTheme.Colors.holo.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    private func actionColor(_ action: ArgusAction) -> Color {
+        switch action {
+        case .aggressiveBuy, .accumulate: return InstitutionalTheme.Colors.aurora
+        case .trim, .liquidate: return InstitutionalTheme.Colors.crimson
+        case .neutral: return InstitutionalTheme.Colors.textSecondary
+        }
+    }
+
+    private func noteIcon(for tone: AdvisorNote.AdvisorTone) -> String {
+        switch tone {
+        case .positive: return "checkmark.seal.fill"
+        case .caution:  return "exclamationmark.triangle.fill"
+        case .warning:  return "xmark.octagon.fill"
+        case .neutral:  return "info.circle"
+        }
+    }
+
+    private func noteColor(for tone: AdvisorNote.AdvisorTone) -> Color {
+        switch tone {
+        case .positive: return InstitutionalTheme.Colors.aurora
+        case .caution:  return InstitutionalTheme.Colors.titan
+        case .warning:  return InstitutionalTheme.Colors.crimson
+        case .neutral:  return InstitutionalTheme.Colors.textSecondary
+        }
+    }
+}
+
 // MARK: - Orion Debate Card Helper
 struct OrionDebateCard: View {
     let decision: CouncilDecision

@@ -55,6 +55,7 @@ struct StockDetailV5Body: View {
                     priceBlock
                     chartBlock
                     councilCard
+                    councilTraceCard
                     motorChipGrid
                     // 2026-04-22: "Temel Veriler" gridi kaldırıldı — veri
                     // sağlayıcılardan tutarlı karşılanamıyor. Temel analiz
@@ -253,6 +254,16 @@ struct StockDetailV5Body: View {
         .padding(.top, 16)
         .onTapGesture {
             showSanctumSheet = true
+        }
+    }
+
+    // MARK: - 4.5 Karar Patikası — Konsey detayları (oylar / vetolar / danışmanlar)
+    @ViewBuilder
+    private var councilTraceCard: some View {
+        if let d = decision {
+            GrandCouncilDebateCard(decision: d)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
         }
     }
 
