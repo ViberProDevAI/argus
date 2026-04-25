@@ -403,7 +403,7 @@ actor TahtaEngine {
         candles: [Candle],
         benchmarkCandles: [Candle]
     ) -> RelativeStrengthResult {
-        guard candles.count == benchmarkCandles.count && candles.count >= 20 else {
+        guard candles.count == benchmarkCandles.count && candles.count >= 21 else {
             return RelativeStrengthResult(
                 symbol: symbol,
                 relativeStrength: 1.0,
@@ -420,7 +420,7 @@ actor TahtaEngine {
         let symbolCloses = candles.map { $0.close }
         let benchmarkCloses = benchmarkCandles.map { $0.close }
 
-        // Relative Strength hesapla
+        // Relative Strength hesapla (20 günlük getiri için 21 fiyat noktası gerekli)
         let startPriceIndex = candles.count - 21
         let symbolStartPrice = symbolCloses[startPriceIndex]
         let symbolReturn = (symbolCloses.last! - symbolStartPrice) / symbolStartPrice
