@@ -1,0 +1,43 @@
+# Render.com blueprint — BorsaPy FastAPI backend için tek-tık deploy.
+#
+# Kullanım:
+#   1. Render hesabı aç → New → Blueprint
+#   2. Bu repo'yu bağla, dal `main` (veya istediğin dal)
+#   3. Otomatik olarak `borsapy-server` adlı bir web service ayaklanır
+#   4. Deploy tamamlandığında URL'yi al:
+#        `https://borsapy-server-<hash>.onrender.com`
+#   5. iOS uygulamada `Secrets.xcconfig` → `BORSAPY_URL` = bu URL
+#
+# Free tier bilgisi: Render free web service'i 15 dakika inaktifse uyutur;
+# istek geldiğinde ~30 sn cold start. BIST ekranları kullanırken arada bir
+# "yükleniyor…" görürsen sebebi budur. Daha sorunsuz için Starter ($7/ay).
+
+services:
+  - type: web
+    name: borsapy-server
+    runtime: python
+    region: frankfurt        # BIST endekslerine en yakın Render bölgesi
+    plan: free               # Ücretli plan istersen: starter / standard
+    rootDir: Scripts/borsapy_server
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"       # borsapy 3.11-3.13 aralığı destekli
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      # Bearer auth token (opsiyonel ama önerilir). Unset bırakılırsa tüm
+      # istekler auth bypass eder (lokal dev davranışı). Set edilirse iOS
+      # tarafındaki `BORSAPY_KEY` ile birebir eşleşmeli.
+      #
+      # Üretim için token oluştur:
+      #   python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+      #
+      # Render dashboard → Environment → Add Environment Variable:
+      #   key: BORSAPY_TOKEN
+      #   value: <yukarıdaki string>
+      #   sync: false  (dashboard'a kaydet, yaml'a commitleme)
+      #
+      # - key: BORSAPY_TOKEN
+      #   sync: false

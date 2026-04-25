@@ -1,0 +1,1128 @@
+import SwiftUI
+import UniformTypeIdentifiers
+
+// MARK: - AYARLAR
+
+struct SettingsView: View {
+    @ObservedObject var settingsViewModel: SettingsViewModel
+    @AppStorage("isDarkMode") private var isDarkMode = true
+    @AppStorage("notify_all_signals") private var notifyAllSignals = true
+    @State private var showDrawer = false
+    @StateObject private var deepLinkManager = DeepLinkManager.shared
+
+    // Alkindus kalibrasyon aksiyon durumu
+    @State private var isRunningCalibration: Bool = false
+    @State private var calibrationFlash: String? = nil
+
+    // AutoPilot durumu — kullanıcı "trade etmiyor" dediğinde nedeni burada görünür
+    @ObservedObject private var autoPilotStore = AutoPilotStore.shared
+
+    // Özet veriler — Chiron & Alkindus durumu
+    @State private var chironTradeCount: Int = 0
+    @State private var chironWinRate: Int = 0
+    @State private var alkindusPendingCount: Int = 0
+
+    // "Neden trade etmiyor?" teşhisi
+    @State private var tradeBlockReasons: [String] = []
+    @State private var policyMode: String = "NORMAL"
+    @State private var marketOpenGlobal: Bool = false
+    @State private var marketOpenBist: Bool = false
+    @State private var watchlistCount: Int = 0
+
+    // Harmony — MarketContextCoordinator canlı durumu
+    @ObservedObject private var marketContext = MarketContextCoordinator.shared
+
+    // Aether velocity durumu (trend dönüş paneli için)
+    @State private var aetherCurrent: Double = 0
+    @State private var aetherVelocity: Double = 0
+    @State private var aetherSignal: String = "—"
+    @State private var aetherCrossingMsg: String? = nil
+
+    // Aether Rejim Dönüşüm durumu
+    @State private var regimeTransitionDirection: String = "STABLE"
+    @State private var regimeTransitionSummary: String? = nil
+    @State private var regimeEvidence: [String] = []
+    @State private var regimeConfidence: Double = 0
+
+    // Watchlist Pulse — tüm listenin ortak ani hareketi
+    @State private var pulseSummary: String = "Veri yok"
+    @State private var pulseIntensity: String = "DORMANT"
+    @State private var pulseDirection: String = "MIXED"
+    @State private var pulseMoveRate: Double = 0
+
+    // Trend dönüş hassasiyeti
+    @AppStorage("trendReversalSensitivity") private var trendSensitivity: String = "balanced"
+
+    // Durum Panosu sheet
+    @State private var showStatusConsole: Bool = false
+
+    var body: some View {
+        NavigationView {
+            ZStack {
+                InstitutionalTheme.Colors.background.edgesIgnoringSafeArea(.all)
+
+                ScrollView {
+                    VStack(spacing: 20) {
+
+                        // MARK: - Command Header
+                        commandHeader
+
+                        // MARK: - Snapshot Ribbon — tıklanınca Durum Panosu açılır
+                        snapshotRibbon
+                            .onTapGesture { showStatusConsole = true }
+
+                        // MARK: - Otopilot & Motor (sade — detay Durum Panosu'nda)
+                        intelligenceSection
+
+                        // MARK: - Bildirimler
+                        notificationsSection
+
+                        // MARK: - İşlem Ayarları (komisyon / stopaj)
+                        tradingFeesSection
+
+                        // MARK: - API Anahtarları
+                        apiKeysSection
+
+                        // MARK: - Depolama
+                        StorageCleanupSection()
+
+                        // MARK: - Hakkında
+                        aboutSection
+
+                        Spacer(minLength: 60)
+                    }
+                    .padding(.bottom, 40)
+                }
+                .task { await refreshSnapshots() }
+                .sheet(isPresented: $showStatusConsole) {
+                    ArgusStatusConsoleView(
+                        aetherCurrent: aetherCurrent,
+                        aetherVelocity: aetherVelocity,
+                        aetherSignal: aetherSignal,
+                        aetherCrossingMsg: aetherCrossingMsg,
+                        regimeDirection: regimeTransitionDirection,
+                        regimeSummary: regimeTransitionSummary,
+                        regimeEvidence: regimeEvidence,
+                        regimeConfidence: regimeConfidence,
+                        pulseSummary: pulseSummary,
+                        pulseIntensity: pulseIntensity,
+                        pulseDirection: pulseDirection,
+                        chironTradeCount: chironTradeCount,
+                        chironWinRate: chironWinRate,
+                        alkindusPendingCount: alkindusPendingCount,
+                        policyMode: policyMode,
+                        marketOpenGlobal: marketOpenGlobal,
+                        marketOpenBist: marketOpenBist,
+                        watchlistCount: watchlistCount,
+                        tradeBlockReasons: tradeBlockReasons
+                    )
+                    .preferredColorScheme(.dark)
+                }
+
+                if showDrawer {
+                    ArgusDrawerView(isPresented: $showDrawer) { openSheet in
+                        drawerSections(openSheet: openSheet)
+                    }
+                    .zIndex(200)
+                }
+            }
+            .navigationTitle("")
+            .navigationBarHidden(true)
+        }
+        .preferredColorScheme(.dark)
+        .navigationViewStyle(StackNavigationViewStyle())
+    }
+}
+
+// MARK: - Bolumlerin Tanimlari
+
+extension SettingsView {
+
+    // -- Command Header (v3'ten port edilen premium başlık) --
+
+    private var commandHeader: some View {
+        VStack(spacing: 10) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 10) {
+                        // V5 sol dikey bar — 3px genişlik, 22 yükseklik (mockup ile aynı)
+                        Rectangle()
+                            .fill(InstitutionalTheme.Colors.holo)
+                            .frame(width: 3, height: 22)
+                        Text("AYARLAR")
+                            .font(.system(size: 22, weight: .black, design: .monospaced))
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                            .tracking(2)
+                            .accessibilityAddTraits(.isHeader)
+                    }
+                    Text("KOMUT · MOTOR · VERİ · BİLDİRİM")
+                        .font(InstitutionalTheme.Typography.dataMicro)
+                        .tracking(1.2)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                }
+                Spacer()
+                Button(action: { showDrawer = true }) {
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(.callout).weight(.bold))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(InstitutionalTheme.Colors.surface2)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                                )
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Menüyü aç")
+            }
+
+            // Pulse şeridi — V5 PİYASA AKTİF satırı ritmi
+            // (ArgusDot + mono uppercase + ArgusHair + versiyon)
+            HStack(spacing: 10) {
+                ArgusDot(
+                    color: autoPilotStore.isAutoPilotEnabled
+                        ? InstitutionalTheme.Colors.aurora
+                        : InstitutionalTheme.Colors.neutral,
+                    size: 6
+                )
+                Text(autoPilotStore.isAutoPilotEnabled ? "SİSTEM AKTİF" : "OTOPİLOT KAPALI")
+                    .font(InstitutionalTheme.Typography.dataMicro)
+                    .tracking(1.5)
+                    .foregroundColor(
+                        autoPilotStore.isAutoPilotEnabled
+                            ? InstitutionalTheme.Colors.textPrimary
+                            : InstitutionalTheme.Colors.neutral
+                    )
+                ArgusHair()
+                Text("v\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")")
+                    .font(InstitutionalTheme.Typography.dataMicro)
+                    .tracking(1.2)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            }
+            .padding(.top, 2)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+    }
+
+    // -- Snapshot Ribbon — 3 tile hızlı özet --
+
+    // MARK: - Snapshot Ribbon
+    //
+    // 2026-04-22 Sprint 1 (V5 Pilot): MotorLogo + ArgusChip + ArgusBar +
+    // ArgusDot + ArgusSectionCaption ile yeniden yazıldı. SF Symbol ikonları
+    // yerine kendi motor logolarımız (Chiron Path, Alkindus PNG, Aether PNG)
+    // kullanılıyor. Değerler hâlâ @AppStorage'lardan (`chironTradeCount`,
+    // `alkindusPendingCount`, `aetherCurrent`, `aetherSignal`) okunuyor —
+    // hardcode mock yok; veri nil/0 ise "veri yok" veya "—" döner.
+    //
+    // Diğer Settings bölümleri (commandHeader, intelligenceSection, vb.) bu
+    // sprint'te dokunulmadı; Sprint 3'te tamamı V5'e geçecek.
+    // 2026-04-22 Sprint 3.2: Mor overdose temizlik. Motor rengi sadece logoya
+    // kalsın; tile border/dot/bar nötr (veya skor bazlı) olsun. Tile neden
+    // "Chiron mor" olsun? Logo zaten motor kimliğini taşıyor.
+    private var snapshotRibbon: some View {
+        HStack(spacing: 10) {
+            snapshotTileV5(
+                title: "CHIRON",
+                motor: .chiron,
+                primary: chironTradeCount > 0 ? "WR %\(chironWinRate)" : "—",
+                secondary: chironTradeCount > 0 ? "\(chironTradeCount) işlem" : "veri yok",
+                barValue: chironTradeCount > 0 ? Double(chironWinRate) / 100.0 : nil,
+                tone: .neutral
+            )
+            snapshotTileV5(
+                title: "ALKINDUS",
+                motor: .alkindus,
+                primary: alkindusPendingCount > 0 ? "\(alkindusPendingCount)" : "0",
+                secondary: "bekleyen",
+                barValue: nil,
+                tone: .neutral
+            )
+            snapshotTileV5(
+                title: "AETHER",
+                motor: .aether,
+                primary: "\(Int(aetherCurrent))",
+                secondary: aetherShortSignal,
+                barValue: aetherCurrent > 0 ? aetherCurrent / 100.0 : nil,
+                tone: aetherTileToneV5
+            )
+        }
+        .padding(.horizontal, 16)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Özet şeridi. Detay için dokun.")
+        .accessibilityHint("Durum panosunu aç")
+    }
+
+    /// V5 snapshot tile — MotorLogo + ArgusSectionCaption + monospace primary
+    /// + secondary + opsiyonel ArgusBar.
+    private func snapshotTileV5(
+        title: String,
+        motor: MotorEngine,
+        primary: String,
+        secondary: String,
+        barValue: Double?,
+        tone: ArgusChipTone
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                MotorLogo(motor, size: 14)
+                ArgusSectionCaption(title)
+                Spacer(minLength: 0)
+                ArgusDot(color: tone.foreground, size: 5)
+            }
+            Text(primary)
+                .font(.system(.title3, design: .monospaced))
+                .fontWeight(.black)
+                .monospacedDigit()
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            if let barValue {
+                ArgusBar(value: barValue, color: tone.foreground, height: 3)
+            }
+            Text(secondary)
+                .font(InstitutionalTheme.Typography.dataMicro)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
+                .fill(InstitutionalTheme.Colors.surface1)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
+                .stroke(tone.foreground.opacity(0.22), lineWidth: 1)
+        )
+    }
+
+    /// V5 Aether tile rengi — velocity sinyaline göre motor/aurora/crimson.
+    private var aetherTileToneV5: ArgusChipTone {
+        if aetherSignal.contains("RECOVERING")    { return .aurora }
+        if aetherSignal.contains("DETERIORATING") { return .crimson }
+        return .motor(.aether)
+    }
+
+    private var aetherShortSignal: String {
+        if aetherSignal.contains("RECOVERING_FAST") { return "↑↑ hızlı" }
+        if aetherSignal.contains("RECOVERING")      { return "↑ toparlanma" }
+        if aetherSignal.contains("DETERIORATING_FAST") { return "↓↓ hızlı" }
+        if aetherSignal.contains("DETERIORATING")   { return "↓ bozulma" }
+        return "stabil"
+    }
+
+    private var aetherTileColor: Color {
+        if aetherSignal.contains("RECOVERING")    { return InstitutionalTheme.Colors.positive }
+        if aetherSignal.contains("DETERIORATING") { return InstitutionalTheme.Colors.negative }
+        return InstitutionalTheme.Colors.primary
+    }
+
+    private var aetherTileIcon: String {
+        if aetherSignal.contains("RECOVERING_FAST")    { return "arrow.up.forward.app.fill" }
+        if aetherSignal.contains("RECOVERING")         { return "arrow.up.right.circle.fill" }
+        if aetherSignal.contains("DETERIORATING_FAST") { return "arrow.down.forward.app.fill" }
+        if aetherSignal.contains("DETERIORATING")      { return "arrow.down.right.circle.fill" }
+        return "minus.circle.fill"
+    }
+
+    // -- 1. Zeka Motorları (Chiron & Alkindus) --
+
+    // Sade kontrol bölümü.
+    // Canlı teşhis (Harmony, Rejim Radar, Modül Sağlık) Durum Panosu sheet'ine taşındı —
+    // Snapshot Ribbon'a tıklanarak açılır. Burada yalnız kullanıcı AYARI kalır.
+    private var intelligenceSection: some View {
+        VStack(spacing: 12) {
+
+            // OTOPİLOT — sade: toggle + mod etiketi + "Detaylı →" link
+            compactAutoPilotCard
+
+            // Aether hassasiyet (picker) — ayar, burada kalmalı
+            aetherSensitivityCard
+
+            // Chiron Öğrenme Motoru kartı
+            TerminalSection(title: "CHIRON · ÖĞRENME MOTORU",
+                            motor: .chiron) {
+                NavigationLink(destination: ChironInsightsView()) {
+                    ArgusTerminalRow(
+                        label: "Kokpit",
+                        value: chironTradeCount > 0 ? "WR %\(chironWinRate) · T \(chironTradeCount)" : "Henüz veri yok",
+                        icon: "ChironIcon",
+                        color: InstitutionalTheme.Colors.Motors.chiron
+                    )
+                }
+                NavigationLink(destination: ChironPerformanceView()) {
+                    ArgusTerminalRow(
+                        label: "Performans",
+                        value: "Grafikler",
+                        icon: "chart.bar.xaxis",
+                        color: InstitutionalTheme.Colors.primary
+                    )
+                }
+                NavigationLink(destination: ChironInsightsView(symbol: nil)) {
+                    ArgusTerminalRow(
+                        label: "İçgörüler",
+                        value: "Son dersler",
+                        icon: "waveform.path.ecg",
+                        color: InstitutionalTheme.Colors.positive
+                    )
+                }
+            }
+
+            // Alkindus Kalibrasyon Motoru kartı
+            TerminalSection(title: "ALKINDUS · KALİBRASYON",
+                            motor: .alkindus) {
+                NavigationLink(destination: AlkindusDashboardView()) {
+                    ArgusTerminalRow(
+                        label: "Gözlem Paneli",
+                        value: alkindusPendingCount > 0 ? "\(alkindusPendingCount) bekliyor" : "Boş",
+                        icon: "eye.circle.fill",
+                        color: InstitutionalTheme.Colors.neutral
+                    )
+                }
+
+                Button(action: runCalibrationNow) {
+                    HStack(spacing: 12) {
+                        Image(systemName: isRunningCalibration ? "arrow.triangle.2.circlepath" : "play.circle.fill")
+                            .font(.system(.callout))
+                            .foregroundColor(isRunningCalibration ? InstitutionalTheme.Colors.textSecondary : InstitutionalTheme.Colors.primary)
+                            .frame(width: 20)
+                            .rotationEffect(.degrees(isRunningCalibration ? 360 : 0))
+                            .animation(isRunningCalibration ? .linear(duration: 1.2).repeatForever(autoreverses: false) : .default, value: isRunningCalibration)
+
+                        Text(isRunningCalibration ? "Çalışıyor…" : "Kalibrasyonu şimdi çalıştır")
+                            .font(InstitutionalTheme.Typography.body)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+
+                        Spacer()
+
+                        if let flash = calibrationFlash {
+                            Text(flash)
+                                .font(InstitutionalTheme.Typography.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.positive)
+                                .transition(.opacity)
+                        }
+                    }
+                    .frame(minHeight: 44)
+                    .padding(.vertical, 12)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isRunningCalibration)
+                .accessibilityLabel(isRunningCalibration ? "Kalibrasyon çalışıyor" : "Kalibrasyonu şimdi çalıştır")
+            }
+        }
+    }
+
+    // -- Compact Otopilot Kartı (sade ayar) --
+    //
+    // Sadece toggle + tek satır mod etiketi + "Detaylar →" link. Canlı teşhis,
+    // Harmony paneli, blocker listesi Durum Panosu sheet'inde (Snapshot Ribbon tıkla).
+
+    private var compactAutoPilotCard: some View {
+        TerminalSection(title: "OTOPİLOT",
+                        motor: .argus) {
+            HStack(spacing: 12) {
+                Image(systemName: autoPilotStore.isAutoPilotEnabled ? "bolt.fill" : "bolt.slash.fill")
+                    .font(.system(.callout))
+                    .foregroundColor(autoPilotStore.isAutoPilotEnabled ? InstitutionalTheme.Colors.positive : InstitutionalTheme.Colors.negative)
+                    .frame(width: 20)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(autoPilotStore.isAutoPilotEnabled ? "Aktif" : "Kapalı")
+                        .font(InstitutionalTheme.Typography.body)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    Text(compactModeLabel)
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(compactModeColor)
+                }
+                Spacer()
+                Toggle("", isOn: $autoPilotStore.isAutoPilotEnabled)
+                    .labelsHidden()
+                    .tint(InstitutionalTheme.Colors.positive)
+                    .accessibilityLabel("Otopilot")
+            }
+            .padding(.vertical, 8)
+
+            Button(action: { showStatusConsole = true }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "stethoscope")
+                        .font(.system(.footnote))
+                        .foregroundColor(InstitutionalTheme.Colors.primary)
+                        .frame(width: 20)
+                    Text("Durum Panosu")
+                        .font(InstitutionalTheme.Typography.body)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    Spacer()
+                    if !tradeBlockReasons.isEmpty {
+                        Text("\(tradeBlockReasons.count) uyarı")
+                            .font(InstitutionalTheme.Typography.caption)
+                            .foregroundColor(InstitutionalTheme.Colors.neutral)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(.caption2))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary.opacity(0.7))
+                }
+                .frame(minHeight: 44)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Durum panosunu aç")
+        }
+    }
+
+    private var compactModeLabel: String {
+        let snap = marketContext.snapshot
+        if !autoPilotStore.isAutoPilotEnabled { return "Hiçbir alım/satım yapılmaz" }
+        if snap.opportunityMode { return "🚀 Fırsat modu (×\(String(format: "%.2f", snap.positionMultiplier)))" }
+        if snap.protectiveMode { return "🛡️ Koruyucu mod (×\(String(format: "%.2f", snap.positionMultiplier)))" }
+        return "Normal seyir"
+    }
+
+    private var compactModeColor: Color {
+        let snap = marketContext.snapshot
+        if !autoPilotStore.isAutoPilotEnabled { return InstitutionalTheme.Colors.neutral }
+        if snap.opportunityMode { return InstitutionalTheme.Colors.positive }
+        if snap.protectiveMode { return InstitutionalTheme.Colors.negative }
+        return InstitutionalTheme.Colors.textSecondary
+    }
+
+    // -- Aether Hassasiyet Kartı (sade ayar) --
+
+    private var aetherSensitivityCard: some View {
+        TerminalSection(title: "AETHER · TREND DÖNÜŞ HASSASİYETİ",
+                        motor: .aether) {
+            VStack(alignment: .leading, spacing: 8) {
+                Picker("Hassasiyet", selection: $trendSensitivity) {
+                    Text("Muhafazakâr").tag("conservative")
+                    Text("Dengeli").tag("balanced")
+                    Text("Agresif").tag("aggressive")
+                }
+                .pickerStyle(.segmented)
+
+                Text(sensitivityExplanation)
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 8)
+        }
+    }
+
+    private var sensitivityExplanation: String {
+        switch trendSensitivity {
+        case "conservative":
+            return "Skor eşikleri bekler — trend dönüşlerini geç yakalar, yanlış sinyal riski düşük."
+        case "aggressive":
+            return "Hız pozitifse skor düşük olsa bile alım penceresi açar — erken girer, yanlış sinyal riski yüksek."
+        default:
+            return "Skor + hız birlikte değerlendirilir — denge. Savaş→ateşkes geçişinde rally penceresi yakalanır."
+        }
+    }
+
+    // -- 2. Bildirimler --
+
+    private var notificationsSection: some View {
+        TerminalSection(title: "BİLDİRİMLER",
+                        systemImage: "bell.fill",
+                        accentColor: InstitutionalTheme.Colors.Motors.hermes) {
+            HStack(spacing: 12) {
+                Image(systemName: "bell.fill")
+                    .font(.system(.callout))
+                    .foregroundColor(InstitutionalTheme.Colors.Motors.hermes)
+                    .frame(width: 20)
+                Text("Sinyal bildirimleri")
+                    .font(InstitutionalTheme.Typography.body)
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Spacer()
+                Toggle("", isOn: $notifyAllSignals)
+                    .labelsHidden()
+                    .tint(InstitutionalTheme.Colors.Motors.hermes)
+                    .accessibilityLabel("Sinyal bildirimleri")
+            }
+            .frame(minHeight: 44)
+            .padding(.vertical, 8)
+
+            NavigationLink(destination: PriceAlertSettingsView()) {
+                ArgusTerminalRow(
+                    label: "Fiyat alarmları",
+                    value: nil,
+                    icon: "chart.line.uptrend.xyaxis",
+                    color: InstitutionalTheme.Colors.Motors.hermes
+                )
+            }
+        }
+    }
+
+    // -- 1.5 İşlem Ayarları (Komisyon / Stopaj) --
+
+    private var tradingFeesSection: some View {
+        TerminalSection(title: "İŞLEM AYARLARI",
+                        systemImage: "percent",
+                        accentColor: InstitutionalTheme.Colors.titan) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("Aracı kurumunuzun komisyon oranlarını girin. Sıfır bırakırsanız komisyon hesaplanmaz — Midas, Garanti, Alpaca gibi sıfır komisyon aracılar için doğru ayar.")
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                feeRow(
+                    label: "BIST komisyon",
+                    value: $settingsViewModel.bistCommissionPercent,
+                    range: 0...1.5,
+                    icon: "turkishlirasign.circle.fill"
+                )
+
+                feeRow(
+                    label: "ABD/Global komisyon",
+                    value: $settingsViewModel.globalCommissionPercent,
+                    range: 0...1.0,
+                    icon: "dollarsign.circle.fill"
+                )
+
+                Divider().background(InstitutionalTheme.Colors.textSecondary.opacity(0.2))
+
+                Text("BIST stopajı şu an 2026 itibariyle hisse senedi kâr istisnası kapsamında. Vergi rejimi değişirse buradan oran girebilirsiniz; backtest ve gerçek alım hesaplarında kâra uygulanır.")
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                feeRow(
+                    label: "BIST stopaj",
+                    value: $settingsViewModel.bistWithholdingPercent,
+                    range: 0...30,
+                    icon: "doc.text.fill"
+                )
+            }
+            .padding(.vertical, 6)
+        }
+    }
+
+    @ViewBuilder
+    private func feeRow(label: String, value: Binding<Double>, range: ClosedRange<Double>, icon: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(.callout))
+                .foregroundColor(InstitutionalTheme.Colors.titan)
+                .frame(width: 20)
+            Text(label)
+                .font(InstitutionalTheme.Typography.body)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+            Spacer()
+            Text(String(format: "%%%.2f", value.wrappedValue))
+                .font(InstitutionalTheme.Typography.data)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .frame(width: 64, alignment: .trailing)
+        }
+        Slider(value: value, in: range, step: 0.01)
+            .tint(InstitutionalTheme.Colors.titan)
+            .accessibilityLabel(label)
+    }
+
+    // -- 2. API Anahtarlari --
+
+    private var apiKeysSection: some View {
+        TerminalSection(title: "API ANAHTARLARI",
+                        systemImage: "key.fill",
+                        accentColor: InstitutionalTheme.Colors.titan) {
+            NavigationLink(destination: APIKeyCenterView()) {
+                ArgusTerminalRow(
+                    label: "Veri kaynakları",
+                    value: nil,
+                    icon: "key.fill",
+                    color: InstitutionalTheme.Colors.titan
+                )
+            }
+        }
+    }
+
+    // -- 4. Hakkinda --
+
+    private var aboutSection: some View {
+        TerminalSection(title: "HAKKINDA",
+                        systemImage: "info.circle.fill",
+                        accentColor: InstitutionalTheme.Colors.textSecondary) {
+            NavigationLink(destination: ArgusGuideView()) {
+                ArgusTerminalRow(
+                    label: "Argus rehberi",
+                    value: nil,
+                    icon: "book.fill",
+                    color: InstitutionalTheme.Colors.primary
+                )
+            }
+
+            NavigationLink(destination: LegalDocumentView(document: settingsViewModel.privacyPolicy)) {
+                ArgusTerminalRow(label: "Gizlilik politikası", value: nil, icon: "hand.raised.fill", color: InstitutionalTheme.Colors.textSecondary)
+            }
+
+            NavigationLink(destination: LegalDocumentView(document: settingsViewModel.termsOfUse)) {
+                ArgusTerminalRow(label: "Kullanım koşulları", value: nil, icon: "doc.text.fill", color: InstitutionalTheme.Colors.textSecondary)
+            }
+
+            NavigationLink(destination: LegalDocumentView(document: settingsViewModel.riskDisclosure)) {
+                ArgusTerminalRow(label: "Risk bildirimi", value: nil, icon: "exclamationmark.triangle.fill", color: InstitutionalTheme.Colors.neutral)
+            }
+
+            Button(action: {
+                if let url = URL(string: "mailto:destek@argusapp.com") {
+                    UIApplication.shared.open(url)
+                }
+            }) {
+                ArgusTerminalRow(
+                    label: "Geri bildirim",
+                    value: nil,
+                    icon: "envelope.fill",
+                    color: InstitutionalTheme.Colors.textSecondary
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Aksiyonlar & Veri Yenileme
+
+extension SettingsView {
+
+    /// Chiron & Alkindus özet verilerini tazele.
+    /// Başlangıçta ve kalibrasyon sonrası çağrılır.
+    fileprivate func refreshSnapshots() async {
+        // Chiron istatistikleri — iki kaynak: ChironDataLake (son dönem, tam kayıt) +
+        // PortfolioStore (tüm tarihsel kapalı trade'ler). Eski import edilmemiş 92
+        // trade Chiron dosyasında olmadığı için WR hep boş kalıyordu. PortfolioStore'dan
+        // doğrudan okuyoruz, fallback olarak Chiron lake kullanılır.
+        let chironTrades = await ChironDataLakeService.shared.loadAllTradeHistory()
+        let portfolioClosed = await MainActor.run {
+            PortfolioStore.shared.trades.filter { !$0.isOpen && $0.exitPrice != nil }
+        }
+        let pending = await AlkindusMemoryStore.shared.loadPendingObservations().count
+        let velocity = await AetherVelocityEngine.shared.analyze()
+
+        // Rejim dönüşüm durumu — Settings'de banner olarak gösterilecek
+        let watchlist = await MainActor.run { WatchlistStore.shared.items }
+        let quotes = await MainActor.run { MarketDataStore.shared.quotes.compactMapValues { $0.value } }
+        let candles = await MainActor.run { MarketDataStore.shared.candles.compactMapValues { $0.value } }
+        let globalMomentum = await MarketMomentumGate.shared.assessGlobal(
+            quotes: quotes, candles: candles, watchlistSymbols: watchlist
+        )
+        let bistMomentum = await MarketMomentumGate.shared.assessBist(
+            quotes: quotes, candles: candles, watchlistSymbols: watchlist
+        )
+        // Hermes event sayımı — gerçek event store'dan son 24 saat
+        let hermesPos = HermesEventStore.shared.countHighImpactEvents(polarity: .positive)
+        let hermesNeg = HermesEventStore.shared.countHighImpactEvents(polarity: .negative)
+
+        // Watchlist pulse — tüm listenin nabzı
+        let pulse = await WatchlistPulseMonitor.shared.assess(candlesBySymbol: candles)
+
+        let transition = await AetherRegimeTransitionDetector.shared.analyze(
+            velocity: velocity,
+            recentPositiveHermesEvents: hermesPos,
+            recentNegativeHermesEvents: hermesNeg,
+            globalMomentumLevel: globalMomentum.level,
+            bistMomentumLevel: bistMomentum.level,
+            watchlistPulse: pulse
+        )
+
+        // Kapalı trade sayımı — iki kaynaktan en büyüğünü al (eski import edilmemiş
+        // trade'ler PortfolioStore'da olabilir ama Chiron'a yansımamış)
+        let tradeCount = max(chironTrades.count, portfolioClosed.count)
+        let winRate: Int = {
+            if !portfolioClosed.isEmpty {
+                let wins = portfolioClosed.filter { ($0.exitPrice ?? 0) > $0.entryPrice }.count
+                return Int((Double(wins) / Double(portfolioClosed.count)) * 100)
+            }
+            if !chironTrades.isEmpty {
+                let wins = chironTrades.filter { $0.pnlPercent > 0 }.count
+                return Int((Double(wins) / Double(chironTrades.count)) * 100)
+            }
+            return 0
+        }()
+
+        // Trade blocker teşhisi
+        let policy = RiskEscapePolicy.from(aetherScore: velocity.currentScore)
+        let globalOpen = MarketStatusService.shared.canTrade(for: .global)
+        let bistOpen   = MarketStatusService.shared.canTrade(for: .bist)
+        let watchCount = await MainActor.run { WatchlistStore.shared.items.count }
+
+        var reasons: [String] = []
+        if !autoPilotStore.isAutoPilotEnabled {
+            reasons.append("Otopilot kapalı — yukarıdaki toggle'dan aç")
+        }
+        if policy.mode != .normal {
+            reasons.append("Risk politikası \(policy.mode.rawValue) — Aether \(Int(velocity.currentScore)) (riskli alım bloke)")
+        }
+        if !globalOpen && !bistOpen {
+            reasons.append("Tüm piyasalar kapalı — açılış saatini bekliyor")
+        }
+        if watchCount == 0 {
+            reasons.append("İzleme listesi boş — sembol ekle")
+        }
+
+        await MainActor.run {
+            self.chironTradeCount = tradeCount
+            self.chironWinRate = winRate
+            self.alkindusPendingCount = pending
+            self.aetherCurrent = velocity.currentScore
+            self.aetherVelocity = velocity.velocity
+            self.aetherSignal = velocity.signal.rawValue
+            self.aetherCrossingMsg = velocity.crossingAlert?.description
+            self.regimeTransitionDirection = transition.direction.rawValue
+            self.regimeTransitionSummary = transition.direction == .stable ? nil : transition.summary
+            self.regimeEvidence = transition.evidence
+            self.regimeConfidence = transition.confidence
+            self.pulseSummary = pulse.summary
+            self.pulseIntensity = pulse.intensity.rawValue
+            self.pulseDirection = pulse.direction.rawValue
+            self.pulseMoveRate = pulse.avgMoveRate
+            self.policyMode = policy.mode.rawValue
+            self.marketOpenGlobal = globalOpen
+            self.marketOpenBist = bistOpen
+            self.watchlistCount = watchCount
+            self.tradeBlockReasons = reasons
+        }
+    }
+
+    /// Alkindus kalibrasyonu manuel tetikle.
+    /// Periyodik maturation'a bağımlı kalmadan kullanıcı "şimdi bak" diyebilir.
+    fileprivate func runCalibrationNow() {
+        guard !isRunningCalibration else { return }
+        isRunningCalibration = true
+        calibrationFlash = nil
+
+        Task {
+            await AlkindusCalibrationEngine.shared.periodicMatureCheck()
+            await refreshSnapshots()
+
+            await MainActor.run {
+                withAnimation { calibrationFlash = "Güncellendi" }
+                isRunningCalibration = false
+            }
+
+            // 2 sn sonra flash mesajını temizle
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await MainActor.run {
+                withAnimation { calibrationFlash = nil }
+            }
+        }
+    }
+}
+
+// MARK: - Drawer
+
+extension SettingsView {
+    private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
+        [
+            ArgusDrawerView.DrawerSection(
+                title: "EKRANLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Piyasa özeti", icon: "waveform.path.ecg") {
+                        deepLinkManager.navigate(to: .home)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Kokpit", subtitle: "Tam liste", icon: "chart.line.uptrend.xyaxis") {
+                        deepLinkManager.navigate(to: .kokpit)
+                        showDrawer = false
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Portföy", subtitle: "Pozisyonlar", icon: "briefcase.fill") {
+                        deepLinkManager.navigate(to: .portfolio)
+                        showDrawer = false
+                    }
+                ]
+            ),
+            ArgusDrawerView.DrawerSection(
+                title: "ARAÇLAR",
+                items: [
+                    ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Önemli tarihler", icon: "calendar") {
+                        openSheet(.calendar)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Finans Sözlüğü", subtitle: "Terimler", icon: "character.book.closed") {
+                        openSheet(.dictionary)
+                    },
+                    ArgusDrawerView.DrawerItem(title: "Geri Bildirim", subtitle: "Sorun bildir", icon: "envelope") {
+                        openSheet(.feedback)
+                    }
+                ]
+            )
+        ]
+    }
+}
+
+// MARK: - UI: Terminal Section
+
+/// V5 card-2 + section title düzeni.
+///
+/// 2026-04-22 Sprint 3: Başlığın yanına opsiyonel motor logosu/SF ikonu,
+/// V5 radius `lg (14)`, solid border renkleri. `motor:` parametresi verilirse
+/// MotorLogo gösterilir; `systemImage:` fallback olarak SF Symbol (kalan
+/// alt bölümler için: bildirim, api, depolama).
+struct TerminalSection<Content: View>: View {
+    let title: String
+    let motor: MotorEngine?
+    let systemImage: String?
+    let accentColor: Color
+    let content: Content
+
+    init(title: String,
+         motor: MotorEngine? = nil,
+         systemImage: String? = nil,
+         accentColor: Color = InstitutionalTheme.Colors.textSecondary,
+         @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.motor = motor
+        self.systemImage = systemImage
+        self.accentColor = accentColor
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                if let motor {
+                    MotorLogo(motor, size: 14)
+                } else if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(accentColor)
+                        .frame(width: 14, height: 14)
+                }
+                ArgusSectionCaption(title)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 8)
+
+            VStack(spacing: 0) {
+                content
+            }
+            .padding(16)
+            .background(InstitutionalTheme.Colors.surface1)
+            .overlay(
+                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
+                    .stroke(InstitutionalTheme.Colors.border, lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
+        }
+    }
+}
+
+// MARK: - UI: Terminal Row
+
+struct ArgusTerminalRow: View {
+    let label: String
+    let value: String?
+    let icon: String
+    let color: Color
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(.callout))
+                .foregroundColor(color)
+                .frame(width: 20)
+
+            Text(label)
+                .font(InstitutionalTheme.Typography.body)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+
+            Spacer()
+
+            if let v = value {
+                Text(v)
+                    .font(InstitutionalTheme.Typography.dataSmall)
+                    .foregroundColor(color.opacity(0.8))
+            }
+
+            Image(systemName: "chevron.right")
+                .font(InstitutionalTheme.Typography.micro)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary.opacity(0.7))
+        }
+        .frame(minHeight: 44)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+        .overlay(
+            Rectangle()
+                .frame(height: 0.5)
+                .foregroundColor(InstitutionalTheme.Colors.borderSubtle),
+            alignment: .bottom
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text(value.map { "\(label), \($0)" } ?? label))
+    }
+}
+
+// MARK: - Utility: Legal Document Viewer
+
+struct LegalDocumentView: View {
+    let document: LegalDocument
+
+    var body: some View {
+        ScrollView {
+            Text(document.content)
+                .font(.system(.body, design: .monospaced))
+                .padding()
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+        }
+        .background(InstitutionalTheme.Colors.background.edgesIgnoringSafeArea(.all))
+        .navigationTitle(document.title)
+        .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Utility: Share Sheet
+
+struct ArgusShareSheet: UIViewControllerRepresentable {
+    var activityItems: [Any]
+    var applicationActivities: [UIActivity]? = nil
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - Depolama Temizligi
+
+struct StorageCleanupSection: View {
+    @State private var isCleaningUp = false
+    @State private var cleanupResult: String?
+    @State private var storageSize: String = "Hesaplanıyor..."
+    @State private var showCleanupConfirmation = false
+
+    var body: some View {
+        TerminalSection(title: "DEPOLAMA",
+                        systemImage: "externaldrive.fill",
+                        accentColor: InstitutionalTheme.Colors.textSecondary) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "externaldrive.fill")
+                        .foregroundColor(InstitutionalTheme.Colors.neutral)
+                        .font(.system(.callout))
+                        .frame(width: 20)
+                    Text("Kullanılan alan")
+                        .font(InstitutionalTheme.Typography.body)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    Spacer()
+                    Text(storageSize)
+                        .font(InstitutionalTheme.Typography.dataSmall)
+                        .foregroundColor(InstitutionalTheme.Colors.neutral)
+                }
+
+                Divider().background(InstitutionalTheme.Colors.borderSubtle)
+
+                Button(action: { showCleanupConfirmation = true }) {
+                    HStack(spacing: 12) {
+                        if isCleaningUp {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .tint(InstitutionalTheme.Colors.negative)
+                                .frame(width: 20)
+                        } else {
+                            Image(systemName: "trash.fill")
+                                .foregroundColor(InstitutionalTheme.Colors.negative)
+                                .font(.system(.callout))
+                                .frame(width: 20)
+                        }
+                        Text(isCleaningUp ? "Temizleniyor..." : "Önbelleği temizle")
+                            .font(InstitutionalTheme.Typography.body)
+                            .foregroundColor(InstitutionalTheme.Colors.negative)
+                        Spacer()
+                    }
+                    .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .disabled(isCleaningUp)
+                .padding(.vertical, 4)
+                .accessibilityLabel(isCleaningUp ? "Temizleniyor" : "Önbelleği temizle")
+
+                if let result = cleanupResult {
+                    Text(result)
+                        .font(InstitutionalTheme.Typography.caption)
+                        .foregroundColor(InstitutionalTheme.Colors.positive)
+                }
+
+                Text("Önbellek ve geçici dosyalar silinir. Öğrenme verileri korunur.")
+                    .font(InstitutionalTheme.Typography.caption)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            }
+        }
+        .onAppear { calculateStorageSize() }
+        .alert("Emin misiniz?", isPresented: $showCleanupConfirmation) {
+            Button("İptal", role: .cancel) { }
+            Button("Temizle", role: .destructive) { performCleanup() }
+        } message: {
+            Text("Bu işlem önbellek ve geçici dosyaları silecek. İşlem geçmişi ve öğrenme verileri korunur.")
+        }
+    }
+
+    private func calculateStorageSize() {
+        Task {
+            let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+
+            var totalSize: Int64 = 0
+            if let docs = docsDir { totalSize += folderSize(url: docs) }
+            if let caches = cachesDir { totalSize += folderSize(url: caches) }
+
+            let mb = Double(totalSize) / 1024.0 / 1024.0
+            let gb = mb / 1024.0
+
+            await MainActor.run {
+                storageSize = gb >= 1.0
+                    ? String(format: "%.2f GB", gb)
+                    : String(format: "%.0f MB", mb)
+            }
+        }
+    }
+
+    private func folderSize(url: URL) -> Int64 {
+        let fm = FileManager.default
+        var size: Int64 = 0
+        if let enumerator = fm.enumerator(at: url, includingPropertiesForKeys: [.fileSizeKey], options: [.skipsHiddenFiles]) {
+            for case let fileURL as URL in enumerator {
+                if let fileSize = try? fileURL.resourceValues(forKeys: [.fileSizeKey]).fileSize {
+                    size += Int64(fileSize ?? 0)
+                }
+            }
+        }
+        return size
+    }
+
+    private func performCleanup() {
+        isCleaningUp = true
+        cleanupResult = nil
+
+        Task {
+            let ledgerResult = await ArgusLedger.shared.aggressiveCleanup(maxBlobAgeDays: 0, maxEventAgeDays: 0)
+            DiskCacheService.shared.cleanup(maxAgeDays: 0)
+            DiskCacheService.shared.clearAll()
+
+            if let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let fm = FileManager.default
+                if let contents = try? fm.contentsOfDirectory(at: docsDir, includingPropertiesForKeys: nil) {
+                    let safeToClean: Set<String> = [
+                        "ArgusScience_V1.sqlite",
+                        "ArgusScience_V2.sqlite",
+                        "forward_test_results.json",
+                        "argus_data_export.zip"
+                    ]
+                    for url in contents {
+                        if safeToClean.contains(where: { url.lastPathComponent.contains($0) }) {
+                            try? fm.removeItem(at: url)
+                        }
+                    }
+                }
+            }
+
+            await MainActor.run {
+                isCleaningUp = false
+                cleanupResult = ledgerResult.summary
+                calculateStorageSize()
+            }
+        }
+    }
+}

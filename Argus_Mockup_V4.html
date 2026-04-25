@@ -1,0 +1,1432 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Argus — Mockup V4 · Gerçek İçerikli Ekran Seti</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  :root{
+    --bg:#060c18;
+    --bg-deep:#03060d;
+    --surface1:#0b1426;
+    --surface2:#111d35;
+    --surface3:#18284a;
+    --border:#1e2a44;
+    --border-strong:#2a3a5b;
+    --text-primary:#e8edf6;
+    --text-secondary:#8a97b2;
+    --text-tertiary:#5b6782;
+    --holo:#3b82f6;           /* Sanctum hologramBlue */
+    --holo-soft:rgba(59,130,246,.18);
+    --aurora:#22c55e;         /* auroraGreen */
+    --crimson:#ef4444;        /* crimsonRed */
+    --titan:#f5c244;          /* titanGold */
+    --orion:#60a5fa;
+    --atlas:#93c5fd;
+    --aether:#22d3ee;
+    --hermes:#f472b6;
+    --athena:#fde68a;
+    --demeter:#84cc16;
+    --chiron:#a78bfa;
+    --prometheus:#fb923c;
+  }
+  html,body{background:var(--bg-deep);color:var(--text-primary);font-family:'Inter',system-ui,sans-serif;}
+  .mono{font-family:'JetBrains Mono',ui-monospace,monospace;}
+  .phone{
+    width:390px;height:844px;
+    background:var(--bg);
+    border-radius:44px;
+    border:1px solid var(--border-strong);
+    box-shadow: 0 0 0 6px #0a0f1a, 0 40px 120px -20px rgba(59,130,246,.25), 0 0 60px -20px rgba(59,130,246,.2);
+    position:relative;overflow:hidden;
+  }
+  .phone-notch{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:120px;height:28px;background:#000;border-radius:14px;z-index:50;}
+  .phone-inner{position:absolute;inset:0;border-radius:44px;overflow:hidden;}
+  .scrolltrack{height:100%;overflow-y:auto;scrollbar-width:none;}
+  .scrolltrack::-webkit-scrollbar{display:none;}
+  .statbar{padding:52px 22px 6px;display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono';font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--text-primary);}
+  .tabbar{position:absolute;bottom:0;left:0;right:0;padding:8px 18px 22px;background:rgba(6,12,24,.92);backdrop-filter:blur(16px);border-top:1px solid var(--border);display:flex;justify-content:space-around;z-index:40;}
+  .tabitem{display:flex;flex-direction:column;align-items:center;gap:2px;font-family:'JetBrains Mono';font-size:9px;font-weight:700;letter-spacing:.8px;color:var(--text-tertiary);}
+  .tabitem.active{color:var(--holo);}
+  .card{background:var(--surface1);border:1px solid var(--border);border-radius:14px;}
+  .card-2{background:var(--surface2);border:1px solid var(--border);border-radius:14px;}
+  .chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-family:'JetBrains Mono';font-size:9px;font-weight:700;letter-spacing:.6px;}
+  .pill{padding:4px 10px;border-radius:8px;font-family:'JetBrains Mono';font-size:10px;font-weight:700;letter-spacing:.5px;}
+  .divider{height:1px;background:var(--border);}
+  .ghost-row{border-bottom:.5px solid var(--border);padding:10px 0;}
+  .orb{border-radius:9999px;display:flex;align-items:center;justify-content:center;}
+  .hair{height:.5px;background:var(--border);}
+  .scan{background-image:linear-gradient(180deg, rgba(255,255,255,.02) 0 1px, transparent 1px 3px);}
+  .glow-holo{box-shadow:0 0 0 1px var(--holo-soft), 0 0 24px -8px var(--holo);}
+  .grid-bg{background-image:
+     linear-gradient(180deg, var(--bg) 0%, #060c18 100%),
+     radial-gradient(circle at 30% 10%, rgba(59,130,246,.12), transparent 40%),
+     radial-gradient(circle at 80% 90%, rgba(34,211,238,.08), transparent 40%);
+     background-blend-mode:normal;}
+  .sec-title{font-family:'JetBrains Mono';font-size:10px;letter-spacing:1.3px;font-weight:700;color:var(--text-secondary);}
+  .micro{font-family:'JetBrains Mono';font-size:9px;letter-spacing:.8px;font-weight:700;}
+  .nomono{font-family:'Inter';}
+  .scr-label{font-family:'JetBrains Mono';font-size:11px;letter-spacing:2.2px;font-weight:800;color:var(--holo);text-transform:uppercase;}
+  .scr-sub{font-size:11px;color:var(--text-secondary);max-width:360px;line-height:1.5;}
+  .drawer-col{width:310px;background:var(--surface1);border-right:1px solid var(--border);height:100%;padding:18px;}
+  .dot{width:6px;height:6px;border-radius:9999px;display:inline-block;}
+  .stripe{background:repeating-linear-gradient(45deg, rgba(59,130,246,.06) 0 2px, transparent 2px 10px);}
+  .drawer-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;display:flex;align-items:center;gap:10px;}
+  .ticker-row{display:flex;gap:18px;white-space:nowrap;animation:tick 40s linear infinite;}
+  @keyframes tick{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  .ring{border-radius:9999px;}
+  .page-title{font-family:'JetBrains Mono';font-weight:900;letter-spacing:3px;}
+  .holo-frame{position:relative;}
+  .holo-frame::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 0 0 1px rgba(59,130,246,.25), inset 0 0 40px -10px rgba(59,130,246,.18);}
+  .sparkline{width:100%;height:34px;}
+  .bar{height:6px;border-radius:999px;background:var(--surface3);overflow:hidden;}
+  .bar>span{display:block;height:100%;background:var(--holo);}
+  .engine-title{font-family:'JetBrains Mono';font-weight:900;letter-spacing:1.5px;font-size:12px;}
+  .kbd{font-family:'JetBrains Mono';font-size:9px;border:1px solid var(--border);padding:1px 5px;border-radius:4px;color:var(--text-secondary);background:var(--surface2);}
+  .shield{background:conic-gradient(from 220deg,var(--holo) 0%,var(--aether) 30%,var(--holo) 60%,var(--holo) 100%);}
+</style>
+</head>
+<body class="grid-bg">
+
+<!-- ================= HEADER ================= -->
+<header class="max-w-[1480px] mx-auto px-10 pt-16 pb-10">
+  <div class="flex items-center gap-5">
+    <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:var(--surface2);border:1px solid var(--border-strong)">
+      <div class="w-4 h-4 rounded-full" style="background:radial-gradient(circle,#9ac1ff,#3b82f6 60%,#0a1a33)"></div>
+    </div>
+    <div>
+      <div class="mono text-[11px] tracking-[3px] text-slate-400">ARGUS · MOCKUP V4</div>
+      <h1 class="text-3xl font-black tracking-tight">Gerçek içerikli ekran seti — anatomi odaklı</h1>
+    </div>
+    <div class="ml-auto flex items-center gap-6 text-[11px] mono text-slate-400">
+      <div class="flex items-center gap-2"><span class="dot" style="background:var(--aurora)"></span>HOLOGRAM BLUE</div>
+      <div class="flex items-center gap-2"><span class="dot" style="background:var(--aurora)"></span>AURORA GREEN</div>
+      <div class="flex items-center gap-2"><span class="dot" style="background:var(--crimson)"></span>CRIMSON RED</div>
+      <div class="flex items-center gap-2"><span class="dot" style="background:var(--titan)"></span>TITAN GOLD</div>
+    </div>
+  </div>
+
+  <p class="mt-6 max-w-[980px] text-slate-400 text-[13px] leading-relaxed">
+    Bu dokümandaki tüm ekranlar <span class="text-slate-200">argus/Views/**/*.swift</span> dosyalarındaki birebir metin ve
+    yapı okunarak çıkarıldı. Hiçbir modül uydurulmadı, hiçbir mevcut modül kaybedilmedi. Sadelik Robinhood/Public çizgisinde,
+    kimlik Argus hologram mavisinde. Her ekran, kendi <code class="kbd">Docs/Argus_Anatomy_*.md</code> dosyasının canlı karşılığıdır.
+  </p>
+</header>
+
+<!-- ================= LEGENDA ================= -->
+<section class="max-w-[1480px] mx-auto px-10 pb-8">
+  <div class="grid grid-cols-6 gap-3 text-[11px] mono">
+    <div class="card p-3"><div class="text-slate-500">TAB 1</div><div class="text-slate-100 tracking-widest mt-1">PİYASA</div></div>
+    <div class="card p-3"><div class="text-slate-500">TAB 2</div><div class="text-slate-100 tracking-widest mt-1">KOKPİT</div></div>
+    <div class="card p-3"><div class="text-slate-500">TAB 3</div><div class="text-slate-100 tracking-widest mt-1">PORTFÖY</div></div>
+    <div class="card p-3"><div class="text-slate-500">TAB 4</div><div class="text-slate-100 tracking-widest mt-1">KEŞFET</div></div>
+    <div class="card p-3"><div class="text-slate-500">TAB 5</div><div class="text-slate-100 tracking-widest mt-1">AYARLAR</div></div>
+    <div class="card p-3"><div class="text-slate-500">DRILL-DOWN</div><div class="text-slate-100 tracking-widest mt-1">SANCTUM</div></div>
+  </div>
+</section>
+
+<!-- ================= ROW 1: MARKET + COCKPIT ================= -->
+<section class="max-w-[1480px] mx-auto px-10 pb-20 grid grid-cols-2 gap-12">
+
+  <!-- ====== PIYASA / MARKET ====== -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="self-start">
+      <div class="scr-label">01 · Piyasa</div>
+      <div class="scr-sub mt-1">MarketView — Global/BIST mod; AetherHUD + ChironNeuralLink + SmartTicker + watchlist.</div>
+    </div>
+
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-inner">
+        <div class="scrolltrack">
+
+          <!-- statusbar -->
+          <div class="statbar"><span>9:41</span><span class="flex items-center gap-1 mono">●●● 5G <span class="ml-2">100%</span></span></div>
+
+          <!-- tab toggle GLOBAL/SIRKIYE -->
+          <div class="px-3 pt-3 pb-2" style="background:var(--surface1);border-bottom:1px solid var(--border)">
+            <div class="flex gap-10 pt-1 px-2">
+              <div class="flex-1 flex flex-col items-center">
+                <div class="mono text-[13px] font-extrabold tracking-wider" style="color:var(--holo)">GLOBAL</div>
+                <div class="h-[2px] mt-2 w-full" style="background:var(--holo)"></div>
+              </div>
+              <div class="flex-1 flex flex-col items-center">
+                <div class="mono text-[13px] font-bold tracking-wider text-slate-500">SİRKİYE</div>
+                <div class="h-[2px] mt-2 w-full" style="background:transparent"></div>
+              </div>
+            </div>
+
+            <!-- komut başlığı -->
+            <div class="mt-3 flex items-center gap-3 px-2">
+              <div class="flex gap-[2px]">
+                <span class="w-[3px] h-5" style="background:var(--holo)"></span>
+                <span class="w-[3px] h-5" style="background:var(--text-primary)"></span>
+                <span class="w-[3px] h-5" style="background:var(--text-primary)"></span>
+              </div>
+              <div>
+                <div class="mono text-[22px] font-black tracking-[2px]">PİYASA</div>
+                <div class="mono text-[9px] tracking-[1.2px] text-slate-500">İZLEME · SİNYAL · KEŞİF</div>
+              </div>
+              <div class="ml-auto flex gap-1 text-slate-300">
+                <div class="w-9 h-9 flex items-center justify-center rounded-lg" style="background:var(--surface2)">≡</div>
+                <div class="w-9 h-9 flex items-center justify-center rounded-lg" style="background:var(--surface2)">◯</div>
+                <div class="w-9 h-9 flex items-center justify-center rounded-lg" style="background:var(--surface2)">＋</div>
+                <div class="w-9 h-9 flex items-center justify-center rounded-lg" style="background:var(--surface2)">🔔</div>
+              </div>
+            </div>
+
+            <!-- pulse şeridi -->
+            <div class="mt-3 flex items-center gap-2 px-2 pb-1 micro text-slate-400">
+              <span class="dot" style="background:var(--aurora)"></span>
+              <span style="color:var(--text-primary)">PİYASA AKTİF</span>
+              <span class="flex-1 hair"></span>
+              <span>22 NİS · 18:42</span>
+            </div>
+          </div>
+
+          <!-- Aether HUD -->
+          <div class="px-3 pt-3">
+            <div class="card p-3 flex items-center gap-3" style="border-color:rgba(59,130,246,.3)">
+              <div class="relative w-11 h-11">
+                <div class="absolute inset-0 rounded-full" style="border:3px solid rgba(59,130,246,.3)"></div>
+                <div class="absolute inset-0 rounded-full" style="border:3px solid var(--holo);border-color:var(--holo) transparent transparent transparent;transform:rotate(45deg)"></div>
+                <div class="absolute inset-0 flex items-center justify-center mono font-black text-[14px]" style="color:var(--holo)">68</div>
+              </div>
+              <div class="flex-1">
+                <div class="micro flex items-center gap-1" style="color:var(--aether)">🌐 AETHER</div>
+                <div class="text-[11px] text-slate-400">Dengeli risk ortamı</div>
+              </div>
+              <div class="flex gap-1">
+                <span class="chip" style="background:rgba(34,197,94,.14);color:var(--aurora)">📈 72</span>
+                <span class="chip" style="background:rgba(59,130,246,.14);color:var(--holo)">⚖ 64</span>
+                <span class="chip" style="background:rgba(245,194,68,.14);color:var(--titan)">🕰 61</span>
+              </div>
+              <div class="text-slate-500 text-xs">›</div>
+            </div>
+          </div>
+
+          <!-- Chiron Neural Link -->
+          <div class="px-3 pt-3">
+            <div class="card-2 p-3 flex items-center gap-3" style="border-color:rgba(167,139,250,.3)">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(167,139,250,.15);color:var(--chiron)">🧠</div>
+              <div class="flex-1">
+                <div class="mono text-[10px] tracking-[1.2px]" style="color:var(--chiron)">CHIRON · NEURAL LINK</div>
+                <div class="text-[11px] text-slate-300">Bugünün dersi: VIX > 18 iken orta vadeli alımlar zayıf.</div>
+              </div>
+              <div class="chip" style="background:rgba(167,139,250,.15);color:var(--chiron)">EĞİT</div>
+            </div>
+          </div>
+
+          <!-- Smart Ticker -->
+          <div class="mt-4" style="background:#060c18">
+            <div class="overflow-hidden h-[30px] flex items-center" style="border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+              <div class="ticker-row mono text-[10px]">
+                <span>⚓ <span class="text-slate-200">TLT</span> <span style="color:var(--aurora)">+0.42%</span></span>
+                <span class="text-slate-500">·</span>
+                <span><span class="text-slate-200">SPY</span> <span style="color:var(--aurora)">+0.31%</span></span>
+                <span class="text-slate-500">·</span>
+                <span><span class="text-slate-200">QQQ</span> <span style="color:var(--aurora)">+0.52%</span></span>
+                <span class="text-slate-500">·</span>
+                <span><span class="text-slate-200">^VIX</span> <span style="color:var(--prometheus)">+3.11%</span></span>
+                <span class="text-slate-500">·</span>
+                <span><span class="text-slate-200">GLD</span> <span style="color:var(--aurora)">+0.18%</span></span>
+                <span class="text-slate-500">·</span>
+                <span><span class="text-slate-200">BTC</span> <span style="color:var(--crimson)">-1.24%</span></span>
+                <span class="text-slate-500">·</span>
+                <span>⚓ <span class="text-slate-200">USDTRY=X</span> <span style="color:var(--aurora)">+0.08%</span></span>
+                <span class="text-slate-500">·</span>
+                <span>⚓ <span class="text-slate-200">TLT</span> <span style="color:var(--aurora)">+0.42%</span></span>
+                <span class="text-slate-500">·</span>
+                <span><span class="text-slate-200">SPY</span> <span style="color:var(--aurora)">+0.31%</span></span>
+                <span class="text-slate-500">·</span>
+                <span><span class="text-slate-200">QQQ</span> <span style="color:var(--aurora)">+0.52%</span></span>
+                <span class="text-slate-500">·</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- GLOBAL İZLEME section header -->
+          <div class="px-4 pt-4 flex items-center justify-between">
+            <div class="sec-title">GLOBAL İZLEME</div>
+            <div class="chip" style="background:rgba(34,197,94,.15);color:var(--aurora)">● CANLI</div>
+          </div>
+
+          <!-- watchlist rows -->
+          <div class="px-4 pt-2 pb-20">
+            <!-- row -->
+            <div class="flex items-center gap-3 py-3 border-b" style="border-color:var(--border)">
+              <div class="w-9 h-9 rounded-full" style="background:linear-gradient(135deg,#1a365d,#3b82f6)"></div>
+              <div class="flex-1">
+                <div class="font-bold text-[14px]">AAPL</div>
+                <div class="text-[11px]" style="color:var(--aurora)">Momentum kırılımı · Phoenix onay</div>
+              </div>
+              <div class="pill" style="background:var(--aurora);color:#0a1f0a">AL</div>
+              <div class="text-right ml-3 min-w-[82px]">
+                <div class="mono font-bold text-[14px]">$178.32</div>
+                <div class="mono text-[10px] px-1.5 py-0.5 rounded inline-block" style="background:rgba(34,197,94,.18);color:var(--aurora)">+1.84%</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 py-3 border-b" style="border-color:var(--border)">
+              <div class="w-9 h-9 rounded-full" style="background:linear-gradient(135deg,#3b0a0a,#ef4444)"></div>
+              <div class="flex-1">
+                <div class="font-bold text-[14px]">TSLA</div>
+                <div class="text-[11px] text-slate-500">Tesla Motors</div>
+              </div>
+              <div class="pill" style="background:rgba(239,68,68,.2);color:var(--crimson)">SAT</div>
+              <div class="text-right ml-3 min-w-[82px]">
+                <div class="mono font-bold text-[14px]">$164.05</div>
+                <div class="mono text-[10px] px-1.5 py-0.5 rounded inline-block" style="background:rgba(239,68,68,.18);color:var(--crimson)">-2.11%</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 py-3 border-b" style="border-color:var(--border)">
+              <div class="w-9 h-9 rounded-full" style="background:linear-gradient(135deg,#112437,#60a5fa)"></div>
+              <div class="flex-1">
+                <div class="font-bold text-[14px]">MSFT</div>
+                <div class="text-[11px] text-slate-500">Microsoft Corporation</div>
+              </div>
+              <div class="pill" style="background:rgba(148,163,184,.2);color:#cbd5e1">BEKLE</div>
+              <div class="text-right ml-3 min-w-[82px]">
+                <div class="mono font-bold text-[14px]">$412.87</div>
+                <div class="mono text-[10px] px-1.5 py-0.5 rounded inline-block" style="background:rgba(148,163,184,.15);color:#cbd5e1">+0.12%</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 py-3 border-b" style="border-color:var(--border)">
+              <div class="w-9 h-9 rounded-full" style="background:linear-gradient(135deg,#0b1426,#22d3ee)"></div>
+              <div class="flex-1">
+                <div class="font-bold text-[14px]">NVDA</div>
+                <div class="text-[11px]" style="color:var(--aurora)">Trend devam · Prometheus onay</div>
+              </div>
+              <div class="pill" style="background:var(--aurora);color:#0a1f0a">AL</div>
+              <div class="text-right ml-3 min-w-[82px]">
+                <div class="mono font-bold text-[14px]">$925.10</div>
+                <div class="mono text-[10px] px-1.5 py-0.5 rounded inline-block" style="background:rgba(34,197,94,.18);color:var(--aurora)">+3.22%</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 py-3">
+              <div class="w-9 h-9 rounded-full" style="background:linear-gradient(135deg,#1a1525,#a78bfa)"></div>
+              <div class="flex-1">
+                <div class="font-bold text-[14px]">META</div>
+                <div class="text-[11px] text-slate-500">Meta Platforms</div>
+              </div>
+              <div class="pill" style="background:rgba(167,139,250,.2);color:var(--chiron)">İZLE</div>
+              <div class="text-right ml-3 min-w-[82px]">
+                <div class="mono font-bold text-[14px]">$492.44</div>
+                <div class="mono text-[10px] px-1.5 py-0.5 rounded inline-block" style="background:rgba(34,197,94,.18);color:var(--aurora)">+0.84%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- tab bar -->
+        <div class="tabbar">
+          <div class="tabitem active"><div>●</div>PİYASA</div>
+          <div class="tabitem"><div>▤</div>KOKPİT</div>
+          <div class="tabitem"><div>◫</div>PORTFÖY</div>
+          <div class="tabitem"><div>◎</div>KEŞFET</div>
+          <div class="tabitem"><div>⚙</div>AYARLAR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== KOKPİT / COCKPIT ====== -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="self-start">
+      <div class="scr-label">02 · Kokpit</div>
+      <div class="scr-sub mt-1">ArgusCockpitView — 3 pazar (Global/Sirkiye/Fonlar) + Terminal listesi, Konsey kararı, O/A/★ skor rozetleri.</div>
+    </div>
+
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-inner">
+        <div class="scrolltrack">
+
+          <div class="statbar"><span>9:41</span><span class="flex items-center gap-1 mono">●●● 5G <span class="ml-2">100%</span></span></div>
+
+          <!-- Toolbar -->
+          <div class="px-3 pb-2" style="background:var(--surface1);border-bottom:1px solid var(--border)">
+            <div class="flex items-center py-2">
+              <div class="w-10 h-10 flex items-center justify-center rounded-lg" style="background:var(--surface2)">≡</div>
+              <div class="flex-1 text-center mono font-extrabold tracking-[1px] text-[14px]" style="color:var(--holo)">
+                🌐 GLOBAL TERMINAL
+              </div>
+              <div class="w-10 h-10 flex items-center justify-center rounded-lg" style="background:var(--surface2)">↻</div>
+            </div>
+
+            <!-- MarketTabBar -->
+            <div class="flex">
+              <div class="flex-1 text-center py-2">
+                <div class="mono text-[12px] font-extrabold" style="color:var(--holo)">Global</div>
+                <div class="h-[2px] mt-2" style="background:var(--holo)"></div>
+              </div>
+              <div class="flex-1 text-center py-2">
+                <div class="mono text-[12px] text-slate-500 font-medium">Sirkiye</div>
+                <div class="h-[2px] mt-2" style="background:transparent"></div>
+              </div>
+              <div class="flex-1 text-center py-2">
+                <div class="mono text-[12px] text-slate-500 font-medium">Fonlar</div>
+                <div class="h-[2px] mt-2" style="background:transparent"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TerminalControlBar -->
+          <div class="px-3 py-2 flex items-center justify-between" style="background:var(--surface1);border-bottom:1px solid var(--border)">
+            <div class="micro tracking-[1.2px] text-slate-500">36 TICKER</div>
+            <div class="flex items-center gap-2">
+              <div class="chip" style="background:rgba(59,130,246,.14);color:var(--holo);border:.5px solid rgba(59,130,246,.35)">⇅ KONSEY / DİVAN</div>
+              <div class="flex items-center gap-2 text-[10px] text-slate-400">
+                <span class="micro">DÜŞÜK KALİTEYİ GİZLE</span>
+                <div class="w-8 h-4 rounded-full relative" style="background:var(--holo)"><span class="absolute right-0.5 top-0.5 w-3 h-3 rounded-full bg-white"></span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ScoutStories -->
+          <div class="px-3 pt-3 pb-2">
+            <div class="flex gap-2 overflow-x-auto scrolltrack">
+              <div class="min-w-[72px] h-[88px] rounded-xl flex flex-col items-center justify-end p-2 text-[10px]" style="background:var(--surface2);border:1px solid var(--border)">
+                <div class="w-10 h-10 rounded-full shield"></div>
+                <div class="mono mt-1 font-bold">GÖZCÜ</div>
+                <div class="text-slate-500">AAPL</div>
+              </div>
+              <div class="min-w-[72px] h-[88px] rounded-xl flex flex-col items-center justify-end p-2 text-[10px]" style="background:var(--surface2);border:1px solid var(--border)">
+                <div class="w-10 h-10 rounded-full" style="background:conic-gradient(from 0deg,var(--prometheus),var(--titan))"></div>
+                <div class="mono mt-1 font-bold">PHOENIX</div>
+                <div class="text-slate-500">TSLA</div>
+              </div>
+              <div class="min-w-[72px] h-[88px] rounded-xl flex flex-col items-center justify-end p-2 text-[10px]" style="background:var(--surface2);border:1px solid var(--border)">
+                <div class="w-10 h-10 rounded-full" style="background:conic-gradient(from 0deg,var(--aurora),var(--holo))"></div>
+                <div class="mono mt-1 font-bold">KONSEY</div>
+                <div class="text-slate-500">NVDA</div>
+              </div>
+              <div class="min-w-[72px] h-[88px] rounded-xl flex flex-col items-center justify-end p-2 text-[10px]" style="background:var(--surface2);border:1px solid var(--border)">
+                <div class="w-10 h-10 rounded-full" style="background:conic-gradient(from 0deg,var(--crimson),var(--prometheus))"></div>
+                <div class="mono mt-1 font-bold">CHIMERA</div>
+                <div class="text-slate-500">META</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ChironCockpitWidget -->
+          <div class="px-3 py-2" style="background:var(--surface1)">
+            <div class="card p-3 flex items-center gap-3" style="border-color:rgba(167,139,250,.25)">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(167,139,250,.15);color:var(--chiron)">🧠</div>
+              <div class="flex-1">
+                <div class="mono text-[9px] tracking-[1.1px]" style="color:var(--chiron)">CHIRON · CANLI ÖĞRENME</div>
+                <div class="text-[12px]">Orion ağırlığı <span class="mono">+0.04</span> — momentum alt kritere yakınsıyor.</div>
+              </div>
+              <div class="mono text-[10px] text-slate-500">3 DK</div>
+            </div>
+          </div>
+
+          <!-- Chiron Terminal Feed -->
+          <div class="px-4 text-[11px] text-slate-400 mono space-y-[6px] pt-1 pb-3">
+            <div>› ANALIZ_TAMAMLANDI <span class="text-slate-200">AAPL</span> <span style="color:var(--aurora)">+2.1</span></div>
+            <div>› AGIRLIK_GUNCEL <span class="text-slate-200">orion:0.31 → 0.35</span></div>
+            <div>› KURAL_EKLE <span style="color:var(--chiron)">"VIX>22 iken tut"</span></div>
+          </div>
+
+          <!-- TerminalStockRow -->
+          <div class="px-3 pt-1 pb-24 space-y-2">
+            <!-- row -->
+            <div class="p-3 rounded-xl" style="background:rgba(17,29,53,.45);border:1px solid var(--border)">
+              <div class="flex items-start">
+                <div>
+                  <div class="flex items-center gap-2"><span class="font-bold mono">AAPL</span><span class="chip" style="background:rgba(239,68,68,.12);color:var(--crimson);border:1px solid var(--crimson)">TR</span></div>
+                  <div class="mono text-[11px] text-slate-500 mt-1">$178.32</div>
+                </div>
+                <div class="ml-auto text-right">
+                  <div class="chip mono font-bold" style="background:rgba(59,130,246,.18);color:var(--holo);border:.5px solid rgba(59,130,246,.4)">KONSEY TOPLA</div>
+                  <div class="mono text-[10px] text-slate-500 mt-1">GÜVEN %74</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 mt-3">
+                <div class="chip w-10 justify-center" style="background:rgba(59,130,246,.14);color:var(--holo);border:.5px solid rgba(59,130,246,.35)">O 82</div>
+                <div class="chip w-10 justify-center" style="background:rgba(148,163,184,.14);color:#cbd5e1;border:.5px solid rgba(148,163,184,.3)">A 71</div>
+                <div class="chip w-10 justify-center" style="background:rgba(34,197,94,.14);color:var(--aurora);border:.5px solid rgba(34,197,94,.35)">★ 78</div>
+                <div class="ml-auto chip" style="background:rgba(251,146,60,.15);color:var(--prometheus)">PHOENIX +5d</div>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl" style="background:rgba(17,29,53,.45);border:1px solid var(--border)">
+              <div class="flex items-start">
+                <div>
+                  <div class="flex items-center gap-2"><span class="font-bold mono">NVDA</span></div>
+                  <div class="mono text-[11px] text-slate-500 mt-1">$925.10</div>
+                </div>
+                <div class="ml-auto text-right">
+                  <div class="chip mono font-bold" style="background:rgba(34,197,94,.18);color:var(--aurora);border:.5px solid rgba(34,197,94,.4)">KONSEY HÜCUM</div>
+                  <div class="mono text-[10px] text-slate-500 mt-1">GÜVEN %88</div>
+                  <div class="chip mt-1" style="background:var(--surface2);color:var(--prometheus)"><span class="dot" style="background:var(--crimson)"></span>Momentum kırılımı</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 mt-3">
+                <div class="chip w-10 justify-center" style="background:rgba(59,130,246,.14);color:var(--holo);border:.5px solid rgba(59,130,246,.35)">O 91</div>
+                <div class="chip w-10 justify-center" style="background:rgba(148,163,184,.14);color:#cbd5e1;border:.5px solid rgba(148,163,184,.3)">A 68</div>
+                <div class="chip w-10 justify-center" style="background:rgba(34,197,94,.14);color:var(--aurora);border:.5px solid rgba(34,197,94,.35)">★ 84</div>
+                <div class="ml-auto chip" style="background:rgba(251,146,60,.15);color:var(--prometheus)">PHOENIX +5d</div>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl" style="background:rgba(17,29,53,.45);border:1px solid var(--border)">
+              <div class="flex items-start">
+                <div>
+                  <div class="flex items-center gap-2"><span class="font-bold mono">TSLA</span></div>
+                  <div class="mono text-[11px] text-slate-500 mt-1">$164.05</div>
+                </div>
+                <div class="ml-auto text-right">
+                  <div class="chip mono font-bold" style="background:rgba(239,68,68,.18);color:var(--crimson);border:.5px solid rgba(239,68,68,.4)">KONSEY ÇIK</div>
+                  <div class="mono text-[10px] text-slate-500 mt-1">GÜVEN %69</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 mt-3">
+                <div class="chip w-10 justify-center" style="background:rgba(59,130,246,.14);color:var(--holo);border:.5px solid rgba(59,130,246,.35)">O 34</div>
+                <div class="chip w-10 justify-center" style="background:rgba(148,163,184,.14);color:#cbd5e1;border:.5px solid rgba(148,163,184,.3)">A 42</div>
+                <div class="chip w-10 justify-center" style="background:rgba(34,197,94,.14);color:var(--aurora);border:.5px solid rgba(34,197,94,.35)">★ 28</div>
+                <div class="ml-auto chip" style="background:rgba(239,68,68,.15);color:var(--crimson)">PHOENIX -5d</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tabitem"><div>●</div>PİYASA</div>
+          <div class="tabitem active"><div>▤</div>KOKPİT</div>
+          <div class="tabitem"><div>◫</div>PORTFÖY</div>
+          <div class="tabitem"><div>◎</div>KEŞFET</div>
+          <div class="tabitem"><div>⚙</div>AYARLAR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ROW 2: PORTFÖY + KEŞFET ================= -->
+<section id="row2" class="max-w-[1480px] mx-auto px-10 pb-20 grid grid-cols-2 gap-12">
+
+  <!-- ====== PORTFÖY ====== -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="self-start">
+      <div class="scr-label">03 · Portföy</div>
+      <div class="scr-sub mt-1">PortfolioView — LiquidDashboardHeader + TradeBrainBand + DailyAgenda + PlanBoard + Reports + EngineSelector + UnifiedPositionCard.</div>
+    </div>
+
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-inner">
+        <div class="scrolltrack">
+          <div class="statbar"><span>9:41</span><span class="flex items-center gap-1 mono">●●● 5G <span class="ml-2">100%</span></span></div>
+
+          <!-- LiquidDashboardHeader -->
+          <div class="px-3 pt-3">
+            <div class="rounded-3xl p-4 holo-frame" style="background:linear-gradient(145deg,rgba(59,130,246,.28),rgba(59,130,246,.08) 70%,var(--surface2));box-shadow:0 15px 40px -15px rgba(59,130,246,.5)">
+              <!-- control bar -->
+              <div class="flex items-center">
+                <div class="flex p-[3px] rounded-full" style="background:var(--surface2);border:1px solid var(--border-strong)">
+                  <div class="px-4 py-1 rounded-full text-[11px] font-bold" style="background:var(--text-primary);color:var(--holo)">Global</div>
+                  <div class="px-4 py-1 rounded-full text-[11px] font-bold text-slate-300">BIST</div>
+                </div>
+                <div class="ml-auto flex gap-2">
+                  <div class="w-9 h-9 rounded-full flex items-center justify-center text-slate-300" style="background:var(--surface2)">≡</div>
+                  <div class="w-9 h-9 rounded-full flex items-center justify-center text-slate-300" style="background:var(--surface2)">🧠</div>
+                  <div class="w-9 h-9 rounded-full flex items-center justify-center text-slate-300" style="background:var(--surface2)">⟲</div>
+                </div>
+              </div>
+              <!-- balance -->
+              <div class="mt-4">
+                <div class="mono text-[10px] tracking-[1.5px] text-slate-400">TOPLAM VARLIK</div>
+                <div class="text-[32px] font-black tracking-tight" style="text-shadow:0 0 20px rgba(59,130,246,.5)">$182,417</div>
+              </div>
+              <!-- stat pills -->
+              <div class="grid grid-cols-3 gap-2 mt-4">
+                <div class="flex items-center gap-2 rounded-2xl px-3 py-2.5" style="background:rgba(17,29,53,.9);border:1px solid rgba(59,130,246,.3)">
+                  <span class="dot" style="background:var(--text-primary)"></span>
+                  <div>
+                    <div class="mono text-[9px] tracking-[1.2px] text-slate-400">NAKİT</div>
+                    <div class="mono font-extrabold text-[13px]">$24,860</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 rounded-2xl px-3 py-2.5" style="background:rgba(17,29,53,.9);border:1px solid rgba(34,197,94,.3)">
+                  <span class="dot" style="background:var(--aurora)"></span>
+                  <div>
+                    <div class="mono text-[9px] tracking-[1.2px] text-slate-400">NET K/Z</div>
+                    <div class="mono font-extrabold text-[13px]" style="color:var(--aurora)">+$9,214</div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 rounded-2xl px-3 py-2.5" style="background:rgba(17,29,53,.9);border:1px solid rgba(34,197,94,.3)">
+                  <span class="dot" style="background:var(--aurora)"></span>
+                  <div>
+                    <div class="mono text-[9px] tracking-[1.2px] text-slate-400">ANLIK</div>
+                    <div class="mono font-extrabold text-[13px]" style="color:var(--aurora)">+$1,342</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TradeBrainStatusBand -->
+          <div class="px-3 pt-3">
+            <div class="card-2 p-3 flex items-center gap-3" style="border-color:rgba(245,194,68,.22)">
+              <div style="color:var(--titan)">⚠</div>
+              <div class="flex-1">
+                <div class="text-[13px]">Dikkat — <span class="mono font-bold">NVDA</span>: momentum kırılımı</div>
+                <div class="text-[11px] text-slate-500">5 pozisyon var, bazıları izleniyor</div>
+              </div>
+              <div class="pill" style="background:rgba(245,194,68,.12);color:var(--titan)">İzleniyor</div>
+              <div class="text-slate-500">›</div>
+            </div>
+          </div>
+
+          <!-- DailyAgendaView -->
+          <div class="px-3 pt-3">
+            <div class="rounded-2xl p-3" style="background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.25)">
+              <div class="flex items-center gap-2">
+                <span style="color:var(--prometheus)">🔔</span>
+                <div class="text-[12px] font-semibold" style="color:var(--prometheus)">Dikkat Gereken Pozisyonlar</div>
+                <div class="ml-auto w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold" style="background:var(--prometheus);color:#0a1f0a">3</div>
+              </div>
+              <div class="h-px mt-2" style="background:rgba(251,146,60,.2)"></div>
+              <div class="divide-y mt-1" style="divide-color:rgba(255,255,255,.06)">
+                <div class="flex items-center gap-3 py-2 text-[13px]"><span style="color:var(--crimson)">✕</span><span class="mono font-bold w-14">TSLA</span><span class="text-slate-200/90">Argus çıkış öneriyor</span></div>
+                <div class="flex items-center gap-3 py-2 text-[13px] border-t" style="border-color:rgba(255,255,255,.06)"><span style="color:var(--prometheus)">⚠</span><span class="mono font-bold w-14">META</span><span class="text-slate-200/90">Stop'a %2.1 yakın</span></div>
+                <div class="flex items-center gap-3 py-2 text-[13px] border-t" style="border-color:rgba(255,255,255,.06)"><span style="color:var(--titan)">⏱</span><span class="mono font-bold w-14">AAPL</span><span class="text-slate-200/90">52 gündür tutuluyor, hedefe %3.4 kaldı</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PlanBoard -->
+          <div class="px-3 pt-3">
+            <div class="card-2 p-3" style="border-color:rgba(59,130,246,.2)">
+              <div class="flex items-center">
+                <div class="sec-title">PLAN PANOSU</div>
+                <div class="ml-auto chip" style="background:rgba(59,130,246,.14);color:var(--holo)">%80 kapsama</div>
+              </div>
+              <div class="grid grid-cols-3 gap-2 mt-2">
+                <div class="rounded-lg p-2" style="background:rgba(24,40,74,.75)">
+                  <div class="micro text-slate-500">PLANLI</div>
+                  <div class="mono font-bold" style="color:var(--holo)">4/5</div>
+                </div>
+                <div class="rounded-lg p-2" style="background:rgba(24,40,74,.75)">
+                  <div class="micro text-slate-500">HAZIR AKSİYON</div>
+                  <div class="mono font-bold" style="color:var(--aurora)">2</div>
+                </div>
+                <div class="rounded-lg p-2" style="background:rgba(24,40,74,.75)">
+                  <div class="micro text-slate-500">RİSK YAKIN</div>
+                  <div class="mono font-bold" style="color:var(--titan)">1</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 mt-2 text-[12px]">
+                <span style="color:var(--chiron)">✨</span>
+                <span>Premium Sinyal: <span style="color:var(--chiron)">Mükemmel fırtına sinyali</span></span>
+              </div>
+              <div class="text-[11px] text-slate-500 mt-1">Odak adım: <span class="mono">NVDA</span> • Fiyat 932 üzerinde</div>
+            </div>
+          </div>
+
+          <!-- Reports -->
+          <div class="px-3 pt-3 grid grid-cols-2 gap-2">
+            <div class="card p-3 flex items-center gap-2" style="border-color:rgba(245,194,68,.2)">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(245,194,68,.15);color:var(--titan)">☀</div>
+              <div class="flex-1">
+                <div class="text-[11px] font-bold tracking-[.5px]">GÜN SONU</div>
+                <div class="text-[10px] text-slate-500">22 Nis</div>
+              </div>
+              <span>↗</span>
+            </div>
+            <div class="card p-3 flex items-center gap-2" style="border-color:rgba(59,130,246,.2)">
+              <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(59,130,246,.15);color:var(--holo)">📅</div>
+              <div class="flex-1">
+                <div class="text-[11px] font-bold tracking-[.5px]">HAFTALIK</div>
+                <div class="text-[10px] text-slate-500">15 – 22 Nis</div>
+              </div>
+              <span>↗</span>
+            </div>
+          </div>
+
+          <!-- EngineSelector -->
+          <div class="px-3 pt-3">
+            <div class="flex gap-1 p-1 rounded-xl" style="background:rgba(11,20,38,.6);border:1px solid var(--border)">
+              <div class="flex-1 py-1.5 rounded-lg text-center mono text-[10px] font-bold" style="background:rgba(59,130,246,.18);color:var(--holo)">⊞ GENEL</div>
+              <div class="flex-1 py-1.5 rounded-lg text-center mono text-[10px] font-bold text-slate-400">⟲ CORSE</div>
+              <div class="flex-1 py-1.5 rounded-lg text-center mono text-[10px] font-bold text-slate-400">⚡ PULSE</div>
+              <div class="flex-1 py-1.5 rounded-lg text-center mono text-[10px] font-bold text-slate-400">👁 GÖZCÜ</div>
+            </div>
+          </div>
+
+          <!-- UnifiedPositionCard -->
+          <div class="px-3 pt-3 pb-24 space-y-3">
+            <div class="rounded-2xl p-3" style="background:var(--surface1);border:1px solid var(--border)">
+              <div class="flex items-start gap-3">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center mono font-extrabold text-[12px]" style="background:rgba(34,197,94,.18);color:var(--aurora)">NVDA</div>
+                <div class="flex-1">
+                  <div class="flex items-center gap-2"><span class="font-extrabold text-[16px] mono">NVDA</span><span class="chip" style="background:rgba(59,130,246,.18);color:var(--holo)">GLOBAL</span></div>
+                  <div class="text-[11px] text-slate-500">25 adet · 18 gün</div>
+                  <span class="chip mt-1" style="background:rgba(34,197,94,.14);color:var(--aurora)">Swing</span>
+                </div>
+                <div class="text-right">
+                  <div class="mono font-bold">$925.10</div>
+                  <div class="mono font-bold text-[18px]" style="color:var(--aurora)">+24.6%</div>
+                  <div class="text-[11px]" style="color:var(--aurora)">+$4,562</div>
+                </div>
+              </div>
+              <!-- price progress -->
+              <div class="relative h-2 mt-3 rounded-full" style="background:var(--surface3)">
+                <div class="absolute top-0 left-[12%] right-[18%] h-2 rounded-full" style="background:rgba(34,197,94,.45)"></div>
+                <div class="absolute top-[-4px] left-[12%] w-2 h-2 rounded-full" style="background:var(--text-secondary)"></div>
+                <div class="absolute top-[-5px] left-[64%] w-3 h-3 rounded-full" style="background:var(--aurora);border:2px solid var(--text-primary)"></div>
+              </div>
+              <div class="flex items-center justify-between mt-1 text-[10px] mono">
+                <span style="color:var(--crimson)">Stop $880</span>
+                <span class="text-slate-500">Giriş $742</span>
+                <span style="color:var(--aurora)">Hedef $980</span>
+              </div>
+              <!-- decision tags -->
+              <div class="flex items-center gap-2 mt-3">
+                <span class="chip" style="background:rgba(34,197,94,.16);color:var(--aurora)">Güçlü al</span>
+                <span class="chip" style="background:rgba(59,130,246,.16);color:var(--holo)">Piyasa olumlu</span>
+                <span class="chip" style="background:rgba(167,139,250,.10);color:var(--chiron)">✨ Momentum kırılımı</span>
+              </div>
+              <!-- plan status -->
+              <div class="mt-3 p-3 rounded-xl" style="background:rgba(24,40,74,.55)">
+                <div class="flex items-center gap-2">
+                  <span style="color:var(--holo)">📋</span>
+                  <div class="micro tracking-[1px]" style="color:var(--text-primary)">PLAN</div>
+                  <div class="ml-auto mono text-[10px] text-slate-500">3/5</div>
+                </div>
+                <div class="h-2 mt-2 rounded-full" style="background:var(--surface2)">
+                  <div class="h-2 rounded-full" style="width:60%;background:rgba(59,130,246,.85)"></div>
+                </div>
+                <div class="flex items-center gap-2 mt-2 text-[12px]">
+                  <span style="color:var(--holo)">▶</span>
+                  <span>Fiyat 932 üzerinde</span>
+                  <span class="text-slate-500">· Pozisyonu azalt</span>
+                  <span class="ml-auto mono text-[10px]" style="color:var(--holo)">+0.8%</span>
+                </div>
+                <div class="flex items-center gap-2 mt-1 text-[11px] text-slate-400">
+                  <span style="color:var(--titan)">🛡</span>Risk adımı: Stop 880 altına düşerse
+                </div>
+              </div>
+              <!-- actions -->
+              <div class="grid grid-cols-2 gap-2 mt-3">
+                <div class="text-center py-2 rounded-lg" style="background:rgba(59,130,246,.12);color:var(--holo)">▬ Planla</div>
+                <div class="text-center py-2 rounded-lg" style="background:rgba(239,68,68,.12);color:var(--crimson)">✕ Kapat</div>
+              </div>
+            </div>
+
+            <div class="rounded-2xl p-3" style="background:var(--surface1);border:1px solid var(--border)">
+              <div class="flex items-start gap-3">
+                <div class="w-12 h-12 rounded-xl flex items-center justify-center mono font-extrabold text-[12px]" style="background:rgba(239,68,68,.18);color:var(--crimson)">TSLA</div>
+                <div class="flex-1">
+                  <div class="flex items-center gap-2"><span class="font-extrabold text-[16px] mono">TSLA</span><span class="chip" style="background:rgba(59,130,246,.18);color:var(--holo)">GLOBAL</span></div>
+                  <div class="text-[11px] text-slate-500">10 adet · 41 gün</div>
+                </div>
+                <div class="text-right">
+                  <div class="mono font-bold">$164.05</div>
+                  <div class="mono font-bold text-[18px]" style="color:var(--crimson)">-8.2%</div>
+                  <div class="text-[11px]" style="color:var(--crimson)">-$148</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 mt-2">
+                <span class="chip" style="background:rgba(239,68,68,.16);color:var(--crimson)">Çık</span>
+                <span class="chip" style="background:rgba(245,194,68,.16);color:var(--titan)">Temkinli</span>
+                <span class="chip" style="background:rgba(239,68,68,.10);color:var(--crimson)">✨ Düşen bıçak — dikkat</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-3">
+                <div class="text-center py-2 rounded-lg" style="background:rgba(59,130,246,.12);color:var(--holo)">▬ Planla</div>
+                <div class="text-center py-2 rounded-lg" style="background:rgba(239,68,68,.12);color:var(--crimson)">✕ Kapat</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FAB -->
+        <div class="absolute right-5 bottom-24 w-14 h-14 rounded-full flex items-center justify-center text-[22px] font-extrabold" style="background:var(--holo);color:#061128;box-shadow:0 10px 30px -6px rgba(59,130,246,.5);z-index:41">＋</div>
+
+        <div class="tabbar">
+          <div class="tabitem"><div>●</div>PİYASA</div>
+          <div class="tabitem"><div>▤</div>KOKPİT</div>
+          <div class="tabitem active"><div>◫</div>PORTFÖY</div>
+          <div class="tabitem"><div>◎</div>KEŞFET</div>
+          <div class="tabitem"><div>⚙</div>AYARLAR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== KEŞFET ====== -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="self-start">
+      <div class="scr-label">04 · Keşfet</div>
+      <div class="scr-sub mt-1">DiscoverView — Yükselenler (momentum) + Düşenler (Phoenix adayları) + En Hareketliler (hacim liderleri). Motor yok, tetikleyici.</div>
+    </div>
+
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-inner">
+        <div class="scrolltrack">
+          <div class="statbar"><span>9:41</span><span class="flex items-center gap-1 mono">●●● 5G <span class="ml-2">100%</span></span></div>
+
+          <!-- toolbar -->
+          <div class="px-4 pt-2 pb-3 flex items-center">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background:var(--surface2)">≡</div>
+            <div class="ml-auto w-9 h-9 rounded-lg flex items-center justify-center" style="background:var(--surface2)">↻</div>
+          </div>
+
+          <!-- large title -->
+          <div class="px-5 pt-1 pb-4">
+            <div class="text-[32px] font-black tracking-tight">Keşfet</div>
+          </div>
+
+          <!-- YÜKSELENLER -->
+          <div class="px-5">
+            <div class="text-[18px] font-bold">Yükselenler</div>
+            <div class="text-[11px] text-slate-500">Günün momentum liderleri</div>
+          </div>
+          <div class="px-5 pt-3 overflow-x-auto scrolltrack">
+            <div class="flex gap-3">
+              <!-- card -->
+              <div class="min-w-[140px] h-[110px] rounded-xl p-3 flex flex-col justify-between" style="background:rgba(17,29,53,.55);border:1px solid rgba(34,197,94,.45)">
+                <div class="flex items-center justify-between">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(34,197,94,.2);color:var(--aurora)">↗</div>
+                  <div class="pill" style="background:var(--aurora);color:#0a1f0a">+3.22%</div>
+                </div>
+                <div>
+                  <div class="font-extrabold text-[15px] mono">NVDA</div>
+                  <div class="text-[11px] text-slate-500">$925.10</div>
+                </div>
+              </div>
+              <div class="min-w-[140px] h-[110px] rounded-xl p-3 flex flex-col justify-between" style="background:rgba(17,29,53,.55);border:1px solid rgba(34,197,94,.45)">
+                <div class="flex items-center justify-between">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(34,197,94,.2);color:var(--aurora)">↗</div>
+                  <div class="pill" style="background:var(--aurora);color:#0a1f0a">+2.08%</div>
+                </div>
+                <div>
+                  <div class="font-extrabold text-[15px] mono">AAPL</div>
+                  <div class="text-[11px] text-slate-500">$178.32</div>
+                </div>
+              </div>
+              <div class="min-w-[140px] h-[110px] rounded-xl p-3 flex flex-col justify-between" style="background:rgba(17,29,53,.55);border:1px solid rgba(34,197,94,.45)">
+                <div class="flex items-center justify-between">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(34,197,94,.2);color:var(--aurora)">↗</div>
+                  <div class="pill" style="background:var(--aurora);color:#0a1f0a">+1.67%</div>
+                </div>
+                <div>
+                  <div class="font-extrabold text-[15px] mono">GOOG</div>
+                  <div class="text-[11px] text-slate-500">$157.22</div>
+                </div>
+              </div>
+              <div class="min-w-[140px] h-[110px] rounded-xl p-3" style="background:rgba(17,29,53,.35);border:1px dashed var(--border)"></div>
+            </div>
+          </div>
+
+          <!-- DÜŞENLER -->
+          <div class="px-5 pt-5">
+            <div class="text-[18px] font-bold">Düşenler</div>
+            <div class="text-[11px] text-slate-500">Olası Phoenix adayları</div>
+          </div>
+          <div class="px-5 pt-3 overflow-x-auto scrolltrack">
+            <div class="flex gap-3">
+              <div class="min-w-[140px] h-[110px] rounded-xl p-3 flex flex-col justify-between" style="background:rgba(17,29,53,.55);border:1px solid rgba(239,68,68,.45)">
+                <div class="flex items-center justify-between">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(239,68,68,.2);color:var(--crimson)">↘</div>
+                  <div class="pill" style="background:var(--crimson);color:#240a0a">-4.11%</div>
+                </div>
+                <div>
+                  <div class="font-extrabold text-[15px] mono">DIS</div>
+                  <div class="text-[11px] text-slate-500">$89.44</div>
+                </div>
+              </div>
+              <div class="min-w-[140px] h-[110px] rounded-xl p-3 flex flex-col justify-between" style="background:rgba(17,29,53,.55);border:1px solid rgba(239,68,68,.45)">
+                <div class="flex items-center justify-between">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(239,68,68,.2);color:var(--crimson)">↘</div>
+                  <div class="pill" style="background:var(--crimson);color:#240a0a">-2.85%</div>
+                </div>
+                <div>
+                  <div class="font-extrabold text-[15px] mono">PYPL</div>
+                  <div class="text-[11px] text-slate-500">$62.18</div>
+                </div>
+              </div>
+              <div class="min-w-[140px] h-[110px] rounded-xl p-3 flex flex-col justify-between" style="background:rgba(17,29,53,.55);border:1px solid rgba(239,68,68,.45)">
+                <div class="flex items-center justify-between">
+                  <div class="w-8 h-8 rounded-full flex items-center justify-center" style="background:rgba(239,68,68,.2);color:var(--crimson)">↘</div>
+                  <div class="pill" style="background:var(--crimson);color:#240a0a">-2.11%</div>
+                </div>
+                <div>
+                  <div class="font-extrabold text-[15px] mono">TSLA</div>
+                  <div class="text-[11px] text-slate-500">$164.05</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- EN HAREKETLİLER -->
+          <div class="px-5 pt-5">
+            <div class="text-[18px] font-bold">En Hareketliler</div>
+            <div class="text-[11px] text-slate-500 pb-2">Hacim liderleri</div>
+          </div>
+          <div class="mx-5 mb-24 rounded-2xl overflow-hidden" style="background:var(--surface1);border:1px solid var(--border)">
+            <!-- row -->
+            <div class="flex items-center gap-3 p-3 border-b" style="border-color:var(--border)">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold" style="background:var(--surface2);color:var(--text-secondary)">N</div>
+              <div class="flex-1">
+                <div class="font-bold">NVDA</div>
+                <div class="text-[11px] text-slate-500">NVIDIA Corp</div>
+              </div>
+              <div class="text-right">
+                <div class="mono">$925.10</div>
+                <div class="mono text-[11px]" style="color:var(--aurora)">↑ +3.22%</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 border-b" style="border-color:var(--border)">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold" style="background:var(--surface2);color:var(--text-secondary)">T</div>
+              <div class="flex-1">
+                <div class="font-bold">TSLA</div>
+                <div class="text-[11px] text-slate-500">Tesla Inc</div>
+              </div>
+              <div class="text-right">
+                <div class="mono">$164.05</div>
+                <div class="mono text-[11px]" style="color:var(--crimson)">↓ -2.11%</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 border-b" style="border-color:var(--border)">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold" style="background:var(--surface2);color:var(--text-secondary)">A</div>
+              <div class="flex-1">
+                <div class="font-bold">AAPL</div>
+                <div class="text-[11px] text-slate-500">Apple Inc</div>
+              </div>
+              <div class="text-right">
+                <div class="mono">$178.32</div>
+                <div class="mono text-[11px]" style="color:var(--aurora)">↑ +1.84%</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 border-b" style="border-color:var(--border)">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold" style="background:var(--surface2);color:var(--text-secondary)">S</div>
+              <div class="flex-1">
+                <div class="font-bold">SPY</div>
+                <div class="text-[11px] text-slate-500">SPDR S&amp;P 500</div>
+              </div>
+              <div class="text-right">
+                <div class="mono">$518.44</div>
+                <div class="mono text-[11px]" style="color:var(--aurora)">↑ +0.31%</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-3">
+              <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold" style="background:var(--surface2);color:var(--text-secondary)">M</div>
+              <div class="flex-1">
+                <div class="font-bold">MSFT</div>
+                <div class="text-[11px] text-slate-500">Microsoft Corp</div>
+              </div>
+              <div class="text-right">
+                <div class="mono">$412.87</div>
+                <div class="mono text-[11px]" style="color:var(--aurora)">↑ +0.12%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tabbar">
+          <div class="tabitem"><div>●</div>PİYASA</div>
+          <div class="tabitem"><div>▤</div>KOKPİT</div>
+          <div class="tabitem"><div>◫</div>PORTFÖY</div>
+          <div class="tabitem active"><div>◎</div>KEŞFET</div>
+          <div class="tabitem"><div>⚙</div>AYARLAR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+<!-- ================= ROW 3: AYARLAR + SANCTUM ================= -->
+<section id="row3" class="max-w-[1480px] mx-auto px-10 pb-20 grid grid-cols-2 gap-12">
+
+  <!-- ====== AYARLAR ====== -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="self-start">
+      <div class="scr-label">05 · Ayarlar</div>
+      <div class="scr-sub mt-1">SettingsView — "Komut Merkezi" · commandHeader + snapshotRibbon (CHIRON/ALKINDUS/AETHER) + Otopilot + Aether hassasiyet + Chiron + Alkindus + bildirim/API/depolama.</div>
+    </div>
+
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-inner">
+        <div class="scrolltrack">
+          <div class="statbar"><span>9:41</span><span class="flex items-center gap-1 mono">●●● 5G <span class="ml-2">100%</span></span></div>
+
+          <!-- Command Header -->
+          <div class="px-4 pt-4">
+            <div class="flex items-start">
+              <div class="flex gap-[3px] mt-2">
+                <span class="w-[3px] h-6" style="background:var(--holo)"></span>
+                <span class="w-[3px] h-6" style="background:var(--text-primary)"></span>
+                <span class="w-[3px] h-6" style="background:var(--text-primary)"></span>
+              </div>
+              <div class="ml-3">
+                <div class="mono text-[22px] font-black tracking-[3px]">AYARLAR</div>
+                <div class="mono text-[9px] tracking-[2px] text-slate-500">KOMUT MERKEZİ · MOTOR · VERİ · BİLDİRİM</div>
+              </div>
+              <div class="ml-auto w-10 h-10 rounded-lg flex items-center justify-center" style="background:var(--surface2);border:1px solid var(--border)">≡</div>
+            </div>
+            <div class="flex items-center gap-3 mt-3">
+              <span class="dot" style="background:var(--aurora)"></span>
+              <span class="mono text-[9px] tracking-[1.5px] font-bold">SİSTEM AKTİF</span>
+              <span class="flex-1 hair"></span>
+              <span class="mono text-[9px] tracking-[1.2px] text-slate-500">v1.42</span>
+            </div>
+          </div>
+
+          <!-- Snapshot Ribbon -->
+          <div class="px-4 pt-4 grid grid-cols-3 gap-2">
+            <div class="p-3 rounded-xl" style="background:var(--surface1);border:1px solid rgba(59,130,246,.22)">
+              <div class="flex items-center gap-1.5">
+                <span style="color:var(--holo)">🧠</span>
+                <span class="mono text-[9px] font-black tracking-[1.2px] text-slate-400">CHIRON</span>
+              </div>
+              <div class="mono text-[16px] font-black mt-1">WR %68</div>
+              <div class="mono text-[10px] text-slate-500">T 142</div>
+            </div>
+            <div class="p-3 rounded-xl" style="background:var(--surface1);border:1px solid rgba(148,163,184,.22)">
+              <div class="flex items-center gap-1.5">
+                <span class="text-slate-400">👁</span>
+                <span class="mono text-[9px] font-black tracking-[1.2px] text-slate-400">ALKINDUS</span>
+              </div>
+              <div class="mono text-[16px] font-black mt-1">3</div>
+              <div class="mono text-[10px] text-slate-500">bekleyen</div>
+            </div>
+            <div class="p-3 rounded-xl" style="background:var(--surface1);border:1px solid rgba(34,197,94,.22)">
+              <div class="flex items-center gap-1.5">
+                <span style="color:var(--aurora)">⬈</span>
+                <span class="mono text-[9px] font-black tracking-[1.2px] text-slate-400">AETHER</span>
+              </div>
+              <div class="mono text-[16px] font-black mt-1" style="color:var(--aurora)">68</div>
+              <div class="mono text-[10px]" style="color:var(--aurora)">↑ toparlanma</div>
+            </div>
+          </div>
+
+          <!-- OTOPİLOT card -->
+          <div class="px-4 pt-5">
+            <div class="sec-title px-2 pb-2">OTOPİLOT</div>
+            <div class="card p-3">
+              <div class="flex items-center">
+                <span style="color:var(--aurora)" class="text-[20px]">⚡</span>
+                <div class="ml-3">
+                  <div class="font-semibold">Aktif</div>
+                  <div class="text-[11px]" style="color:var(--aurora)">🚀 Fırsat modu (×1.25)</div>
+                </div>
+                <div class="ml-auto w-10 h-5 rounded-full relative" style="background:var(--aurora)"><span class="absolute right-0.5 top-0.5 w-4 h-4 rounded-full bg-white"></span></div>
+              </div>
+              <div class="h-px my-3" style="background:var(--border)"></div>
+              <div class="flex items-center">
+                <span style="color:var(--holo)">🩺</span>
+                <div class="ml-3">Durum Panosu</div>
+                <div class="ml-auto mono text-[11px]" style="color:var(--titan)">2 uyarı</div>
+                <span class="ml-3 text-slate-500">›</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Aether hassasiyet -->
+          <div class="px-4 pt-4">
+            <div class="sec-title px-2 pb-2">AETHER · TREND DÖNÜŞ HASSASİYETİ</div>
+            <div class="card p-3">
+              <div class="flex p-[3px] rounded-lg" style="background:var(--surface2)">
+                <div class="flex-1 py-1.5 text-center mono text-[11px] text-slate-400">Muhafazakâr</div>
+                <div class="flex-1 py-1.5 text-center mono text-[11px] font-bold rounded-md" style="background:var(--surface3);color:var(--holo)">Dengeli</div>
+                <div class="flex-1 py-1.5 text-center mono text-[11px] text-slate-400">Agresif</div>
+              </div>
+              <div class="mt-2 text-[11px] text-slate-400 leading-relaxed">Skor + hız birlikte değerlendirilir — denge. Savaş→ateşkes geçişinde rally penceresi yakalanır.</div>
+            </div>
+          </div>
+
+          <!-- CHIRON links -->
+          <div class="px-4 pt-4">
+            <div class="sec-title px-2 pb-2">CHIRON · ÖĞRENME MOTORU</div>
+            <div class="card p-3 divide-y" style="divide-color:var(--border)">
+              <div class="flex items-center py-2">
+                <span style="color:var(--holo)">🧠</span>
+                <span class="ml-3">Kokpit</span>
+                <span class="ml-auto mono text-[11px]" style="color:var(--holo);opacity:.85">WR %68 · T 142</span>
+                <span class="ml-2 text-slate-500">›</span>
+              </div>
+              <div class="flex items-center py-2 border-t" style="border-color:var(--border)">
+                <span style="color:var(--holo)">📊</span>
+                <span class="ml-3">Performans</span>
+                <span class="ml-auto mono text-[11px] text-slate-500">Grafikler</span>
+                <span class="ml-2 text-slate-500">›</span>
+              </div>
+              <div class="flex items-center py-2 border-t" style="border-color:var(--border)">
+                <span style="color:var(--aurora)">〰</span>
+                <span class="ml-3">İçgörüler</span>
+                <span class="ml-auto mono text-[11px]" style="color:var(--aurora);opacity:.85">Son dersler</span>
+                <span class="ml-2 text-slate-500">›</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- ALKINDUS -->
+          <div class="px-4 pt-4">
+            <div class="sec-title px-2 pb-2">ALKINDUS · KALİBRASYON</div>
+            <div class="card p-3">
+              <div class="flex items-center">
+                <span class="text-slate-400">👁</span>
+                <span class="ml-3">Gözlem Paneli</span>
+                <span class="ml-auto mono text-[11px] text-slate-500">3 bekliyor</span>
+                <span class="ml-2 text-slate-500">›</span>
+              </div>
+              <div class="h-px my-3" style="background:var(--border)"></div>
+              <div class="flex items-center">
+                <span style="color:var(--holo)">▶</span>
+                <span class="ml-3">Kalibrasyonu şimdi çalıştır</span>
+                <span class="ml-auto chip" style="background:rgba(34,197,94,.14);color:var(--aurora)">Güncellendi</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- BİLDİRİMLER + API + DEPOLAMA + HAKKINDA -->
+          <div class="px-4 pt-4 pb-24 space-y-3">
+            <div>
+              <div class="sec-title px-2 pb-2">BİLDİRİMLER</div>
+              <div class="card p-3 divide-y" style="divide-color:var(--border)">
+                <div class="flex items-center py-2">
+                  <span style="color:var(--holo)">🔔</span>
+                  <span class="ml-3">Sinyal bildirimleri</span>
+                  <div class="ml-auto w-10 h-5 rounded-full relative" style="background:var(--holo)"><span class="absolute right-0.5 top-0.5 w-4 h-4 rounded-full bg-white"></span></div>
+                </div>
+                <div class="flex items-center py-2 border-t" style="border-color:var(--border)">
+                  <span style="color:var(--holo)">📈</span>
+                  <span class="ml-3">Fiyat alarmları</span>
+                  <span class="ml-auto text-slate-500">›</span>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div class="sec-title px-2 pb-2">DEPOLAMA</div>
+              <div class="card p-3 divide-y" style="divide-color:var(--border)">
+                <div class="flex items-center py-2">
+                  <span class="text-slate-400">💾</span>
+                  <span class="ml-3">Kullanılan alan</span>
+                  <span class="ml-auto mono text-[11px] text-slate-400">1.42 GB</span>
+                </div>
+                <div class="flex items-center py-2 border-t" style="border-color:var(--border)">
+                  <span style="color:var(--crimson)">🗑</span>
+                  <span class="ml-3" style="color:var(--crimson)">Önbelleği temizle</span>
+                </div>
+                <div class="text-[11px] text-slate-500 pt-2">Önbellek ve geçici dosyalar silinir. Öğrenme verileri korunur.</div>
+              </div>
+            </div>
+
+            <div>
+              <div class="sec-title px-2 pb-2">HAKKINDA</div>
+              <div class="card p-3 divide-y text-[13px]" style="divide-color:var(--border)">
+                <div class="flex items-center py-2"><span style="color:var(--holo)">📘</span><span class="ml-3">Argus rehberi</span><span class="ml-auto text-slate-500">›</span></div>
+                <div class="flex items-center py-2 border-t" style="border-color:var(--border)"><span class="text-slate-400">✋</span><span class="ml-3">Gizlilik politikası</span><span class="ml-auto text-slate-500">›</span></div>
+                <div class="flex items-center py-2 border-t" style="border-color:var(--border)"><span class="text-slate-400">📄</span><span class="ml-3">Kullanım koşulları</span><span class="ml-auto text-slate-500">›</span></div>
+                <div class="flex items-center py-2 border-t" style="border-color:var(--border)"><span style="color:var(--titan)">⚠</span><span class="ml-3">Risk bildirimi</span><span class="ml-auto text-slate-500">›</span></div>
+                <div class="flex items-center py-2 border-t" style="border-color:var(--border)"><span class="text-slate-400">✉</span><span class="ml-3">Geri bildirim</span><span class="ml-auto text-slate-500">›</span></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="tabbar">
+          <div class="tabitem"><div>●</div>PİYASA</div>
+          <div class="tabitem"><div>▤</div>KOKPİT</div>
+          <div class="tabitem"><div>◫</div>PORTFÖY</div>
+          <div class="tabitem"><div>◎</div>KEŞFET</div>
+          <div class="tabitem active"><div>⚙</div>AYARLAR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== SANCTUM / STOCK DETAIL ====== -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="self-start">
+      <div class="scr-label">06 · Sanctum · Hisse Detayı</div>
+      <div class="scr-sub mt-1">ArgusSanctumView — Header + PantheonDeck (Athena/Chiron/Demeter) + ModuleGrid (Orion/Atlas/Aether/Hermes/Prometheus) + DecisionPanel + TradePanel (SAT/AL).</div>
+    </div>
+
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-inner">
+        <div class="scrolltrack">
+          <div class="statbar"><span>9:41</span><span class="flex items-center gap-1 mono">●●● 5G <span class="ml-2">100%</span></span></div>
+
+          <!-- Back + Chronos -->
+          <div class="px-4 pt-2 flex items-center">
+            <div class="w-9 h-9 rounded-full flex items-center justify-center" style="background:var(--surface2)">‹</div>
+            <div class="ml-auto w-9 h-9 rounded-full flex items-center justify-center" style="background:var(--surface2);color:var(--titan)">⟲</div>
+          </div>
+
+          <!-- Header: symbol + price -->
+          <div class="px-5 pt-2">
+            <div class="mono text-[28px] font-black tracking-[2px]" style="color:var(--text-primary);text-shadow:0 0 20px rgba(59,130,246,.55)">NVDA</div>
+            <div class="mono text-[11px] tracking-[1px] text-slate-500">NVIDIA CORPORATION · NASDAQ</div>
+            <div class="flex items-baseline gap-3 mt-1">
+              <div class="mono text-[30px] font-extrabold">$925.10</div>
+              <div class="mono text-[13px] font-bold" style="color:var(--aurora)">+29.04 (+3.22%)</div>
+            </div>
+            <div class="mt-2 flex items-center gap-2">
+              <span class="chip" style="background:rgba(34,197,94,.14);color:var(--aurora)">● CANLI</span>
+              <span class="chip" style="background:rgba(148,163,184,.14);color:#cbd5e1">GLOBAL</span>
+              <span class="chip" style="background:rgba(59,130,246,.14);color:var(--holo)">VERİ %100</span>
+            </div>
+          </div>
+
+          <!-- Pantheon Deck (Athena · Chiron · Demeter) -->
+          <div class="px-10 pt-4 flex items-center justify-between">
+            <div class="flex flex-col items-center">
+              <div class="w-8 h-8 rounded-full" style="background:var(--surface2);box-shadow:0 0 10px rgba(253,230,138,.4);border:1.5px solid rgba(253,230,138,.7);color:var(--athena);display:flex;align-items:center;justify-content:center;font-size:13px">♀</div>
+              <div class="mono text-[7px] font-bold mt-1 tracking-[.5px]" style="color:rgba(253,230,138,.8)">ATHENA</div>
+            </div>
+            <div class="flex flex-col items-center">
+              <div class="w-[38px] h-[38px] rounded-full" style="background:var(--surface2);box-shadow:0 0 14px rgba(167,139,250,.55);border:1.5px solid rgba(167,139,250,.85);color:var(--chiron);display:flex;align-items:center;justify-content:center;font-size:16px">🝮</div>
+              <div class="mono text-[7px] font-bold mt-1 tracking-[.5px]" style="color:rgba(167,139,250,.9)">CHIRON</div>
+            </div>
+            <div class="flex flex-col items-center">
+              <div class="w-8 h-8 rounded-full" style="background:var(--surface2);box-shadow:0 0 10px rgba(132,204,22,.4);border:1.5px solid rgba(132,204,22,.7);color:var(--demeter);display:flex;align-items:center;justify-content:center;font-size:13px">⚘</div>
+              <div class="mono text-[7px] font-bold mt-1 tracking-[.5px]" style="color:rgba(132,204,22,.8)">DEMETER</div>
+            </div>
+          </div>
+
+          <!-- Module Grid (5 orbs around center) -->
+          <div class="relative mx-auto mt-4" style="width:260px;height:260px">
+            <div class="absolute inset-0 rounded-full" style="border:1px dashed rgba(59,130,246,.18)"></div>
+            <div class="absolute inset-4 rounded-full" style="border:1px dashed rgba(59,130,246,.12)"></div>
+            <!-- Center: Konsey / Decision -->
+            <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[108px] h-[108px] rounded-full flex flex-col items-center justify-center" style="background:radial-gradient(circle, rgba(59,130,246,.35), rgba(10,16,32,0.9) 60%);border:1.5px solid rgba(59,130,246,.6);box-shadow:0 0 40px -10px var(--holo) inset, 0 0 30px rgba(59,130,246,.35)">
+              <div class="mono text-[9px] tracking-[1.2px] font-bold" style="color:var(--holo)">NİHAİ KARAR</div>
+              <div class="mt-1 chip font-black" style="background:rgba(34,197,94,.2);color:var(--aurora);border:.5px solid rgba(34,197,94,.5)">KONSEY HÜCUM</div>
+              <div class="mono text-[10px] mt-1 text-slate-400">Güven %88</div>
+            </div>
+            <!-- Orb: Orion (top) -->
+            <div class="absolute left-1/2 -translate-x-1/2 top-0 flex flex-col items-center">
+              <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:var(--surface2);border:1.5px solid rgba(96,165,250,.7);box-shadow:0 0 16px rgba(96,165,250,.45);color:var(--orion);font-size:16px">◈</div>
+              <div class="mono text-[8px] font-bold mt-1 tracking-[.5px]" style="color:var(--orion)">ORION · 91</div>
+            </div>
+            <!-- Orb: Atlas (right top) -->
+            <div class="absolute right-0 top-[30%] flex flex-col items-center">
+              <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:var(--surface2);border:1.5px solid rgba(147,197,253,.7);box-shadow:0 0 16px rgba(147,197,253,.45);color:var(--atlas);font-size:16px">◫</div>
+              <div class="mono text-[8px] font-bold mt-1 tracking-[.5px]" style="color:var(--atlas)">ATLAS · 68</div>
+            </div>
+            <!-- Orb: Aether (right bottom) -->
+            <div class="absolute right-[10%] bottom-[8%] flex flex-col items-center">
+              <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:var(--surface2);border:1.5px solid rgba(34,211,238,.7);box-shadow:0 0 16px rgba(34,211,238,.45);color:var(--aether);font-size:16px">🜁</div>
+              <div class="mono text-[8px] font-bold mt-1 tracking-[.5px]" style="color:var(--aether)">AETHER · 68</div>
+            </div>
+            <!-- Orb: Hermes (left bottom) -->
+            <div class="absolute left-[10%] bottom-[8%] flex flex-col items-center">
+              <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:var(--surface2);border:1.5px solid rgba(244,114,182,.7);box-shadow:0 0 16px rgba(244,114,182,.45);color:var(--hermes);font-size:16px">✉</div>
+              <div class="mono text-[8px] font-bold mt-1 tracking-[.5px]" style="color:var(--hermes)">HERMES · 74</div>
+            </div>
+            <!-- Orb: Prometheus (left top) -->
+            <div class="absolute left-0 top-[30%] flex flex-col items-center">
+              <div class="w-12 h-12 rounded-full flex items-center justify-center" style="background:var(--surface2);border:1.5px solid rgba(251,146,60,.7);box-shadow:0 0 16px rgba(251,146,60,.45);color:var(--prometheus);font-size:16px">🜂</div>
+              <div class="mono text-[8px] font-bold mt-1 tracking-[.5px]" style="color:var(--prometheus)">PROMETHEUS</div>
+            </div>
+          </div>
+
+          <!-- Decision Panel / Argus görüşü -->
+          <div class="mx-5 mt-3 p-3 rounded-2xl" style="background:var(--surface1);border:1px solid rgba(59,130,246,.25)">
+            <div class="sec-title">ARGUS GÖRÜŞÜ</div>
+            <div class="text-[13px] mt-1">Makro zemin destekleyici, Orion trend güçlü. Pozisyon artırımı düşünülebilir.</div>
+            <div class="flex items-center gap-2 mt-2">
+              <span class="chip" style="background:rgba(34,197,94,.18);color:var(--aurora)">Güçlü al</span>
+              <span class="chip" style="background:rgba(59,130,246,.18);color:var(--holo)">Piyasa olumlu</span>
+              <span class="chip" style="background:rgba(167,139,250,.15);color:var(--chiron)">✨ Momentum kırılımı</span>
+            </div>
+          </div>
+
+          <!-- Trade Panel (SAT / AL) -->
+          <div class="px-4 pt-3 pb-28 flex items-center justify-between">
+            <div class="px-3 py-2 rounded-xl flex items-center gap-2" style="background:rgba(239,68,68,.2);border:1px solid rgba(239,68,68,.45)">
+              <div class="mono text-[12px]">925.10</div>
+              <div class="mono text-[10px] font-bold tracking-[1px]">SAT</div>
+            </div>
+            <div class="px-3 py-2 rounded-xl flex items-center gap-2" style="background:rgba(34,197,94,.2);border:1px solid rgba(34,197,94,.45);box-shadow:0 0 18px rgba(34,197,94,.25)">
+              <div class="mono text-[10px] font-bold tracking-[1px]">AL</div>
+              <div class="mono text-[12px]">925.10</div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="tabbar">
+          <div class="tabitem active"><div>●</div>PİYASA</div>
+          <div class="tabitem"><div>▤</div>KOKPİT</div>
+          <div class="tabitem"><div>◫</div>PORTFÖY</div>
+          <div class="tabitem"><div>◎</div>KEŞFET</div>
+          <div class="tabitem"><div>⚙</div>AYARLAR</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<!-- ================= ROW 4: HOLO PANEL + DRAWER ================= -->
+<section class="max-w-[1480px] mx-auto px-10 pb-20 grid grid-cols-2 gap-12">
+
+  <!-- HOLO PANEL (Chiron module detail) -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="self-start">
+      <div class="scr-label">07 · HoloPanel · Chiron modülü</div>
+      <div class="scr-sub mt-1">SanctumHoloPanelView — orb tıklandığında alttan slide-up; PULSE + CORSE ağırlıkları, "Nasıl Öğreniyor?" eğitim kartı, kapat ile geri döner.</div>
+    </div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-inner">
+        <!-- dim background -->
+        <div class="absolute inset-0" style="background:rgba(3,6,13,.88);backdrop-filter:blur(6px);z-index:5"></div>
+
+        <!-- holo panel sheet -->
+        <div class="absolute left-0 right-0 bottom-0 rounded-t-[32px]" style="background:var(--surface1);border-top:1px solid rgba(167,139,250,.35);box-shadow:0 -30px 80px -10px rgba(167,139,250,.3);z-index:10;height:72%">
+          <div class="pt-3 pb-2 flex justify-center"><div class="w-10 h-1 rounded-full" style="background:var(--border-strong)"></div></div>
+
+          <!-- header -->
+          <div class="px-5 pt-1 flex items-center">
+            <div class="w-11 h-11 rounded-full flex items-center justify-center" style="background:rgba(167,139,250,.2);color:var(--chiron);font-size:18px;border:1.5px solid rgba(167,139,250,.55)">🝮</div>
+            <div class="ml-3">
+              <div class="mono text-[10px] tracking-[1.2px]" style="color:var(--chiron)">CHIRON</div>
+              <div class="font-extrabold text-[16px]">Öğrenme & Risk Yönetimi</div>
+            </div>
+            <div class="ml-auto w-8 h-8 rounded-full flex items-center justify-center" style="background:var(--surface2)">✕</div>
+          </div>
+
+          <!-- PULSE weights -->
+          <div class="mx-5 mt-4 p-3 rounded-xl" style="background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.25)">
+            <div class="flex items-center">
+              <div class="mono text-[10px] tracking-[1.2px]" style="color:var(--holo)">PULSE · SCALP AĞIRLIKLARI</div>
+              <div class="ml-auto mono text-[10px] text-slate-400">Σ = 1.00</div>
+            </div>
+            <div class="mt-2 space-y-1.5 text-[12px]">
+              <div class="flex items-center"><span class="w-24 text-slate-300">Orion</span><div class="flex-1 bar"><span style="width:38%;background:var(--orion)"></span></div><span class="w-10 text-right mono">0.38</span></div>
+              <div class="flex items-center"><span class="w-24 text-slate-300">Hermes</span><div class="flex-1 bar"><span style="width:22%;background:var(--hermes)"></span></div><span class="w-10 text-right mono">0.22</span></div>
+              <div class="flex items-center"><span class="w-24 text-slate-300">Phoenix</span><div class="flex-1 bar"><span style="width:18%;background:var(--prometheus)"></span></div><span class="w-10 text-right mono">0.18</span></div>
+              <div class="flex items-center"><span class="w-24 text-slate-300">Aether</span><div class="flex-1 bar"><span style="width:12%;background:var(--aether)"></span></div><span class="w-10 text-right mono">0.12</span></div>
+              <div class="flex items-center"><span class="w-24 text-slate-300">Athena</span><div class="flex-1 bar"><span style="width:10%;background:var(--athena)"></span></div><span class="w-10 text-right mono">0.10</span></div>
+            </div>
+          </div>
+
+          <!-- CORSE weights -->
+          <div class="mx-5 mt-3 p-3 rounded-xl" style="background:var(--surface2);border:1px solid var(--border)">
+            <div class="flex items-center">
+              <div class="mono text-[10px] tracking-[1.2px] text-slate-300">CORSE · SWING AĞIRLIKLARI</div>
+              <div class="ml-auto mono text-[10px] text-slate-400">Σ = 1.00</div>
+            </div>
+            <div class="mt-2 space-y-1.5 text-[12px]">
+              <div class="flex items-center"><span class="w-24 text-slate-300">Atlas</span><div class="flex-1 bar"><span style="width:34%;background:var(--atlas)"></span></div><span class="w-10 text-right mono">0.34</span></div>
+              <div class="flex items-center"><span class="w-24 text-slate-300">Demeter</span><div class="flex-1 bar"><span style="width:22%;background:var(--demeter)"></span></div><span class="w-10 text-right mono">0.22</span></div>
+              <div class="flex items-center"><span class="w-24 text-slate-300">Aether</span><div class="flex-1 bar"><span style="width:20%;background:var(--aether)"></span></div><span class="w-10 text-right mono">0.20</span></div>
+              <div class="flex items-center"><span class="w-24 text-slate-300">Orion</span><div class="flex-1 bar"><span style="width:14%;background:var(--orion)"></span></div><span class="w-10 text-right mono">0.14</span></div>
+              <div class="flex items-center"><span class="w-24 text-slate-300">Hermes</span><div class="flex-1 bar"><span style="width:10%;background:var(--hermes)"></span></div><span class="w-10 text-right mono">0.10</span></div>
+            </div>
+          </div>
+
+          <!-- Nasıl öğreniyor? -->
+          <div class="mx-5 mt-3 p-3 rounded-xl" style="background:rgba(167,139,250,.08);border:1px solid rgba(167,139,250,.25)">
+            <div class="text-[12px] font-bold" style="color:var(--chiron)">Nasıl Öğreniyor?</div>
+            <div class="text-[11px] text-slate-300/90 mt-1 leading-relaxed">Her kapanan işlemin sonucu Chiron Datalake'e yazılır. Kazanılan/kaybedilen pozisyonlara göre ağırlıklar periyodik olarak güncellenir. Orion son 14 günde momentum kırılımlarında %72 doğrulukla çıktı → ağırlık +0.04 artırıldı.</div>
+          </div>
+
+          <div class="mx-5 mt-3 flex justify-center">
+            <div class="chip" style="background:var(--surface3);color:var(--text-primary)">DETAYLI KOKPİT ›</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DRAWER / TRADE SHEET -->
+  <div class="flex flex-col items-center gap-4">
+    <div class="self-start">
+      <div class="scr-label">08 · Argus Drawer + Alış Emri</div>
+      <div class="scr-sub mt-1">ArgusDrawerView solda soldan kayar (zIndex 200). Örnek: Piyasa drawer'ı (EKRANLAR · PİYASA · ARAÇLAR). Yanında SanctumTradeSheet — "Emri Gönder (AL)" formu.</div>
+    </div>
+    <div class="phone">
+      <div class="phone-notch"></div>
+      <div class="phone-inner">
+        <!-- ghost background screen -->
+        <div class="absolute inset-0" style="background:rgba(3,6,13,.65)"></div>
+
+        <!-- drawer -->
+        <div class="drawer-col relative z-10 scrolltrack">
+          <div class="pt-10 flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:var(--surface2);border:1px solid var(--border-strong)">
+              <div class="w-4 h-4 rounded-full" style="background:radial-gradient(circle,#9ac1ff,#3b82f6 60%,#0a1a33)"></div>
+            </div>
+            <div>
+              <div class="mono font-extrabold tracking-[2px]">ARGUS</div>
+              <div class="mono text-[9px] tracking-[1.2px] text-slate-500">MENÜ v1.42</div>
+            </div>
+            <div class="ml-auto text-slate-400">✕</div>
+          </div>
+
+          <div class="mt-5 sec-title">EKRANLAR</div>
+          <div class="mt-2 space-y-2">
+            <div class="drawer-card"><span style="color:var(--holo)">〰</span><div><div class="font-semibold">Ana Sayfa</div><div class="text-[10px] text-slate-500">Sinyal akişi</div></div></div>
+            <div class="drawer-card"><span style="color:var(--holo)">📊</span><div><div class="font-semibold">Piyasalar</div><div class="text-[10px] text-slate-500">Market ekranı</div></div></div>
+            <div class="drawer-card"><span style="color:var(--chiron)">✱</span><div><div class="font-semibold">Alkindus</div><div class="text-[10px] text-slate-500">Yapay zeka merkez</div></div></div>
+            <div class="drawer-card"><span style="color:var(--aurora)">💼</span><div><div class="font-semibold">Portföy</div><div class="text-[10px] text-slate-500">Pozisyonlar</div></div></div>
+            <div class="drawer-card"><span class="text-slate-400">⚙</span><div><div class="font-semibold">Ayarlar</div><div class="text-[10px] text-slate-500">Tercihler</div></div></div>
+          </div>
+
+          <div class="mt-5 sec-title">PİYASA</div>
+          <div class="mt-2 space-y-2">
+            <div class="drawer-card"><span style="color:var(--holo)">＋</span><div><div class="font-semibold">Hisse Ekle</div><div class="text-[10px] text-slate-500">Watchlist'e ekle</div></div></div>
+            <div class="drawer-card"><span style="color:var(--aurora)">◎</span><div><div class="font-semibold">Keşfet</div><div class="text-[10px] text-slate-500">Radar</div></div></div>
+            <div class="drawer-card"><span style="color:var(--holo)">🔔</span><div><div class="font-semibold">Bildirimler</div><div class="text-[10px] text-slate-500">Tüm akış</div></div></div>
+            <div class="drawer-card"><span style="color:var(--aether)">🌐</span><div><div class="font-semibold">Aether Detay</div><div class="text-[10px] text-slate-500">Makro panel</div></div></div>
+            <div class="drawer-card"><span style="color:var(--chiron)">📖</span><div><div class="font-semibold">Eğitim</div><div class="text-[10px] text-slate-500">Chiron dersleri</div></div></div>
+          </div>
+
+          <div class="mt-5 sec-title">ARAÇLAR</div>
+          <div class="mt-2 space-y-2">
+            <div class="drawer-card"><span>📅</span><div><div class="font-semibold">Ekonomi Takvimi</div><div class="text-[10px] text-slate-500">Gerçek takvim</div></div></div>
+            <div class="drawer-card"><span>📗</span><div><div class="font-semibold">Finans Sözlüğü</div><div class="text-[10px] text-slate-500">Terimler</div></div></div>
+            <div class="drawer-card"><span>"</span><div><div class="font-semibold">Ünlü Finans Sözleri</div><div class="text-[10px] text-slate-500">Alıntılar</div></div></div>
+            <div class="drawer-card"><span style="color:var(--aurora)">〰</span><div><div class="font-semibold">Sistem Durumu</div><div class="text-[10px] text-slate-500">Servis sağlığı</div></div></div>
+            <div class="drawer-card"><span>✉</span><div><div class="font-semibold">Geri Bildirim</div><div class="text-[10px] text-slate-500">Sorun bildir</div></div></div>
+          </div>
+        </div>
+
+        <!-- trade sheet preview (right edge) -->
+        <div class="absolute right-3 top-16 bottom-16 w-[62px] rounded-2xl flex flex-col items-center justify-center gap-2" style="background:var(--surface2);border:1px solid var(--border);opacity:.85">
+          <div class="mono text-[8px] tracking-[1.4px] text-slate-400 rotate-90 whitespace-nowrap">EMRİ GÖNDER (AL)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- separate card: trade sheet detail — below the phone -->
+    <div class="mt-2 w-[390px] p-4 rounded-2xl" style="background:var(--surface1);border:1px solid var(--border)">
+      <div class="flex items-center">
+        <div class="mono font-extrabold tracking-[1.5px]">ARGUS ALIŞ</div>
+        <div class="ml-auto mono text-[10px] text-slate-400">İptal ›</div>
+      </div>
+      <div class="mt-3 space-y-2">
+        <div class="flex items-center justify-between text-[13px]"><span class="text-slate-400">Sembol</span><span class="mono font-bold">NVDA</span></div>
+        <div class="flex items-center justify-between text-[13px]"><span class="text-slate-400">İşlem</span><span class="mono font-bold" style="color:var(--aurora)">ALIŞ</span></div>
+        <div class="flex items-center justify-between text-[13px]"><span class="text-slate-400">Mevcut Fiyat</span><span class="mono">925.10</span></div>
+        <div class="flex items-center justify-between text-[13px]"><span class="text-slate-400">Bakiye</span><span class="mono" style="color:var(--aurora)">$24,860.00</span></div>
+        <div class="flex items-center justify-between text-[13px]"><span class="text-slate-400">Adet Giriniz</span><span class="mono" style="background:var(--surface2);padding:2px 10px;border-radius:6px">25</span></div>
+        <div class="flex items-center justify-between text-[13px]"><span class="text-slate-400">Fiyat (Opsiyonel)</span><span class="mono" style="background:var(--surface2);padding:2px 10px;border-radius:6px">925.10</span></div>
+        <div class="flex items-center justify-between text-[13px]"><span class="text-slate-400">Tahmini Maliyet</span><span class="mono">$23,173.88</span></div>
+      </div>
+      <div class="mt-4 py-3 rounded-xl text-center font-extrabold tracking-[1.5px]" style="background:rgba(34,197,94,.25);color:var(--aurora);border:1px solid rgba(34,197,94,.4)">EMRİ GÖNDER (AL)</div>
+    </div>
+  </div>
+
+</section>
+
+<footer class="max-w-[1480px] mx-auto px-10 pb-24 text-center text-slate-600 text-[11px] mono tracking-widest">
+  ARGUS · F0.8 MOCKUP · BUILT FROM Docs/Argus_Anatomy_01–06 · Robinhood-clean × Hologram-blue
+</footer>
+
+</body>
+</html>

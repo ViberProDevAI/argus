@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <filter id="chiron-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <!-- echo halkaları -->
+  <circle cx="64" cy="64" r="58" fill="none" stroke="#a78bfa" stroke-width="0.6" stroke-opacity="0.35"/>
+  <circle cx="64" cy="64" r="48" fill="none" stroke="#a78bfa" stroke-width="0.8" stroke-opacity="0.55"/>
+  <circle cx="64" cy="64" r="38" fill="none" stroke="#a78bfa" stroke-width="0.5" stroke-opacity="0.25" stroke-dasharray="2 3"/>
+  <g fill="none" stroke="#c4b5fd" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#chiron-glow)">
+    <!-- insan gövdesi (üst) -->
+    <path d="M60 32 L60 54"/>
+    <circle cx="60" cy="28" r="4.5" stroke="#e9d5ff" stroke-width="1.4"/>
+    <!-- omuz + yay tutan kol -->
+    <path d="M60 40 L78 36"/>
+    <!-- yay -->
+    <path d="M82 22 Q98 38 82 54" stroke="#e9d5ff"/>
+    <!-- yay ipi -->
+    <path d="M82 22 L82 54" stroke="#a78bfa" stroke-width="0.8"/>
+    <!-- ok -->
+    <path d="M60 38 L96 38" stroke="#e9d5ff"/>
+    <path d="M92 34 L96 38 L92 42" stroke="#e9d5ff"/>
+    <!-- arka kol -->
+    <path d="M60 40 L48 44"/>
+    <!-- at gövdesi -->
+    <path d="M44 56 Q36 58 34 70 L34 84 Q34 92 38 94 L42 94 L42 82"/>
+    <path d="M44 56 Q56 52 72 54 Q86 56 88 68 L88 84 Q88 92 84 94 L80 94 L80 82"/>
+    <!-- ön bacaklar -->
+    <path d="M74 68 L74 94 L70 96"/>
+    <path d="M50 68 L50 94 L46 96"/>
+    <!-- kuyruk -->
+    <path d="M34 66 Q24 64 22 72"/>
+  </g>
+  <!-- parıltılar -->
+  <circle cx="82" cy="22" r="1.6" fill="#e9d5ff"/>
+  <circle cx="96" cy="38" r="1.4" fill="#e9d5ff"/>
+</svg>

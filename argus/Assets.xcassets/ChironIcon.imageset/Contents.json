@@ -1,0 +1,15 @@
+{
+  "images" : [
+    {
+      "filename" : "chiron.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "argus",
+    "version" : 1
+  },
+  "properties" : {
+    "preserves-vector-representation" : true
+  }
+}

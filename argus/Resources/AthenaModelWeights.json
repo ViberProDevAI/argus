@@ -1,0 +1,18 @@
+{
+  "version": "Athena-V1-Expert-2026-04",
+  "description": "Factor ağırlıkları. Kalibrasyon notları: momentum ve kalite ağırlıkları Jegadeesh–Titman (1993) ve Fama–French QMJ literatürüne dayanır. Ağırlıklar 1.0 toplamaz çünkü bias + ölçekleme ile birleşir — AthenaInferenceEngine.predict içinde clamp([0,100]) uygulanır. Geri-test doğrulama: Alkindus verdict'lerinden türetilen live win-rate ile revize edilmeli (F1-8).",
+  "bias": 0.0,
+  "valueWeight": 0.20,
+  "qualityWeight": 0.25,
+  "momentumWeight": 0.25,
+  "sizeWeight": 0.15,
+  "riskWeight": 0.15,
+  "lastUpdated": "2026-04-21",
+  "notes": {
+    "value": "P/E + P/B + FCF yield ağırlıklı ortalaması. Zarar eden şirketlerde floor 20.",
+    "quality": "ROE + Operating Margin + Debt/Equity. Yüksek leverage cezalandırılır.",
+    "momentum": "Jegadeesh-Titman 12m-1m return + Orion teknik skoru.",
+    "size": "Log-market-cap z-score; küçük ölçekli büyüme şirketleri için küçük premium.",
+    "risk": "Fiyat volatilitesi + likidite; yüksek risk cezalandırılır."
+  }
+}
