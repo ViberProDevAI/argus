@@ -37,9 +37,6 @@ class SettingsViewModel: ObservableObject {
     }
     
     // MARK: - Privacy & Security
-    @Published var isFaceIDEnabled: Bool {
-        didSet { UserDefaults.standard.set(isFaceIDEnabled, forKey: "isFaceIDEnabled") }
-    }
     @Published var shareAnalytics: Bool {
         didSet { UserDefaults.standard.set(shareAnalytics, forKey: "shareAnalytics") }
     }
@@ -99,7 +96,6 @@ class SettingsViewModel: ObservableObject {
         self.bistWithholdingPercent = UserDefaults.standard.bistWithholdingRate * 100.0
 
         self.notificationsEnabled = UserDefaults.standard.object(forKey: "notificationsEnabled") as? Bool ?? true
-        self.isFaceIDEnabled = UserDefaults.standard.bool(forKey: "isFaceIDEnabled")
         self.shareAnalytics = UserDefaults.standard.object(forKey: "shareAnalytics") as? Bool ?? true
         
         // AI Init

@@ -224,7 +224,6 @@ argus/Views/Components/AlkindusAvatarView.swift
 argus/Views/Components/TradeHistoryCard.swift
 argus/Views/Components/WisdomQuoteView.swift
 argus/Views/Components/HeimdallPulseView.swift
-argus/Views/Components/SecureViewModifier.swift
 argus/Views/Components/AlkindusCards.swift
 argus/Views/Components/BrandStoryView.swift
 argus/Views/Components/ChimeraRadarView.swift
@@ -587,7 +586,6 @@ argus/Services/AnalysisService.swift
 argus/Services/ChironRegimeEngine.swift
 argus/Services/EODHDProviderAdapter.swift
 argus/Services/GeminiNewsServiceExtensions.swift
-argus/Services/SecurityService.swift
 argus/Services/ArgusStorage.swift
 argus/Services/GeminiNewsService.swift
 argus/Services/PhoenixScenarioEngine.swift
