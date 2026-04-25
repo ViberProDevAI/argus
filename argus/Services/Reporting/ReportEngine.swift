@@ -14,6 +14,28 @@ import Foundation
 actor ReportEngine {
     static let shared = ReportEngine()
 
+    // Reusable formatters. Configuring DateFormatter is expensive; share
+    // a configured instance instead of allocating per call. Reads are
+    // thread-safe after configuration completes here.
+    private static let isoFormatter = ISO8601DateFormatter()
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+    private static let longDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMMM yyyy, EEEE"
+        f.locale = Locale(identifier: "tr_TR")
+        return f
+    }()
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "d MMM"
+        f.locale = Locale(identifier: "tr_TR")
+        return f
+    }()
+
     private let storagePath: URL = {
         FileManager.default.documentsURL.appendingPathComponent("reports")
     }()
@@ -45,7 +67,7 @@ actor ReportEngine {
     }
 
     private func saveReport(_ report: StoredReport) async {
-        let filename = "\(report.type.rawValue)_\(ISO8601DateFormatter().string(from: report.date)).json"
+        let filename = "\(report.type.rawValue)_\(Self.isoFormatter.string(from: report.date)).json"
         let fileURL = storagePath.appendingPathComponent(filename)
         guard let data = try? JSONEncoder().encode(report) else { return }
         try? data.write(to: fileURL)
@@ -150,10 +172,8 @@ actor ReportEngine {
         // —— 4. İşlem detayı
         if !todayTrades.isEmpty {
             md += "## İşlemler\n\n"
-            let timeF = DateFormatter()
-            timeF.dateFormat = "HH:mm"
             for t in todayTrades.prefix(12) {
-                let time = timeF.string(from: t.date)
+                let time = Self.timeFormatter.string(from: t.date)
                 let action = t.type == .buy ? "AL" : "SAT"
                 let cur = t.symbol.hasSuffix(".IS") ? "₺" : "$"
                 var line = "- `\(time)` · **\(action)** \(t.symbol) · \(cur)\(formatNumber(t.price, decimals: 2))"
@@ -336,17 +356,11 @@ actor ReportEngine {
     // MARK: - Helpers
 
     private func longDateString(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "d MMMM yyyy, EEEE"
-        f.locale = Locale(identifier: "tr_TR")
-        return f.string(from: date)
+        Self.longDateFormatter.string(from: date)
     }
 
     private func shortDateString(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "d MMM"
-        f.locale = Locale(identifier: "tr_TR")
-        return f.string(from: date)
+        Self.shortDateFormatter.string(from: date)
     }
 
     private func formatNumber(_ value: Double, decimals: Int = 2) -> String {
