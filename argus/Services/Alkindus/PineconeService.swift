@@ -20,6 +20,20 @@ final class PineconeService {
     /// Örnek format: `https://<index>-<project>.svc.<region>.pinecone.io`
     private var baseURL: String { Secrets.pineconeBaseURL }
 
+    /// Beklenen vektör boyutu. `text-embedding-004` modeli her zaman 768-dim
+    /// üretir (`GeminiEmbeddingService`). Index farklı boyutta kurulduysa
+    /// upsert request'i Pinecone tarafında 400 ile reddedilir; o noktaya
+    /// kadar olan tüm "kuyruk akıyor" sinyalleri yanıltıcı olur. Bu yüzden
+    /// ilk network çağrısında `validateIndexDimension()` ile fail-fast.
+    static let expectedDimension = 768
+
+    /// `validateIndexDimension()` cache'i. Pinecone serverless index'leri
+    /// kullanım ömrü boyunca dimension'ını değiştirmez (sabit boyutlu
+    /// kuruluyor); o yüzden tek bir başarılı doğrulama yeterli, sonraki
+    /// çağrılar bunu okur. Hata cache'lenir ki ilk hatadan sonra her upsert
+    /// aynı describe_index_stats çağrısını tekrar yapmasın.
+    private var dimensionValidation: Result<Int, PineconeError>?
+
     private init() {}
 
     /// RAG sistemi şu an kullanılabilir mi? Key + URL + parse edilebilir URL şartlarını tarar.
@@ -89,11 +103,64 @@ final class PineconeService {
         let deleteAll: Bool?
         let namespace: String?
     }
-    
+
+    /// Pinecone `/describe_index_stats` yanıtı. `dimension` döndüren minimal
+    /// alt küme; `namespaces` / `totalVectorCount` gerekirse genişletilebilir.
+    struct IndexStats: Codable {
+        let dimension: Int?
+        let totalVectorCount: Int?
+    }
+
     // MARK: - API Methods
-    
+
+    /// Pinecone index'in metadata'sını alır. Tek başına çağrı maliyeti düşük
+    /// (DB read yok); bu yüzden dimension doğrulaması için kullanılır.
+    func describeIndexStats() async throws -> IndexStats {
+        struct EmptyBody: Codable {}
+        return try await post(endpoint: "/describe_index_stats", body: EmptyBody())
+    }
+
+    /// Index dimension'ı `expectedDimension` (768) ile uyuşuyor mu?
+    /// İlk başarılı çağrı cache'lenir; sonraki çağrılar network'e dönmez.
+    /// Mismatch durumunda `.dimensionMismatch` fırlatılır ki kullanıcı
+    /// "ilk upsert 400 aldı, neden?" sürprizini değil "index'iniz 768 değil
+    /// 1024 kurulmuş, yeniden oluşturun" mesajını alsın.
+    ///
+    /// Cache politikası: sadece dimension'a dair sonuçlar (`.success`,
+    /// `.dimensionUnknown`, `.dimensionMismatch`) cache'lenir. Network
+    /// hataları (auth, timeout, 5xx) propagate eder ama cache'lenmez ki
+    /// kullanıcı key'i veya bağlantıyı düzelttiğinde retry başarılı olsun.
+    @discardableResult
+    func validateIndexDimension(expected: Int = PineconeService.expectedDimension) async throws -> Int {
+        if let cached = dimensionValidation {
+            return try cached.get()
+        }
+
+        let stats = try await describeIndexStats()
+
+        guard let actual = stats.dimension else {
+            let error = PineconeError.dimensionUnknown
+            dimensionValidation = .failure(error)
+            throw error
+        }
+        guard actual == expected else {
+            let error = PineconeError.dimensionMismatch(expected: expected, actual: actual)
+            dimensionValidation = .failure(error)
+            throw error
+        }
+        dimensionValidation = .success(actual)
+        return actual
+    }
+
+    /// Test/diagnostic için cache'i sıfırlar (örn. kullanıcı Secrets.xcconfig'i
+    /// güncelleyip yeniden bağlandığında).
+    func resetDimensionValidationCache() {
+        dimensionValidation = nil
+    }
+
     /// Upsert vectors to Pinecone
     func upsert(vectors: [Vector], namespace: String = "default") async throws -> Int {
+        try await validateIndexDimension()
         let request = UpsertRequest(vectors: vectors, namespace: namespace)
         let response: UpsertResponse = try await post(endpoint: "/vectors/upsert", body: request)
         return response.upsertedCount ?? 0
@@ -163,15 +230,23 @@ final class PineconeService {
 
 // MARK: - Errors
 
-enum PineconeError: Error, LocalizedError {
+enum PineconeError: Error, LocalizedError, Equatable {
     case missingAPIKey
     case invalidURL
     case invalidResponse
     case apiError(Int, String)
     /// Kullanıcı Pinecone hesabı/endpoint'i Secrets'e eklememiş. Uygulamanın
-    /// kendi açığı değil — RAG öğrenme opsiyonel. Engine bunu yakalayınca
+    /// kendi açığı değil, RAG öğrenme opsiyonel. Engine bunu yakalayınca
     /// işlemi sessizce atlar, "RAG devre dışı" bilgisini UI'a iletir.
     case notConfigured(String)
+    /// Index `dimension` Pinecone'dan dönmedi. API yanıtı eksik; muhtemelen
+    /// describe_index_stats yetkisi yok ya da serverless variant farklı
+    /// shape döndürüyor. Operasyonel bir sürpriz, kullanıcıya bildir.
+    case dimensionUnknown
+    /// Index `dimension` beklenen `expected` değerinden farklı. README Adım
+    /// 5'in en yaygın kurulum hatası: kullanıcı 1024/1536 kurmuş.
+    /// `text-embedding-004` 768 üretir, mismatch durumunda upsert 400 alır.
+    case dimensionMismatch(expected: Int, actual: Int)
 
     var errorDescription: String? {
         switch self {
@@ -185,6 +260,10 @@ enum PineconeError: Error, LocalizedError {
             return "Pinecone hatası (\(code)): \(message)"
         case .notConfigured(let reason):
             return "Pinecone yapılandırılmamış: \(reason)"
+        case .dimensionUnknown:
+            return "Pinecone index dimension'ı okunamadı. describe_index_stats yanıtı eksik veya yetki yok."
+        case .dimensionMismatch(let expected, let actual):
+            return "Pinecone index dimension'ı \(actual), beklenen \(expected). text-embedding-004 modeli \(expected)-dim üretir; index'i bu boyutta yeniden oluşturmalısın (README Adım 5)."
         }
     }
 }
