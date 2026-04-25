@@ -1,6 +1,6 @@
 # Argus'a Katkı Rehberi
 
-Bu rehber Argus'a katkı verecek geliştiriciler için yazılmıştır. `README.md` kurulumu, `ARCHITECTURE.md` mimari kararları anlatır — bu belge **nasıl katkı verileceğini** kapsar: dal stratejisi, commit biçimi, kod beklentileri, test ve gizli bilgi hijyeni.
+Bu rehber Argus'a katkı verecek geliştiriciler için yazılmıştır. `README.md` kurulumu, `ARCHITECTURE.md` mimari kararları anlatır; bu belge **nasıl katkı verileceğini** kapsar: dal stratejisi, commit biçimi, kod beklentileri, test ve gizli bilgi hijyeni.
 
 > 🇬🇧 **English speakers:** all conventions below apply identically. Turkish is the primary language for commits, PR descriptions and inline comments because the original maintainer writes in Turkish; English is welcome and won't be rejected. Bilingual PR descriptions (TR + EN) are preferred for broader contribution.
 
@@ -8,8 +8,8 @@ Bu rehber Argus'a katkı verecek geliştiriciler için yazılmıştır. `README.
 
 ## 0. Önemli ilkeler
 
-1. **Yatırım tavsiyesi değildir.** Argus paper-trading ve eğitim simülasyonudur. Gerçek emir gönderen kod, gerçek aracı entegrasyonu, lisanssız fiyat dağıtımı — kabul edilmez. Yeni PR'larda kullanıcıya gösterilen metinlerde model belirsizliği ve veri gecikmesi açıkça belirtilmelidir (`ARCHITECTURE.md §6`).
-2. **Yanıltıcı güvenlik yüzeyi yaratma.** Bağlanmamış toggle, çağrılmayan kilit modifier'ı, "şifrelenmiş" iddiasında olan sade `UserDefaults` yazımı — hepsi reddedilir.
+1. **Yatırım tavsiyesi değildir.** Argus paper-trading ve eğitim simülasyonudur. Gerçek emir gönderen kod, gerçek aracı entegrasyonu, lisanssız fiyat dağıtımı kabul edilmez. Yeni PR'larda kullanıcıya gösterilen metinlerde model belirsizliği ve veri gecikmesi açıkça belirtilmelidir (`ARCHITECTURE.md §6`).
+2. **Yanıltıcı güvenlik yüzeyi yaratma.** Bağlanmamış toggle, çağrılmayan kilit modifier'ı, "şifrelenmiş" iddiasında olan sade `UserDefaults` yazımı, hepsi reddedilir.
 3. **"Eksik çalışmasın."** Opsiyonel bir API anahtarı eksikse hata fırlatma; özelliği sessizce devre dışı bırakıp `README.md` "Zarif bozulma" tablosuna ek satır ekle.
 4. **Tek facade, çok store.** Yeni özellik için `TradingViewModel`'e satır ekleme. `PortfolioStore` / `MarketDataStore` / yeni odaklı bir `Store` üzerinden geç (`ARCHITECTURE.md §2`).
 
@@ -30,7 +30,7 @@ git checkout -b <type>/<short-description>
 
 ### 1.2 Dal adı kalıbı
 
-`<type>/<kısa-açıklama>` — kebab-case, İngilizce kabul edilir.
+`<type>/<kısa-açıklama>`, kebab-case, İngilizce kabul edilir.
 
 | Type | Ne için | Örnek |
 |------|---------|-------|
@@ -43,7 +43,7 @@ git checkout -b <type>/<short-description>
 | `perf`  | Performans odaklı | `perf/logo-cache-eviction` |
 | `ci`    | GitHub Actions / build script | `ci/ios-runner-destination` |
 
-Tek PR, tek konu. Kod refactor'ünü yeni özellikle aynı PR'a sıkıştırma — review'ı zorlaştırır ve revert riskini artırır.
+Tek PR, tek konu. Kod refactor'ünü yeni özellikle aynı PR'a sıkıştırma; review'ı zorlaştırır ve revert riskini artırır.
 
 ### 1.3 Fork akışı
 
@@ -64,15 +64,15 @@ Tek satırlık başlık + (gerekirse) boş satır + gövde.
 ```
 <type>: <konu>
 
-<gövde — neden bu değişiklik gerekiyordu, davranış nasıl değişti,
+<gövde: neden bu değişiklik gerekiyordu, davranış nasıl değişti,
 hangi ölçütleri sağlıyor, hangi riskleri taşıyor>
 ```
 
-- **Başlık imperatif kipte.** "remove dead Face ID code path", "fix marquee ticker direction" — geçmiş zaman değil.
+- **Başlık imperatif kipte.** "remove dead Face ID code path", "fix marquee ticker direction"; geçmiş zaman değil.
 - **Başlık ≤ 72 karakter.** Detay gövdeye gider.
 - **Tip prefix'i** dal adıyla aynı tabloyu kullanır.
 - **Türkçe / İngilizce karışık** OK; tutarlı olsun (başlık+gövde aynı dilde).
-- **Co-author** kullanma — PR'da ayrı görünür, commit'te gerek yok.
+- **Co-author** kullanma; PR'da ayrı görünür, commit'te gerek yok.
 
 ### Örnekler (kabul edilen)
 
@@ -132,11 +132,11 @@ git reset --soft HEAD~1
 ### 4.1 Loglama
 
 ```swift
-// ✅ Doğru — fire-and-forget statik API
+// ✅ Doğru: fire-and-forget statik API
 ArgusLogger.info("Pinecone upsert ok", category: "RAG")
 ArgusLogger.error("FMP 429", category: "Network", error: err)
 
-// ❌ Yanlış — yeni kod print() kullanmaz
+// ❌ Yanlış: yeni kod print() kullanmaz
 print("[DEBUG] something")
 ```
 
@@ -165,7 +165,7 @@ print("[DEBUG] something")
 
 ### 4.5 Modern Xcode 16 ipucu
 
-Proje `PBXFileSystemSynchronizedRootGroup` kullanır — Xcode `argus/` klasörünü filesystem'le otomatik senkron tutar. Yeni `.swift` dosyası eklemek için manuel `pbxproj` düzenlemeye **gerek yok**. Ama:
+Proje `PBXFileSystemSynchronizedRootGroup` kullanır; Xcode `argus/` klasörünü filesystem'le otomatik senkron tutar. Yeni `.swift` dosyası eklemek için manuel `pbxproj` düzenlemeye **gerek yok**. Ama:
 
 - **`swift_files.txt` manifestini güncelle.** Repo'nun bağımsız listesi; eklediysen ekle, sildiysen çıkar.
 
@@ -207,23 +207,23 @@ Yeni bir motor entegrasyonu mock provider ile test edilmelidir; gerçek anahtar 
 
 ### 6.1 Hedef dal
 
-`ui/v5-designkit` — `main` değildir. (Maintainer ileride değiştirirse README "Durum" bölümü güncellenir.)
+`ui/v5-designkit`, `main` değildir. (Maintainer ileride değiştirirse README "Durum" bölümü güncellenir.)
 
 ### 6.2 PR şablonu
 
 `.github/pull_request_template.md` PR oluştururken otomatik dolar. Şu alanları doldur:
 
-- **Özet (TR + EN, 2-4 cümle)** — ne, neden, gözlemlenebilir etki.
-- **Değişiklikler** — silinen / eklenen / düzenlenen dosyalar liste halinde.
-- **Doğrulama** — hangi test, hangi simülatör, hangi VoiceOver / Dynamic Type taraması yapıldı.
-- **Risk** — geri alma kolay mı? UserDefaults / Keychain'de orphan veri kalır mı? Hangi sağlayıcı çağrılarına etki eder?
-- **CHANGELOG.md** — kullanıcıya etki eden değişiklik için ilgili numaralı bölüme bir madde ekle. "Karar bekleyen" → "Bu turda kapatılan" geçişlerini ihmal etme.
-- **ARCHITECTURE.md §7 status table** — büyük PR'larda satır eklenir/güncellenir.
+- **Özet (TR + EN, 2-4 cümle):** ne, neden, gözlemlenebilir etki.
+- **Değişiklikler:** silinen / eklenen / düzenlenen dosyalar liste halinde.
+- **Doğrulama:** hangi test, hangi simülatör, hangi VoiceOver / Dynamic Type taraması yapıldı.
+- **Risk:** geri alma kolay mı? UserDefaults / Keychain'de orphan veri kalır mı? Hangi sağlayıcı çağrılarına etki eder?
+- **CHANGELOG.md:** kullanıcıya etki eden değişiklik için ilgili numaralı bölüme bir madde ekle. "Karar bekleyen" → "Bu turda kapatılan" geçişlerini ihmal etme.
+- **ARCHITECTURE.md §7 status table:** büyük PR'larda satır eklenir/güncellenir.
 
 ### 6.3 Boyut
 
-- **<400 değişen satır** ideal — review hızlı, revert kolay.
-- **>1000 satır** — gerekçesi gövdede açıklanır (büyük rename / rewrite). Mümkünse alt-PR'lara bölünür.
+- **<400 değişen satır** ideal: review hızlı, revert kolay.
+- **>1000 satır:** gerekçesi gövdede açıklanır (büyük rename / rewrite). Mümkünse alt-PR'lara bölünür.
 - Generated dosyalar (asset PNG, plist) sayım dışıdır; not düş.
 
 ### 6.4 İnceleme öncesi checklist

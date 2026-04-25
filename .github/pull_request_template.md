@@ -1,5 +1,5 @@
 <!--
-  PR şablonu — tüm bölümleri doldur. Doldurulmamış başlıklar review'ı yavaşlatır.
+  PR şablonu: tüm bölümleri doldur. Doldurulmamış başlıklar review'ı yavaşlatır.
   PR açmadan önce CONTRIBUTING.md §6.4 checklist'i kendi diff'ine uygula.
 -->
 
