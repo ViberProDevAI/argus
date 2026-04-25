@@ -26,7 +26,7 @@ actor CircuitBreaker {
             // Check cooldown
             if let last = lastFailureTime, -last.timeIntervalSinceNow > Double(config.circuitBreakerOpenSeconds) {
                 state = .halfOpen
-                print("⚡️ Mimir Circuit: Half-Open via Cooldown")
+                ArgusLogger.info(.mimir, "Circuit: Half-Open via Cooldown")
                 return true
             }
             return false
@@ -41,7 +41,7 @@ actor CircuitBreaker {
         if state == .halfOpen {
             state = .closed
             failureCount = 0
-            print("⚡️ Mimir Circuit: Closed (Restored)")
+            ArgusLogger.info(.mimir, "Circuit: Closed (Restored)")
         } else if state == .closed {
             failureCount = 0 // Reset burst counter on stable success
         }
@@ -53,11 +53,11 @@ actor CircuitBreaker {
         
         if state == .halfOpen {
             state = .open
-            print("⚡️ Mimir Circuit: Re-Opened (Half-Open Fail)")
+            ArgusLogger.warning(.mimir, "Circuit: Re-Opened (Half-Open Fail)")
         }
         else if state == .closed && (failureCount >= config.circuitBreakerThreshold || isCritical) {
             state = .open
-            print("⚡️ Mimir Circuit: Opened (Fail Threshold)")
+            ArgusLogger.warning(.mimir, "Circuit: Opened (Fail Threshold)")
         }
     }
     
