@@ -74,7 +74,7 @@ actor QuotaGovernor {
         if !calendar.isDate(lastDayReset, inSameDayAs: Date()) {
             dailyUsage = 0
             lastDayReset = Date()
-            print("📅 Mimir Governor: Daily Budget Reset")
+            ArgusLogger.info(.mimir, "Governor: Daily Budget Reset")
         }
     }
     
