@@ -204,28 +204,36 @@ struct AtlasDebateCard: View {
 // MARK: - Grand Council Debate Card
 //
 // ArgusGrandDecision için karar patikası kartı: kim oy verdi, hangi yönde,
-// hangi modül veto etti, danışmanlar ne dedi. Konsey kararının "neden bu
-// çıktı" sorusunun cevabı tek ekranda görünür. Eskiden bu bilgi yalnız
-// reasoning string'inde sıkışıyordu.
+// hangi modül veto etti, kim oy vermedi neden, danışmanlar ne dedi.
+//
+// 2026-04-25 — Dürüstlük revizyonu:
+// 1. SAT oyu artık "VETO" diye gösterilmiyor. Önceki version
+//    `.sell → .veto` mapping yapıyordu, ama satış OYU ile sert VETO ayrı şeyler.
+//    Sert veto sadece ModuleVeto listesindeki kayıtlar.
+// 2. "BEKLEYEN MODÜL" bölümü: Atlas/Hermes oy vermediyse (snapshot yok / haber
+//    yok), bunlar ayrı bölümde "veri bekleniyor" notuyla gösterilir.
+//    Eskiden contributors listesi sadece oy verenleri içeriyordu — kullanıcı
+//    "2 modül oy verdi" görüp "kalan modüller nerede?" diye haklı şikayet ediyordu.
 struct GrandCouncilDebateCard: View {
     let decision: ArgusGrandDecision
     @State private var isExpanded: Bool = true
 
-    private var votes: [(name: String, decision: VoteDecision, reasoning: String?, weight: Double)] {
-        decision.contributors.map { contrib in
-            let voteDecision: VoteDecision
-            switch contrib.action {
-            case .buy:  voteDecision = .approve
-            case .sell: voteDecision = .veto
-            case .hold: voteDecision = .abstain
-            }
-            return (
-                name: contrib.module,
-                decision: voteDecision,
-                reasoning: contrib.reasoning,
-                weight: contrib.confidence
-            )
+    /// Tüm Council üyeleri — oy verenler + bekleyenler.
+    /// Bekleyenler: Atlas (atlasDecision nil), Hermes (hermesDecision nil).
+    private var pendingMembers: [(name: String, reason: String)] {
+        var pending: [(String, String)] = []
+        let voted = Set(decision.contributors.map { $0.module.lowercased() })
+        if decision.atlasDecision == nil && !voted.contains("atlas") {
+            pending.append(("Atlas", "Bilanço/temel veri yüklenmedi"))
         }
+        if decision.hermesDecision == nil && !voted.contains("hermes") {
+            pending.append(("Hermes", "Haber verisi yok"))
+        }
+        return pending
+    }
+
+    private var totalExpectedVoters: Int {
+        decision.contributors.count + pendingMembers.count
     }
 
     var body: some View {
@@ -248,7 +256,7 @@ struct GrandCouncilDebateCard: View {
                 }
             }
 
-            // Reasoning özet (zaten zenginleşti — sayım+ağırlık+eşik içerir)
+            // Reasoning özet (sayım + ağırlık + eşik dahil)
             Text(decision.reasoning)
                 .font(.system(size: 11))
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
@@ -257,27 +265,35 @@ struct GrandCouncilDebateCard: View {
             if isExpanded {
                 Divider().background(InstitutionalTheme.Colors.border)
 
-                // Oy listesi
+                // Oy verenler
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("OYLAR (\(votes.count) modül)")
+                    Text("OYLAR (\(decision.contributors.count)/\(totalExpectedVoters) modül)")
                         .font(.system(size: 9, weight: .bold, design: .monospaced))
                         .tracking(1)
                         .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    ForEach(Array(votes.enumerated()), id: \.offset) { _, vote in
-                        DebateVoteRow(
-                            name: vote.name,
-                            decision: vote.decision,
-                            reasoning: vote.reasoning,
-                            weight: vote.weight
-                        )
+                    ForEach(Array(decision.contributors.enumerated()), id: \.offset) { _, contrib in
+                        contributorRow(contrib)
                     }
                 }
 
-                // Hard vetolar (varsa) ayrı bölümde
+                // Oy vermeyenler (Atlas/Hermes vb. veri yok durumu)
+                if !pendingMembers.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("BEKLEYEN MODÜL (\(pendingMembers.count))")
+                            .font(.system(size: 9, weight: .bold, design: .monospaced))
+                            .tracking(1)
+                            .foregroundColor(InstitutionalTheme.Colors.titan)
+                        ForEach(Array(pendingMembers.enumerated()), id: \.offset) { _, p in
+                            pendingRow(name: p.name, reason: p.reason)
+                        }
+                    }
+                }
+
+                // Hard veto'lar (gerçek veto — ModuleVeto listesi)
                 if !decision.vetoes.isEmpty {
                     Divider().background(InstitutionalTheme.Colors.border)
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("VETO (\(decision.vetoes.count))")
+                        Text("SERT VETO (\(decision.vetoes.count))")
                             .font(.system(size: 9, weight: .bold, design: .monospaced))
                             .tracking(1)
                             .foregroundColor(InstitutionalTheme.Colors.crimson)
@@ -299,7 +315,7 @@ struct GrandCouncilDebateCard: View {
                     }
                 }
 
-                // Danışman notları (Phoenix, Prometheus, Athena/Chimera vb.)
+                // Danışman notları
                 if !decision.advisors.isEmpty {
                     Divider().background(InstitutionalTheme.Colors.border)
                     VStack(alignment: .leading, spacing: 6) {
@@ -334,6 +350,87 @@ struct GrandCouncilDebateCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(InstitutionalTheme.Colors.holo.opacity(0.3), lineWidth: 1)
         )
+    }
+
+    /// Modül oy satırı — AL/SAT/BEKLE yönünde + güven yüzdesi + 1 satır rationale.
+    @ViewBuilder
+    private func contributorRow(_ contrib: ModuleContribution) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: voteIcon(for: contrib.action))
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(voteColor(for: contrib.action))
+                .frame(width: 14)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(contrib.module)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    Text(voteLabel(for: contrib.action))
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(voteColor(for: contrib.action))
+                    Spacer()
+                    Text("%\(Int(abs(contrib.confidence) * 100))")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                }
+                if !contrib.reasoning.isEmpty {
+                    Text(contrib.reasoning)
+                        .font(.system(size: 10))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+        }
+    }
+
+    /// Bekleyen (oy vermemiş) modül satırı — neden oy vermediğini açıklar.
+    @ViewBuilder
+    private func pendingRow(name: String, reason: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "clock")
+                .font(.system(size: 10))
+                .foregroundColor(InstitutionalTheme.Colors.titan)
+                .frame(width: 14)
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(name)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    Text("BEKLENİYOR")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(InstitutionalTheme.Colors.titan)
+                    Spacer()
+                }
+                Text(reason)
+                    .font(.system(size: 10))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .lineLimit(1)
+            }
+        }
+    }
+
+    private func voteIcon(for action: ProposedAction) -> String {
+        switch action {
+        case .buy:  return "arrow.up.circle.fill"
+        case .sell: return "arrow.down.circle.fill"
+        case .hold: return "minus.circle.fill"
+        }
+    }
+
+    private func voteLabel(for action: ProposedAction) -> String {
+        switch action {
+        case .buy:  return "AL"
+        case .sell: return "SAT"
+        case .hold: return "BEKLE"
+        }
+    }
+
+    private func voteColor(for action: ProposedAction) -> Color {
+        switch action {
+        case .buy:  return InstitutionalTheme.Colors.aurora
+        case .sell: return InstitutionalTheme.Colors.crimson
+        case .hold: return InstitutionalTheme.Colors.textSecondary
+        }
     }
 
     private func actionColor(_ action: ArgusAction) -> Color {
