@@ -23,11 +23,11 @@ struct HermesCouncil {
     func convene(symbol: String, news: HermesNewsSnapshot) async -> HermesDecision {
         let timestamp = Date()
         
-        print("🏛️ Hermes Konseyi Toplanıyor: \(symbol)")
-        
+        ArgusLogger.info(.hermes, "Konsey toplanıyor: \(symbol)")
+
         // 1. Collect proposals
         let proposals = await collectProposals(news: news, symbol: symbol)
-        print("   📋 \(proposals.count) öneri toplandı")
+        ArgusLogger.info(.hermes, "\(proposals.count) öneri toplandı")
         
         // 2. No news = neutral
         guard !proposals.isEmpty else {
@@ -47,7 +47,7 @@ struct HermesCouncil {
         
         // 3. Best proposal
         let bestProposal = proposals.max(by: { $0.confidence < $1.confidence })!
-        print("   🎯 En iyi öneri: \(bestProposal.proposerName) → \(bestProposal.sentiment.rawValue)")
+        ArgusLogger.info(.hermes, "En iyi öneri: \(bestProposal.proposerName) -> \(bestProposal.sentiment.rawValue)")
         
         // 4. Voting
         let votes = conductVoting(proposal: bestProposal, news: news)
@@ -61,7 +61,7 @@ struct HermesCouncil {
             timestamp: timestamp
         )
         
-        print("   📊 Sonuç: \(decision.summary)")
+        ArgusLogger.info(.hermes, "Sonuç: \(decision.summary)")
         
         return decision
     }
@@ -100,7 +100,7 @@ struct HermesCouncil {
             )
             
             votes.append(vote)
-            print("      \(vote.decision.emoji) \(vote.voterName): \(vote.decision.rawValue) - \(vote.reasoning ?? "")")
+            ArgusLogger.info(.hermes, "Oy: \(vote.voterName): \(vote.decision.rawValue) - \(vote.reasoning ?? "")")
         }
         
         return votes

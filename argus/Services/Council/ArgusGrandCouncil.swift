@@ -132,28 +132,27 @@ actor ArgusGrandCouncil {
         // 1. Check Cache
         if !forceRefresh, let cached = decisionCache[symbol] {
              if Date().timeIntervalSince(cached.timestamp) < cacheTTL {
-                 print("🏛️ Argus: Cache kullanılıyor (\(symbol))")
+                 ArgusLogger.info(.argus, "Cache kullanılıyor (\(symbol))")
                  return cached.decision
              }
          }
-        
+
         let timestamp = Date()
-        print("🏛️🏛️🏛️ ARGUS ÜST KONSEYİ TOPLANIYOR: \(symbol)")
-        print("=".padding(toLength: 50, withPad: "=", startingAt: 0))
+        ArgusLogger.info(.argus, "Üst konseyi toplanıyor: \(symbol)")
         
         let isBist = symbol.uppercased().hasSuffix(".IS")
         
         // 1.5 Orion V3 Pattern Detection (Synchronous calculation for decision input)
         let detectedPatterns = await OrionPatternEngine.shared.detectPatterns(candles: candles)
         if !detectedPatterns.isEmpty {
-            print("📐 Orion V3: \(detectedPatterns.count) formasyon tespit edildi.")
+            ArgusLogger.info(.orion, "V3: \(detectedPatterns.count) formasyon tespit edildi.")
         }
         
         // 2. Gather all council decisions (Parallel execution could be optimized here)
         let orionDecision: CouncilDecision
         
         if isBist {
-            print("🇹🇷 Orion TR (Turquoise) Devrede - \(symbol)")
+            ArgusLogger.info(.orion, "TR (Turquoise) devrede: \(symbol)")
             orionDecision = await OrionBistEngine.shared.analyze(symbol: symbol, candles: candles)
         } else {
             orionDecision = await OrionCouncil.shared.convene(symbol: symbol, candles: candles, engine: engine)
@@ -162,7 +161,7 @@ actor ArgusGrandCouncil {
         var atlasDecision: AtlasDecision? = nil
         if let snap = snapshot {
             if isBist {
-                print("🇹🇷 Atlas TR (Turquoise) Devrede - \(symbol)")
+                ArgusLogger.info(.atlas, "TR (Turquoise) devrede: \(symbol)")
                 atlasDecision = await AtlasBistEngine.shared.analyze(symbol: symbol, financials: snap)
             } else {
                 atlasDecision = await AtlasCouncil.shared.convene(symbol: symbol, financials: snap, engine: engine)
@@ -173,7 +172,7 @@ actor ArgusGrandCouncil {
         let aetherDecision: AetherDecision
         
         if isBist, let bistInput = sirkiyeInput {
-            print("🇹🇷 Sirkiye (Politik Korteks) Devrede - \(symbol)")
+            ArgusLogger.info(.aether, "Sirkiye (Politik Korteks) devrede: \(symbol)")
             aetherDecision = await SirkiyeEngine.shared.analyze(input: bistInput)
         } else {
             aetherDecision = await AetherCouncil.shared.convene(macro: macro)
@@ -187,7 +186,7 @@ actor ArgusGrandCouncil {
             if let payload = try? await BISTSentimentEngine.shared.analyzeSentimentPayload(for: symbol) {
                 let adaptedSnapshot = BISTSentimentAdapter.adapt(result: payload.result, articles: payload.articles)
                 hermesDecision = await HermesCouncil.shared.convene(symbol: symbol, news: adaptedSnapshot)
-                print("🇹🇷 Hermes (Adapter): BIST Sentiment Entegre Edildi. Skor: \(Int(payload.result.overallScore))")
+                ArgusLogger.info(.hermes, "Adapter: BIST Sentiment entegre edildi. Skor: \(Int(payload.result.overallScore))")
             }
         } else if let newsData = news {
             hermesDecision = await HermesCouncil.shared.convene(symbol: symbol, news: newsData)
@@ -205,7 +204,7 @@ actor ArgusGrandCouncil {
             // Analist konsensüsünü BorsaPy'den çek (BIST sembolü için)
             let analystConsensus = try? await BorsaPyProvider.shared.getAnalystRecommendations(symbol: symbol)
             if let ac = analystConsensus {
-                print("🎯 Council: Analist konsensüsü alındı - \(ac.recommendation) (\(ac.totalAnalysts) analist)")
+                ArgusLogger.info(.argus, "Council: Analist konsensüsü alındı: \(ac.recommendation) (\(ac.totalAnalysts) analist)")
             }
 
             let bistRes = await BistGrandCouncil.shared.convene(
@@ -1004,7 +1003,7 @@ actor BistGrandCouncil {
         analystConsensus: BistAnalystConsensus? = nil // Analist konsensüsü (BorsaPy)
     ) async -> BistDecisionResult {
         
-        print("🇹🇷 BIST KONSEYİ TOPLANIYOR: \(symbol) 🇹🇷")
+        ArgusLogger.info(.argus, "BIST konseyi toplanıyor: \(symbol)")
         
         // 1. Module Analysis & Data Storytelling Generation
         
