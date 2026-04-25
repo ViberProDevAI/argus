@@ -1,6 +1,6 @@
 # Argus'a Katkı Rehberi
 
-Bu rehber Argus'a katkı verecek geliştiriciler ve AI agent'lar için yazılmıştır. `README.md` kurulumu, `ARCHITECTURE.md` mimari kararları anlatır — bu belge **nasıl katkı verileceğini** kapsar: dal stratejisi, commit biçimi, kod beklentileri, test ve gizli bilgi hijyeni.
+Bu rehber Argus'a katkı verecek geliştiriciler için yazılmıştır. `README.md` kurulumu, `ARCHITECTURE.md` mimari kararları anlatır — bu belge **nasıl katkı verileceğini** kapsar: dal stratejisi, commit biçimi, kod beklentileri, test ve gizli bilgi hijyeni.
 
 > 🇬🇧 **English speakers:** all conventions below apply identically. Turkish is the primary language for commits, PR descriptions and inline comments because the original maintainer writes in Turkish; English is welcome and won't be rejected. Bilingual PR descriptions (TR + EN) are preferred for broader contribution.
 
@@ -251,18 +251,7 @@ PR açmadan önce kendi diff'ine bakıp gör:
 
 ---
 
-## 8. AI agent için ek notlar
-
-Bu repo'ya AI agent (Claude Code, Cursor, Aider, Antigravity) ile katkı veriyorsan:
-
-- **README "Dur-ve-sor noktaları"** tablosunu (Apple Developer ücreti, kredi kartı, 2FA, force-push) ihlal etme.
-- API anahtarını **fork repo'nun secrets'ında** saklama; lokalde `Secrets.xcconfig` yeterli.
-- Commit mesajını agent yazıyorsa, `Co-authored-by: Claude` satırı **kullanma** — orijinal repo bu kalıbı tutmuyor; PR gövdesinde "AI agent yardımıyla hazırlandı" demek yeter.
-- Refactor önerirken `ARCHITECTURE.md §2` sırasını izle; `TradingViewModel`'a doğrudan satır ekleme.
-
----
-
-## 9. Sorular
+## 8. Sorular
 
 - Yapısal soru: bir GitHub Issue aç, `question` etiketi ekle.
 - Mimari karar: `ARCHITECTURE.md`'ye yansıması olan değişiklikleri PR açmadan kısa bir Issue ile tartış.

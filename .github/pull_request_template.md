@@ -60,7 +60,3 @@
 ## Bağlantılı issue / önceki PR
 
 <!-- "Closes #123" / "Fixes #45" / "Refs #78" -->
-
----
-
-<!-- AI agent yardımıyla hazırlandıysa kısa not düş. Co-authored-by satırı kullanma. -->
