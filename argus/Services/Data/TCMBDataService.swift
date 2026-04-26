@@ -290,7 +290,7 @@ actor TCMBDataService {
             let _ = try await fetchSerie(.usdTry, days: 1)
             return true
         } catch {
-            print("❌ TCMB API baglanti hatasi: \(error)")
+            ArgusLogger.error(.veri, "TCMB API baglanti hatasi: \(error)")
             return false
         }
     }
@@ -365,9 +365,9 @@ actor TCMBDataService {
             sourceStatus: .live
         )
 
-        print("✅ TCMB: Kapsamlı makro veriler güncellendi")
-        print("   USD/TRY: \(snapshot.usdTry ?? 0), Faiz: %\(snapshot.policyRate ?? 0), Enflasyon: %\(snapshot.inflation ?? 0)")
-        print("   Reel Faiz: %\(snapshot.realInterestRate ?? 0), Cari Denge: \(snapshot.currentAccount ?? 0)B$")
+        ArgusLogger.info(.veri, "TCMB: Kapsamlı makro veriler güncellendi")
+        ArgusLogger.info(.veri, "USD/TRY: \(snapshot.usdTry ?? 0), Faiz: %\(snapshot.policyRate ?? 0), Enflasyon: %\(snapshot.inflation ?? 0)")
+        ArgusLogger.info(.veri, "Reel Faiz: %\(snapshot.realInterestRate ?? 0), Cari Denge: \(snapshot.currentAccount ?? 0)B$")
         
         return snapshot
     }
@@ -377,7 +377,7 @@ actor TCMBDataService {
             let data = try await fetchSerie(serie, days: 7)
             return data.last?.value
         } catch {
-            print("⚠️ TCMB \(serie.rawValue) veri alinamadi: \(error)")
+            ArgusLogger.warning(.veri, "TCMB \(serie.rawValue) veri alinamadi: \(error)")
             return nil
         }
     }
@@ -399,7 +399,7 @@ actor TCMBDataService {
         let urlString = "\(baseURL)/series=\(serieCode)&startDate=\(startStr)&endDate=\(endStr)&type=json"
 
         guard let url = URL(string: urlString) else {
-            print("❌ TCMB: Geçersiz URL - \(urlString)")
+            ArgusLogger.error(.veri, "TCMB: Geçersiz URL: \(urlString)")
             throw TCMBError.invalidURL
         }
 
@@ -411,15 +411,15 @@ actor TCMBDataService {
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ TCMB: HTTP response alınamadı")
+            ArgusLogger.error(.veri, "TCMB: HTTP response alınamadı")
             throw TCMBError.apiError
         }
 
         // Debug: HTTP durumu
         if httpResponse.statusCode != 200 {
             let responseBody = String(data: data, encoding: .utf8) ?? "Body okunamadı"
-            print("❌ TCMB API Hata [\(serie.rawValue)]: HTTP \(httpResponse.statusCode)")
-            print("   Response: \(responseBody.prefix(500))")
+            ArgusLogger.error(.veri, "TCMB API Hata [\(serie.rawValue)]: HTTP \(httpResponse.statusCode)")
+            ArgusLogger.error(.veri, "Response: \(responseBody.prefix(500))")
             // Auth hatalarını actor state'ine yaz → pipeline `.apiKeyNeeded` ayırt edebilsin.
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 lastEVDSAuthFailure = Date()
@@ -431,14 +431,14 @@ actor TCMBDataService {
         // Parse JSON with JSONSerialization
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             let responseBody = String(data: data, encoding: .utf8) ?? "Body okunamadı"
-            print("❌ TCMB JSON Parse Hatası [\(serie.rawValue)]: \(responseBody.prefix(300))")
+            ArgusLogger.error(.veri, "TCMB JSON Parse Hatası [\(serie.rawValue)]: \(responseBody.prefix(300))")
             throw TCMBError.parseError
         }
 
         // items array'i kontrol et
         guard let items = json["items"] as? [[String: Any]], !items.isEmpty else {
-            print("⚠️ TCMB: Veri bulunamadı [\(serie.rawValue)] - items boş veya yok")
-            print("   JSON Keys: \(json.keys.joined(separator: ", "))")
+            ArgusLogger.warning(.veri, "TCMB: Veri bulunamadı [\(serie.rawValue)], items boş veya yok")
+            ArgusLogger.warning(.veri, "JSON Keys: \(json.keys.joined(separator: ", "))")
             return []
         }
 
@@ -540,7 +540,7 @@ actor TCMBDataService {
             let eur = extractForexBuying(xml: xml, currencyCode: "EUR")
             return (usd, eur)
         } catch {
-            print("⚠️ TCMB keyless FX alınamadı: \(error)")
+            ArgusLogger.warning(.veri, "TCMB keyless FX alınamadı: \(error)")
             return (nil, nil)
         }
     }
@@ -568,7 +568,7 @@ actor TCMBDataService {
             let loan = parseLocalizedDouble(byName["gon-bv"])
             return (policy, deposit, loan)
         } catch {
-            print("⚠️ TCMB keyless faiz oranları alınamadı: \(error)")
+            ArgusLogger.warning(.veri, "TCMB keyless faiz oranları alınamadı: \(error)")
             return (nil, nil, nil)
         }
     }
@@ -588,7 +588,7 @@ actor TCMBDataService {
             }
             return extractLatestInflationFromHomepage(html: html)
         } catch {
-            print("⚠️ TCMB keyless enflasyon alınamadı: \(error)")
+            ArgusLogger.warning(.veri, "TCMB keyless enflasyon alınamadı: \(error)")
             return nil
         }
     }
@@ -704,31 +704,31 @@ actor TCMBDataService {
 
         // TIER 1 — EVDS (API key varsa)
         if !apiKey.isEmpty {
-            print("🔄 TCMB pipeline → TIER 1: EVDS (key mevcut)")
+            ArgusLogger.info(.veri, "TCMB pipeline → TIER 1: EVDS (key mevcut)")
             let evdsSnapshot = await fetchFreshData()
             if isMeaningful(snapshot: evdsSnapshot) {
                 let result = evdsSnapshot.withStatus(.live)
                 store(snapshot: result)
-                print("✅ TCMB: EVDS live veri (anlamlı)")
+                ArgusLogger.info(.veri, "TCMB: EVDS live veri (anlamlı)")
                 return result
             }
-            print("⚠️ TCMB: EVDS yanıt anlamlı değil (key geçersiz olabilir veya seri boş)")
+            ArgusLogger.warning(.veri, "TCMB: EVDS yanıt anlamlı değil (key geçersiz olabilir veya seri boş)")
         } else {
-            print("⚠️ TCMB pipeline → EVDS key yok, public fallback'e düşülüyor")
+            ArgusLogger.warning(.veri, "TCMB pipeline → EVDS key yok, public fallback'e düşülüyor")
         }
 
         // TIER 2 — Public keyless (TCMB homepage + Yahoo)
-        print("🔄 TCMB pipeline → TIER 2: Public fallback")
+        ArgusLogger.info(.veri, "TCMB pipeline → TIER 2: Public fallback")
         if let publicSnapshot = await fetchPublicKeylessSnapshot(),
            isMeaningful(snapshot: publicSnapshot) {
             store(snapshot: publicSnapshot)
-            print("✅ TCMB: Public fallback verileri kullanılıyor (kısmi)")
+            ArgusLogger.info(.veri, "TCMB: Public fallback verileri kullanılıyor (kısmi)")
             return publicSnapshot
         }
 
         // TIER 3 — Stale cache (eski ama varsa)
         if let cached = cachedSnapshot, isMeaningful(snapshot: cached) {
-            print("⚠️ TCMB pipeline → TIER 3: Stale cache kullanılıyor")
+            ArgusLogger.warning(.veri, "TCMB pipeline → TIER 3: Stale cache kullanılıyor")
             return cached.withStatus(.cached)
         }
 
@@ -736,13 +736,13 @@ actor TCMBDataService {
         let status: DataSourceStatus
         if apiKey.isEmpty {
             status = .apiKeyNeeded
-            print("❌ TCMB pipeline → TIER 4: .apiKeyNeeded (key tanımlı değil)")
+            ArgusLogger.error(.veri, "TCMB pipeline → TIER 4: .apiKeyNeeded (key tanımlı değil)")
         } else if lastEVDSAuthFailure != nil {
             status = .apiKeyNeeded
-            print("❌ TCMB pipeline → TIER 4: .apiKeyNeeded (401/403)")
+            ArgusLogger.error(.veri, "TCMB pipeline → TIER 4: .apiKeyNeeded (401/403)")
         } else {
             status = .offline
-            print("❌ TCMB pipeline → TIER 4: .offline (ağ/parse hataları)")
+            ArgusLogger.error(.veri, "TCMB pipeline → TIER 4: .offline (ağ/parse hataları)")
         }
         return TCMBMacroSnapshot.empty.withStatus(status)
     }
@@ -896,7 +896,7 @@ extension TCMBDataService {
                 changeMoM: changeMoM
             )
         } catch {
-            print("⚠️ Oracle sektör proxy alınamadı (\(code)): \(error)")
+            ArgusLogger.warning(.veri, "Oracle sektör proxy alınamadı (\(code)): \(error)")
             return nil
         }
     }
@@ -914,7 +914,7 @@ extension TCMBDataService {
             let prevYear = data[data.count - 12].value
             return (current, prevYear)
         } catch {
-            print("⚠️ KKO geçmiş veri alınamadı: \(error)")
+            ArgusLogger.warning(.veri, "KKO geçmiş veri alınamadı: \(error)")
             return nil
         }
     }
@@ -933,7 +933,7 @@ extension TCMBDataService {
             let changeYoY = ((current - prevYear) / prevYear) * 100
             return (current / 1_000_000, changeYoY) // Bin TL -> Milyar TL
         } catch {
-            print("⚠️ Kredi kartı geçmiş veri alınamadı: \(error)")
+            ArgusLogger.warning(.veri, "Kredi kartı geçmiş veri alınamadı: \(error)")
             return nil
         }
     }
