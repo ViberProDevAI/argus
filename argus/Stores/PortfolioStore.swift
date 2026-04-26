@@ -71,7 +71,7 @@ final class PortfolioStore: ObservableObject {
     func addTransaction(_ transaction: Transaction) {
         transactions.insert(transaction, at: 0)
         saveToDisk() // Will verify balance > 0 inside
-        print("📝 PortfolioStore: Transaction logged: \(transaction.type.rawValue) \(transaction.symbol)")
+        ArgusLogger.info(.portfoy, "Transaction logged: \(transaction.type.rawValue) \(transaction.symbol)")
     }
 
     func addTrade(_ trade: Trade) {
@@ -81,7 +81,7 @@ final class PortfolioStore: ObservableObject {
     
     // MARK: - Initialization
     private init() {
-        print("🚀 PortfolioStore: Initializing (V6 FileManager)...")
+        ArgusLogger.info(.portfoy, "Initializing (V6 FileManager)...")
         loadFromDisk()
     }
     
@@ -96,7 +96,7 @@ final class PortfolioStore: ObservableObject {
     private func saveToDisk() {
         // SAFETY CHECK: Never overwrite disk with uninitialized (-1) state
         if globalBalance < 0 || bistBalance < 0 {
-            print("⚠️ PortfolioStore: Skipping Save (Balances not loaded yet)")
+            ArgusLogger.warning(.portfoy, "Skipping Save (Balances not loaded yet)")
             return
         }
     
@@ -110,7 +110,7 @@ final class PortfolioStore: ObservableObject {
             let data = try encoder.encode(trades)
             try data.write(to: docs.appendingPathComponent(portfolioFileName))
         } catch {
-            print("❌ PortfolioStore: Portfolio save failed: \(error)")
+            ArgusLogger.error(.portfoy, "Portfolio save failed: \(error)")
         }
         
         // 2. Save Transactions
@@ -120,7 +120,7 @@ final class PortfolioStore: ObservableObject {
             // Also backup to UserDefaults for Widget access?
             // ArgusStorage handles AppGroup sync separately.
         } catch {
-            print("❌ PortfolioStore: Transactions save failed: \(error)")
+            ArgusLogger.error(.portfoy, "Transactions save failed: \(error)")
         }
         
         // 3. Save Balances
@@ -129,10 +129,10 @@ final class PortfolioStore: ObservableObject {
             let data = try encoder.encode(balances)
             try data.write(to: docs.appendingPathComponent(balanceFileName))
         } catch {
-             print("❌ PortfolioStore: Balance save failed: \(error)")
+            ArgusLogger.error(.portfoy, "Balance save failed: \(error)")
         }
         
-        print("💾 PortfolioStore: Saved to Disk (V6) - USD: \(globalBalance)")
+        ArgusLogger.info(.portfoy, "Saved to Disk (V6), USD: \(globalBalance)")
         
         // Sync with ArgusStorage (for Widget/AppGroup)
         ArgusStorage.shared.savePortfolio(trades)
@@ -152,12 +152,12 @@ final class PortfolioStore: ObservableObject {
 
         // 1. Check for legacy migration ONLY if no V6 files exist at all
         if !balanceExists && !portfolioExists && !txExists {
-            print("📂 PortfolioStore: No V6 files found. Attempting migration from V5...")
+            ArgusLogger.info(.portfoy, "No V6 files found. Attempting migration from V5...")
             migrateFromV5()
             return
         }
         
-        print("🚀 PortfolioStore: Loading V6 Data (Granular Load)...")
+        ArgusLogger.info(.portfoy, "Loading V6 Data (Granular Load)...")
         
         // 2. Load Balances
         if balanceExists {
@@ -167,14 +167,14 @@ final class PortfolioStore: ObservableObject {
                 if let usd = balances["usd"], let tl = balances["try"] {
                     globalBalance = usd
                     bistBalance = tl
-                    print("✅ PortfolioStore: Balances loaded: $\(usd) / ₺\(tl)")
+                    ArgusLogger.info(.portfoy, "Balances loaded: $\(usd) / ₺\(tl)")
                 }
             } catch {
-                print("❌ PortfolioStore: Balance Load FAILED: \(error)")
+                ArgusLogger.error(.portfoy, "Balance Load FAILED: \(error)")
                 // Do NOT reset to default. Keep -1 to prevent 'saveToDisk' from overwriting broken file with defaults.
             }
         } else {
-             print("⚠️ PortfolioStore: Balance file missing, but other V6 files exist.")
+            ArgusLogger.warning(.portfoy, "Balance file missing, but other V6 files exist.")
              // If we found trades but no balance, maybe it was deleted?
              // Initialize defaults to allow usage, but this is a rare edge case.
              globalBalance = 100_000.0
@@ -186,9 +186,9 @@ final class PortfolioStore: ObservableObject {
             do {
                 let data = try Data(contentsOf: portfolioFile)
                 trades = try decoder.decode([Trade].self, from: data)
-                print("✅ PortfolioStore: \(trades.count) trades loaded")
+                ArgusLogger.info(.portfoy, "\(trades.count) trades loaded")
             } catch {
-                print("❌ PortfolioStore: Trades Load FAILED: \(error)")
+                ArgusLogger.error(.portfoy, "Trades Load FAILED: \(error)")
                 // Keep trades empty [] but don't delete file
             }
         }
@@ -198,13 +198,13 @@ final class PortfolioStore: ObservableObject {
              do {
                 let data = try Data(contentsOf: txFile)
                 transactions = try decoder.decode([Transaction].self, from: data)
-                print("✅ PortfolioStore: \(transactions.count) transactions loaded")
+                ArgusLogger.info(.portfoy, "\(transactions.count) transactions loaded")
             } catch {
-                print("❌ PortfolioStore: Transactions Load FAILED: \(error)")
+                ArgusLogger.error(.portfoy, "Transactions Load FAILED: \(error)")
             }
         }
         
-        print("🏁 PortfolioStore: Load Complete - Trades: \(trades.count), USD: $\(globalBalance), TRY: ₺\(bistBalance)")
+        ArgusLogger.info(.portfoy, "Load Complete, Trades: \(trades.count), USD: $\(globalBalance), TRY: ₺\(bistBalance)")
 
         // ── Tek seferlik GLOBAL RESET (2026-04-21) ────────────────────────
         // Kullanıcı isteği: "Global portföyü sıfırla, $100k yatır, baştan
@@ -213,10 +213,10 @@ final class PortfolioStore: ObservableObject {
         let resetFlagKey = "Argus_PendingGlobalReset_2026_04_21"
         let alreadyDone = UserDefaults.standard.bool(forKey: resetFlagKey)
         if !alreadyDone {
-            print("🚨 PortfolioStore: Pending Global Reset algılandı — yürütülüyor...")
+            ArgusLogger.warning(.portfoy, "Pending Global Reset algılandı, yürütülüyor...")
             resetGlobalPortfolio()
             UserDefaults.standard.set(true, forKey: resetFlagKey)
-            print("✅ PortfolioStore: Global reset tamamlandı, flag kapatıldı. Bu build'de bir daha çalışmaz.")
+            ArgusLogger.info(.portfoy, "Global reset tamamlandı, flag kapatıldı. Bu build'de bir daha çalışmaz.")
         }
 
         // Tek seferlik migration: `.IS` suffix'li ama USD etiketli eski trade'leri TRY'ye çek.
@@ -235,7 +235,7 @@ final class PortfolioStore: ObservableObject {
                 relabeled += 1
             }
             if relabeled > 0 {
-                print("🔧 PortfolioStore: \(relabeled) BIST trade USD→TRY'ye taşındı.")
+                ArgusLogger.info(.portfoy, "\(relabeled) BIST trade USD→TRY'ye taşındı.")
                 saveToDisk()
             }
             UserDefaults.standard.set(true, forKey: bistCurrencyFixKey)
@@ -260,7 +260,7 @@ final class PortfolioStore: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: legacyPortfolioKey),
            let v5Trades = try? decoder.decode([Trade].self, from: data) {
             trades = v5Trades
-            print("📦 PortfolioStore: Migrated \(trades.count) trades from V5")
+            ArgusLogger.info(.portfoy, "Migrated \(trades.count) trades from V5")
             migrationSuccess = true
         }
         
@@ -275,10 +275,10 @@ final class PortfolioStore: ObservableObject {
             if globalBalance < 0 { globalBalance = 100_000.0 }
             if bistBalance < 0 { bistBalance = 1_000_000.0 }
             saveToDisk() // Create V6 files
-            print("✅ PortfolioStore: V5 -> V6 Migration Successful")
+            ArgusLogger.info(.portfoy, "V5 -> V6 Migration Successful")
         } else {
             // FRESH INSTALL
-            print("🆕 PortfolioStore: No V5 data found. Fresh Install Defaults.")
+            ArgusLogger.info(.portfoy, "No V5 data found. Fresh Install Defaults.")
             globalBalance = 100_000.0
             bistBalance = 1_000_000.0
             saveToDisk()
@@ -336,13 +336,13 @@ final class PortfolioStore: ObservableObject {
         // Balance Check
         if isBist {
             guard bistBalance >= totalCost else {
-                print("❌ PortfolioEngine: Yetersiz BIST bakiyesi (₺\(bistBalance) < ₺\(totalCost))")
+                ArgusLogger.error(.portfoy, "Yetersiz BIST bakiyesi (₺\(bistBalance) < ₺\(totalCost))")
                 return nil
             }
             bistBalance -= totalCost
         } else {
             guard globalBalance >= totalCost else {
-                print("❌ PortfolioEngine: Yetersiz USD bakiyesi ($\(globalBalance) < $\(totalCost))")
+                ArgusLogger.error(.portfoy, "Yetersiz USD bakiyesi ($\(globalBalance) < $\(totalCost))")
                 return nil
             }
             globalBalance -= totalCost
@@ -384,7 +384,7 @@ final class PortfolioStore: ObservableObject {
         saveToDisk()
         
         let currencySymbol = isBist ? "₺" : "$"
-        print("✅ PortfolioEngine: BUY \(symbol) x\(quantity) @ \(currencySymbol)\(price)")
+        ArgusLogger.info(.portfoy, "BUY \(symbol) x\(quantity) @ \(currencySymbol)\(price)")
         return trade
     }
     
@@ -449,9 +449,9 @@ final class PortfolioStore: ObservableObject {
         let reason = isRetroactiveGap ? "STOP_LOSS_RETROACTIVE" : "STOP_LOSS"
 
         if isRetroactiveGap {
-            print("🛑⏮️ PortfolioStore: STOP LOSS (RETROAKTİF) tetiklendi for \(trade.symbol) — Stop: \(sellPrice), Mevcut: \(currentPrice)")
+            ArgusLogger.warning(.portfoy, "STOP LOSS (RETROAKTİF) tetiklendi for \(trade.symbol), Stop: \(sellPrice), Mevcut: \(currentPrice)")
         } else {
-            print("🛑 PortfolioStore: STOP LOSS tetiklendi for \(trade.symbol) @ \(sellPrice) (SL: \(stopLoss))")
+            ArgusLogger.warning(.portfoy, "STOP LOSS tetiklendi for \(trade.symbol) @ \(sellPrice) (SL: \(stopLoss))")
         }
         sell(tradeId: trade.id, currentPrice: sellPrice, reason: reason)
     }
@@ -472,9 +472,9 @@ final class PortfolioStore: ObservableObject {
         let reason = isRetroactiveGap ? "TAKE_PROFIT_RETROACTIVE" : "TAKE_PROFIT"
 
         if isRetroactiveGap {
-            print("💰⏮️ PortfolioStore: TAKE PROFIT (RETROAKTİF) tetiklendi for \(trade.symbol) — TP: \(sellPrice), Mevcut: \(currentPrice)")
+            ArgusLogger.info(.portfoy, "TAKE PROFIT (RETROAKTİF) tetiklendi for \(trade.symbol), TP: \(sellPrice), Mevcut: \(currentPrice)")
         } else {
-            print("💰 PortfolioStore: TAKE PROFIT tetiklendi for \(trade.symbol) @ \(sellPrice) (TP: \(takeProfit))")
+            ArgusLogger.info(.portfoy, "TAKE PROFIT tetiklendi for \(trade.symbol) @ \(sellPrice) (TP: \(takeProfit))")
         }
         sell(tradeId: trade.id, currentPrice: sellPrice, reason: reason)
     }
@@ -484,7 +484,7 @@ final class PortfolioStore: ObservableObject {
     @discardableResult
     func sell(tradeId: UUID, currentPrice: Double, reason: String? = nil) -> Double? {
         guard let index = trades.firstIndex(where: { $0.id == tradeId && $0.isOpen }) else {
-            print("❌ PortfolioEngine: Trade bulunamadı: \(tradeId)")
+            ArgusLogger.error(.portfoy, "Trade bulunamadı: \(tradeId)")
             return nil
         }
         
@@ -610,7 +610,7 @@ final class PortfolioStore: ObservableObject {
         saveToDisk()
         
         let currencySymbol = isBist ? "₺" : "$"
-        print("✅ PortfolioEngine: SELL \(trade.symbol) @ \(currencySymbol)\(currentPrice), PnL: \(currencySymbol)\(String(format: "%.2f", pnl))")
+        ArgusLogger.info(.portfoy, "SELL \(trade.symbol) @ \(currencySymbol)\(currentPrice), PnL: \(currencySymbol)\(String(format: "%.2f", pnl))")
         return pnl
     }
 
@@ -696,7 +696,7 @@ final class PortfolioStore: ObservableObject {
 
         saveToDisk()
 
-        print("✅ PortfolioEngine: TRIM \(trade.symbol) \(Int(percentage))% @ \(currentPrice)")
+        ArgusLogger.info(.portfoy, "TRIM \(trade.symbol) \(Int(percentage))% @ \(currentPrice)")
         return pnl
     }
 
@@ -762,7 +762,7 @@ final class PortfolioStore: ObservableObject {
         saveToDisk()
 
         let currencySymbol = isBist ? "₺" : "$"
-        print("✅ PortfolioEngine: TRIM-QTY \(trade.symbol) \(String(format: "%.4f", quantity))@ \(currencySymbol)\(currentPrice), PnL: \(currencySymbol)\(String(format: "%.2f", pnl))")
+        ArgusLogger.info(.portfoy, "TRIM-QTY \(trade.symbol) \(String(format: "%.4f", quantity))@ \(currencySymbol)\(currentPrice), PnL: \(currencySymbol)\(String(format: "%.2f", pnl))")
         return pnl
     }
 
@@ -847,26 +847,26 @@ final class PortfolioStore: ObservableObject {
         
         // Force sync removal of V5 keys first? No, just overwrite.
         saveToDisk()
-        print("🔄 PortfolioEngine: Reset complete (V6 FileManager)")
+        ArgusLogger.info(.portfoy, "Reset complete (V6 FileManager)")
     }
     
     /// Sadece GLOBAL (USD) portföyü sıfırla — BIST'e dokunma.
     /// Tüm USD trade'leri ve USD cinsi transaction'ları sil, bakiyeyi $100k yap.
     /// Kullanıcı gözlemi: "Baştan deneyelim, sıfır temiz kullanıcı."
     func resetGlobalPortfolio() {
-        print("🚨 PortfolioStore: GLOBAL PORTFÖY SIFIRLANIYOR...")
+        ArgusLogger.warning(.portfoy, "GLOBAL PORTFÖY SIFIRLANIYOR...")
         let beforeTradeCount = trades.filter { $0.currency == .USD }.count
         let beforeTxCount = transactions.filter { !isBistSymbol($0.symbol) }.count
         trades.removeAll { $0.currency == .USD }
         transactions.removeAll { !isBistSymbol($0.symbol) }
         globalBalance = 100_000.0
         saveToDisk()
-        print("🔄 PortfolioStore: Global reset — \(beforeTradeCount) trade + \(beforeTxCount) tx silindi, bakiye $100k")
+        ArgusLogger.info(.portfoy, "Global reset, \(beforeTradeCount) trade + \(beforeTxCount) tx silindi, bakiye $100k")
         ArgusLogger.warn("🔄 Global portföy sıfırlandı — \(beforeTradeCount) pozisyon kapatıldı, bakiye $100k", category: "PORTFOLIO")
     }
 
     func resetBistPortfolio() {
-        print("🚨 PortfolioStore: BIST PORTFÖYÜ SIFIRLANIYOR...")
+        ArgusLogger.warning(.portfoy, "BIST PORTFÖYÜ SIFIRLANIYOR...")
         trades.removeAll { $0.currency == .TRY }
         transactions.removeAll { isBistSymbol($0.symbol) }
         bistBalance = 1_000_000.0
@@ -888,6 +888,6 @@ final class PortfolioStore: ObservableObject {
         if let globalBalance = globalBalance { self.globalBalance = globalBalance }
         if let bistBalance = bistBalance { self.bistBalance = bistBalance }
         saveToDisk()
-        print("📥 PortfolioStore: Snapshot import tamamlandı — trades:\(self.trades.count) tx:\(self.transactions.count)")
+        ArgusLogger.info(.portfoy, "Snapshot import tamamlandı, trades:\(self.trades.count) tx:\(self.transactions.count)")
     }
 }
