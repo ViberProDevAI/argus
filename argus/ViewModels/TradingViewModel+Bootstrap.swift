@@ -41,70 +41,64 @@ extension TradingViewModel {
         
         ArgusLogger.success(.bootstrap, "Faz 1: UI hazır")
         
-        // PHASE 2: GECİKTİRİLMİŞ - Ağır işlemler background'da
+        // PHASE 2: Stream + polling priority tier — hemen başlar.
+        // Stream WebSocket; HTTP burst yapmaz, Yahoo cap'ini yemez.
+        // Polling Tier 1 (~30 sembol) chunked 4@1.1s → 3.6 r/s, ~8sn'de tamam.
         // ---------------------------------------------------------
-        Task.detached(priority: .background) { [weak self] in
-            // 2 saniye bekle - UI'ın render olmasına izin ver
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            
-            await MainActor.run {
-                guard let self = self else { return }
-                
-                // RL-Lite: Tune System based on history
-                ArgusFeedbackLoopService.shared.tuneSystem(history: self.portfolio)
-                
-                // Enable Live Mode
-                self.isLiveMode = true
-                
-                // Connect Stream for Watchlist
-                ArgusLogger.phase(.veri, "Faz 2: Stream bağlanıyor...")
-                self.marketDataProvider.connectStream(symbols: self.watchlist)
-            }
-        }
-        
-        // PHASE 3: LAZY - Scout/AutoPilot loop'ları daha geç başlasın
-        // ---------------------------------------------------------
-        Task.detached(priority: .utility) { [weak self] in
-            // 5 saniye bekle - Kullanıcı UI'ı görsün önce
-            try? await Task.sleep(nanoseconds: 5_000_000_000)
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
 
-            // BorsaPy Warm-Up: Render.com free tier uyku modundan çıkarılıyor
-            // (AutoPilot başlamadan önce yapılırsa BIST verileri hazır olur)
+            // RL-Lite: Tune System based on history
+            ArgusFeedbackLoopService.shared.tuneSystem(history: self.portfolio)
+
+            // Enable Live Mode
+            self.isLiveMode = true
+
+            // Connect Stream for Watchlist (WebSocket, ücretsiz cap)
+            ArgusLogger.phase(.veri, "Faz 2: Stream bağlanıyor...")
+            self.marketDataProvider.connectStream(symbols: self.watchlist)
+        }
+
+        // PHASE 3: Scout/Watchlist polling — Tier 1 fetch hemen, UI bloklamaz.
+        // ---------------------------------------------------------
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+
+            // BorsaPy Warm-Up: Render.com free tier uyku modundan çıkar
             Task.detached(priority: .background) {
                 ArgusLogger.phase(.veri, "BorsaPy: Backend ısındırılıyor...")
                 await BorsaPyProvider.shared.warmUp()
             }
 
-            await MainActor.run {
-                guard let self = self else { return }
+            ArgusLogger.phase(.autopilot, "Faz 3: Scout + Watchlist döngüsü başlatılıyor...")
+            self.startScoutLoop()
+            self.startWatchlistLoop()
 
-                // Start Scout Loop
-                ArgusLogger.phase(.autopilot, "Faz 3: Scout döngüsü başlatılıyor...")
-                self.startScoutLoop()
-
-                // Start Watchlist Loop (Polling Backup)
-                self.startWatchlistLoop()
-
-                // Start Auto-Pilot Loop (Delayed 5s - BorsaPy warm-up için ek süre)
-                Task { @MainActor in
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+            // AutoPilot ML — Tier 1 fetch'in (~8sn) tamamlanmasına süre tanıyıp
+            // ondan sonra başlasın. Aynı saniyede ağ üstüne çıkmasın.
+            Task.detached(priority: .utility) {
+                try? await Task.sleep(nanoseconds: 9_000_000_000)
+                await MainActor.run {
                     AutoPilotStore.shared.startAutoPilotLoop()
                 }
             }
         }
-        
-        // PHASE 4: BACKGROUND - Atlas/Demeter (en ağır işlemler)
+
+        // PHASE 4: Atlas/Demeter — Tier 1 priority fetch tamamlandıktan sonra
+        // background'a düşsün. Aksi halde watchlist + Atlas paralel candle
+        // çağrıları aynı 60s pencereyi paylaşıp kotayı yer.
         // ---------------------------------------------------------
         Task.detached(priority: .background) { [weak self] in
-            // 10 saniye bekle
+            // ~10sn: Tier 1 (~8sn) bitsin + 2sn marj. Bu süre içinde Stream
+            // zaten quote akışı sağlıyor, kullanıcı boş ekran görmüyor.
             try? await Task.sleep(nanoseconds: 10_000_000_000)
-            
+
             guard let self = self else { return }
-            
+
             ArgusLogger.phase(.atlas, "Faz 4: Atlas/Demeter başlatılıyor...")
             await self.hydrateAtlas()
             await self.runDemeterAnalysis()
-            
+
             // Quota Reset (artık acil değil)
             await QuotaLedger.shared.reset(provider: "Finnhub")
             await QuotaLedger.shared.reset(provider: "Yahoo")

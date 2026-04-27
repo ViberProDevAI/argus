@@ -91,24 +91,39 @@ extension TradingViewModel {
         let safeSymbols = SafeUniverseService.shared.universe.map { $0.symbol }
         // Include Discover Symbols in the loop
         let allSymbols = Array(Set(watchlist + portfolioSymbols + safeSymbols).union(discoverSymbols))
-        
+
         guard !allSymbols.isEmpty else { return }
-        
+
+        // Tier 1 (priority): kullanıcının ilk göreceği şeyler — açık pozisyonlar +
+        // watchlist ilk 20 + Safe pinned ilk 5. Yahoo cap=5 r/s; 4'lü chunk +
+        // 1.1s ara → 3.6 r/s. ~30 sembol ≈ 8 sn'de gelir.
+        // Tier 2 (background): kalan sembollar — 4'lü chunk + 1.4s ara → 2.86 r/s.
+        // İki tier ardışık çalışır; bot-tarama tetiklemez, kotayı boş yere yakmaz.
+        let prioritySet = Set(portfolioSymbols)
+            .union(watchlist.prefix(20))
+            .union(safeSymbols.prefix(5))
+        let priorityList = allSymbols.filter { prioritySet.contains($0) }
+        let backgroundList = allSymbols.filter { !prioritySet.contains($0) }
+
         // Don't set isLoading=true globally to avoid flickering if we have cached data
         // Only if empty quotes
         if quotes.isEmpty {
            await MainActor.run { self.isLoading = true }
         }
-        
+
         do {
-            print("📡 TradingViewModel: Delegating Batch Fetch of \(allSymbols.count) symbols to MarketDataStore...")
-            
-            // Delegate completely to Store
-            // Store handles coalescing, caching (TTL), and updating via $quotes publisher
-            try await MarketDataStore.shared.refreshQuotes(symbols: allSymbols)
-            
-            await MainActor.run {
-                self.isLoading = false
+            print("📡 TradingViewModel: Tiered fetch — priority \(priorityList.count), background \(backgroundList.count)")
+
+            // Tier 1: priority first, awaited — kullanıcı bunları görene kadar UI loading
+            try await MarketDataStore.shared.refreshQuotes(symbols: priorityList, priority: true)
+
+            await MainActor.run { self.isLoading = false }
+
+            // Tier 2: background tier — UI bloklamadan kalan sembolleri akıt
+            if !backgroundList.isEmpty {
+                Task.detached(priority: .utility) {
+                    try? await MarketDataStore.shared.refreshQuotes(symbols: backgroundList, priority: false)
+                }
             }
         } catch {
              print("Watchlist Refresh Failed: \(error)")
