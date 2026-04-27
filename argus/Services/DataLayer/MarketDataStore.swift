@@ -294,15 +294,21 @@ final class MarketDataStore: ObservableObject {
     
     // MARK: - Bulk Operations
 
-    /// Tek seferde ne kadar paralel ensureQuote çalıştırılacağı. Yahoo cap
-    /// ~5 req/s; chunk=10 + 600ms ara → bir önceki chunk'ın ilk 5'i pencerede,
-    /// sonraki 5 backoff'ta zaten beklerken yeni chunk geliyor. Eskiden 304
-    /// sembolün hepsi aynı anda paralel gönderiliyordu → acquireSlot kuyruğu
-    /// patlayıp 200+ istek 30s'de timeout oluyordu ("kimisi boş" semptomu).
-    private static let bulkChunkSize = 10
-    private static let bulkChunkDelayNs: UInt64 = 600_000_000 // 600ms
+    /// Yahoo cap = 300 req / 60s sliding window = 5 req/s sustained.
+    /// Eski 10@600ms = 16.7 req/s burst → cap'i ilk ~18s'de yakıyordu, sonrası
+    /// `acquireSlot` 30s timeout kuyruğunda boğuluyordu ("dakikalarca bekleme"
+    /// + "kimi sembol boş" semptomları). Bot-tarama heuristic'i de >10 paralel
+    /// burst'te tetiklenir.
+    ///
+    /// Yeni hedef: chunk=4 (bot eşiğinin altında), gecikme parametrik.
+    /// Priority tier 1100ms → 3.6 r/s, background tier 1400ms → 2.86 r/s.
+    /// İki tier ardışık çalışır; toplam ortalama ≤4 r/s, 60s pencere içinde
+    /// ~240 req — ~60 req/min headroom grafik+modül çağrılarına kalıyor.
+    private static let bulkChunkSize = 4
+    private static let priorityChunkDelayNs: UInt64 = 1_100_000_000 // 3.6 req/s
+    private static let backgroundChunkDelayNs: UInt64 = 1_400_000_000 // 2.86 req/s
 
-    func ensureQuotes(symbols: [String]) async {
+    func ensureQuotes(symbols: [String], priority: Bool = false) async {
         // Cache + in-flight ön filtreleme: zaten taze veya in-flight olan
         // sembolleri ağa yeniden göndermiyoruz, geri kalanları küçük chunk'larda
         // sıralayıp rate limiter'ı boğmadan akıtıyoruz.
@@ -316,6 +322,9 @@ final class MarketDataStore: ObservableObject {
         guard !needsFetch.isEmpty else { return }
 
         let chunkSize = MarketDataStore.bulkChunkSize
+        let delayNs = priority
+            ? MarketDataStore.priorityChunkDelayNs
+            : MarketDataStore.backgroundChunkDelayNs
         let chunks = stride(from: 0, to: needsFetch.count, by: chunkSize).map {
             Array(needsFetch[$0..<min($0 + chunkSize, needsFetch.count)])
         }
@@ -328,7 +337,7 @@ final class MarketDataStore: ObservableObject {
             }
             // Son batch sonrası beklemeye gerek yok
             if index < chunks.count - 1 {
-                try? await Task.sleep(nanoseconds: MarketDataStore.bulkChunkDelayNs)
+                try? await Task.sleep(nanoseconds: delayNs)
             }
         }
     }
@@ -344,9 +353,9 @@ final class MarketDataStore: ObservableObject {
     }
 
     /// Batch Refresh Logic - Replaces ArgusDataService call in ViewModel
-    func refreshQuotes(symbols: [String]) async throws {
+    func refreshQuotes(symbols: [String], priority: Bool = false) async throws {
         // Chunked rate-limit dostu fetch.
-        await ensureQuotes(symbols: symbols)
+        await ensureQuotes(symbols: symbols, priority: priority)
     }
     // MARK: - Historical Data Access (Validator)
     
