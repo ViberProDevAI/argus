@@ -56,42 +56,32 @@ struct SettingsView: View {
     // Durum Panosu sheet
     @State private var showStatusConsole: Bool = false
 
+    // 2026-04-25 H-38 — Settings tamamen yeniden tasarlandı:
+    //   • Eski commandHeader (mono caps "AYARLAR" + 3px holo şerit + alt yazı)
+    //     → sade "Ayarlar" + drawer butonu sticky top nav.
+    //   • Eski snapshotRibbon (Chiron/Alkindus/Aether tile'ları) kaldırıldı —
+    //     bu veriler Argus Status Console'a aittir.
+    //   • Eski intelligenceSection (compactAutoPilotCard + aetherSensitivityCard +
+    //     Chiron/Alkindus TerminalSection'lar) "Argus zekâsı" grubu altında 5
+    //     ayrı alt sayfaya bölündü: Sistem durumu, Motor kalibrasyonu, Otopilot
+    //     kuralları, Trend hassasiyeti, API anahtarları.
+    //   • iOS Settings.app dilinde gruplandırılmış list — toggle, chevron,
+    //     value badge formatı tutarlı.
+    //   • Eski section computed property'leri (commandHeader, snapshotRibbon,
+    //     intelligenceSection, vs.) şimdilik kodda kaldı, sonraki cleanup
+    //     turunda silinecek. Artık çağrılmıyor.
     var body: some View {
         NavigationView {
             ZStack {
                 InstitutionalTheme.Colors.background.edgesIgnoringSafeArea(.all)
 
-                ScrollView {
-                    VStack(spacing: 20) {
-
-                        // MARK: - Command Header
-                        commandHeader
-
-                        // MARK: - Snapshot Ribbon — tıklanınca Durum Panosu açılır
-                        snapshotRibbon
-                            .onTapGesture { showStatusConsole = true }
-
-                        // MARK: - Otopilot & Motor (sade — detay Durum Panosu'nda)
-                        intelligenceSection
-
-                        // MARK: - Bildirimler
-                        notificationsSection
-
-                        // MARK: - İşlem Ayarları (komisyon / stopaj)
-                        tradingFeesSection
-
-                        // MARK: - API Anahtarları
-                        apiKeysSection
-
-                        // MARK: - Depolama
-                        StorageCleanupSection()
-
-                        // MARK: - Hakkında
-                        aboutSection
-
-                        Spacer(minLength: 60)
+                VStack(spacing: 0) {
+                    topNav
+                    ScrollView {
+                        settingsList
+                            .padding(.top, 14)
+                            .padding(.bottom, 60)
                     }
-                    .padding(.bottom, 40)
                 }
                 .task { await refreshSnapshots() }
                 .sheet(isPresented: $showStatusConsole) {
@@ -134,7 +124,406 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Bolumlerin Tanimlari
+// MARK: - 2026-04-25 H-38 · Yeni sade list dili
+
+extension SettingsView {
+
+    // MARK: Top nav
+
+    fileprivate var topNav: some View {
+        HStack(spacing: 8) {
+            Text("Ayarlar")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .accessibilityAddTraits(.isHeader)
+
+            Spacer()
+
+            Button(action: { showDrawer = true }) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Menüyü aç")
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(InstitutionalTheme.Colors.surface1)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(InstitutionalTheme.Colors.border)
+                .frame(height: 0.5)
+        }
+    }
+
+    // MARK: Liste
+
+    fileprivate var settingsList: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            settingsGroup("Görünüm") {
+                settingsToggleRow(title: "Karanlık mod", isOn: $isDarkMode, last: true)
+            }
+
+            settingsGroup("Bildirimler") {
+                settingsToggleRow(title: "Sinyal bildirimleri", isOn: $notifyAllSignals)
+                settingsLinkRow(title: "Fiyat alarmları", last: true) { PriceAlertSettingsView() }
+            }
+
+            settingsGroup("İşlem") {
+                settingsLinkRow(title: "Komisyon ve stopaj") {
+                    SettingsSubPage(title: "Komisyon ve stopaj") { tradingFeesSection }
+                }
+                settingsToggleRow(title: "Otopilot", isOn: $autoPilotStore.isAutoPilotEnabled, last: true)
+            }
+
+            settingsGroup("Argus zekâsı") {
+                settingsButtonRow(title: "Sistem durumu") { showStatusConsole = true }
+                settingsLinkRow(title: "Motor kalibrasyonu") {
+                    SettingsSubPage(title: "Motor kalibrasyonu") { motorCalibrationSubPage }
+                }
+                settingsLinkRow(title: "Otopilot kuralları") {
+                    SettingsSubPage(title: "Otopilot kuralları") { autopilotRulesSubPage }
+                }
+                settingsLinkRow(title: "Trend hassasiyeti", value: trendSensitivityShortLabel) {
+                    SettingsSubPage(title: "Trend hassasiyeti") { trendSensitivitySubPage }
+                }
+                settingsLinkRow(title: "API anahtarları", last: true) { APIKeyCenterView() }
+            }
+
+            settingsGroup("Veri") {
+                settingsLinkRow(title: "Önbellek", last: true) {
+                    SettingsSubPage(title: "Önbellek") {
+                        VStack(spacing: 12) {
+                            StorageCleanupSection()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 14)
+                    }
+                }
+            }
+
+            settingsGroup("Hakkında") {
+                settingsLinkRow(title: "Argus rehberi") { ArgusGuideView() }
+                settingsLinkRow(title: "Gizlilik politikası") { LegalDocumentView(document: settingsViewModel.privacyPolicy) }
+                settingsLinkRow(title: "Kullanım koşulları") { LegalDocumentView(document: settingsViewModel.termsOfUse) }
+                settingsLinkRow(title: "Risk bildirimi") { LegalDocumentView(document: settingsViewModel.riskDisclosure) }
+                settingsButtonRow(title: "Geri bildirim") {
+                    if let url = URL(string: "mailto:destek@argusapp.com") {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                settingsValueRow(title: "Sürüm", value: appVersionString, last: true)
+            }
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private var appVersionString: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    private var trendSensitivityShortLabel: String {
+        switch trendSensitivity {
+        case "conservative": return "Muhafazakâr"
+        case "aggressive":   return "Agresif"
+        default:             return "Dengeli"
+        }
+    }
+
+    // MARK: Group & row helpers
+
+    @ViewBuilder
+    fileprivate func settingsGroup<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 11))
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                .padding(.leading, 6)
+            VStack(spacing: 0) {
+                content()
+            }
+            .background(InstitutionalTheme.Colors.surface1)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
+    fileprivate func settingsToggleRow(title: String, isOn: Binding<Bool>, last: Bool = false) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 14))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+            Spacer()
+            Toggle("", isOn: isOn)
+                .labelsHidden()
+                .tint(InstitutionalTheme.Colors.aurora)
+                .accessibilityLabel(title)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .frame(minHeight: 44)
+        .overlay(alignment: .bottom) {
+            if !last {
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.border)
+                    .frame(height: 0.5)
+                    .padding(.leading, 14)
+            }
+        }
+    }
+
+    @ViewBuilder
+    fileprivate func settingsLinkRow<Destination: View>(
+        title: String,
+        value: String? = nil,
+        last: Bool = false,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) -> some View {
+        NavigationLink(destination: destination()) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 14))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Spacer()
+                if let value, !value.isEmpty {
+                    Text(value)
+                        .font(.system(size: 13))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .bottom) {
+            if !last {
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.border)
+                    .frame(height: 0.5)
+                    .padding(.leading, 14)
+            }
+        }
+    }
+
+    fileprivate func settingsButtonRow(title: String, value: String? = nil, last: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 14))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Spacer()
+                if let value, !value.isEmpty {
+                    Text(value)
+                        .font(.system(size: 13))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .bottom) {
+            if !last {
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.border)
+                    .frame(height: 0.5)
+                    .padding(.leading, 14)
+            }
+        }
+    }
+
+    fileprivate func settingsValueRow(title: String, value: String, last: Bool = false) -> some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 14))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .frame(minHeight: 44)
+        .overlay(alignment: .bottom) {
+            if !last {
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.border)
+                    .frame(height: 0.5)
+                    .padding(.leading, 14)
+            }
+        }
+    }
+
+    // MARK: Argus zekâsı alt sayfaları
+    //
+    // Eski intelligenceSection content'i 3 ayrı alt sayfaya bölündü.
+    // İçerikler eski compactAutoPilotCard / aetherSensitivityCard /
+    // Chiron + Alkindus TerminalSection'lar.
+
+    fileprivate var motorCalibrationSubPage: some View {
+        VStack(spacing: 12) {
+            // Chiron Öğrenme Motoru
+            TerminalSection(title: "CHIRON · ÖĞRENME",
+                            motor: .chiron) {
+                NavigationLink(destination: ChironInsightsView()) {
+                    ArgusTerminalRow(
+                        label: "Kokpit",
+                        value: chironTradeCount > 0 ? "WR %\(chironWinRate) · T \(chironTradeCount)" : "Henüz veri yok",
+                        icon: "ChironIcon",
+                        color: InstitutionalTheme.Colors.Motors.chiron
+                    )
+                }
+                NavigationLink(destination: ChironPerformanceView()) {
+                    ArgusTerminalRow(
+                        label: "Performans",
+                        value: "Grafikler",
+                        icon: "chart.bar.xaxis",
+                        color: InstitutionalTheme.Colors.primary
+                    )
+                }
+                NavigationLink(destination: ChironInsightsView(symbol: nil)) {
+                    ArgusTerminalRow(
+                        label: "İçgörüler",
+                        value: "Son dersler",
+                        icon: "waveform.path.ecg",
+                        color: InstitutionalTheme.Colors.positive
+                    )
+                }
+            }
+
+            // Alkindus Kalibrasyon Motoru
+            TerminalSection(title: "ALKINDUS · KALİBRASYON",
+                            motor: .alkindus) {
+                NavigationLink(destination: AlkindusDashboardView()) {
+                    ArgusTerminalRow(
+                        label: "Gözlem Paneli",
+                        value: alkindusPendingCount > 0 ? "\(alkindusPendingCount) bekliyor" : "Boş",
+                        icon: "eye.circle.fill",
+                        color: InstitutionalTheme.Colors.neutral
+                    )
+                }
+
+                Button(action: runCalibrationNow) {
+                    HStack(spacing: 12) {
+                        Image(systemName: isRunningCalibration ? "arrow.triangle.2.circlepath" : "play.circle.fill")
+                            .font(.system(.callout))
+                            .foregroundColor(isRunningCalibration ? InstitutionalTheme.Colors.textSecondary : InstitutionalTheme.Colors.primary)
+                            .frame(width: 20)
+                            .rotationEffect(.degrees(isRunningCalibration ? 360 : 0))
+                            .animation(isRunningCalibration ? .linear(duration: 1.2).repeatForever(autoreverses: false) : .default, value: isRunningCalibration)
+
+                        Text(isRunningCalibration ? "Çalışıyor…" : "Kalibrasyonu şimdi çalıştır")
+                            .font(InstitutionalTheme.Typography.body)
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+
+                        Spacer()
+
+                        if let flash = calibrationFlash {
+                            Text(flash)
+                                .font(InstitutionalTheme.Typography.caption)
+                                .foregroundColor(InstitutionalTheme.Colors.positive)
+                                .transition(.opacity)
+                        }
+                    }
+                    .frame(minHeight: 44)
+                    .padding(.vertical, 12)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(isRunningCalibration)
+                .accessibilityLabel(isRunningCalibration ? "Kalibrasyon çalışıyor" : "Kalibrasyonu şimdi çalıştır")
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+    }
+
+    fileprivate var autopilotRulesSubPage: some View {
+        VStack(spacing: 12) {
+            compactAutoPilotCard
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+    }
+
+    fileprivate var trendSensitivitySubPage: some View {
+        VStack(spacing: 12) {
+            aetherSensitivityCard
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+    }
+}
+
+// MARK: - SettingsSubPage helper
+//
+// Argus zekâsı ve İşlem alt sayfalarını sarmalar — back chevron + başlık
+// üst nav. NavigationLink destination olarak kullanıma hazır.
+
+struct SettingsSubPage<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack {
+            InstitutionalTheme.Colors.background.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                            .frame(width: 36, height: 36)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Geri")
+
+                    Text(title)
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        .accessibilityAddTraits(.isHeader)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(InstitutionalTheme.Colors.surface1)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(InstitutionalTheme.Colors.border)
+                        .frame(height: 0.5)
+                }
+
+                ScrollView {
+                    content()
+                        .padding(.bottom, 40)
+                }
+            }
+        }
+        .navigationBarHidden(true)
+    }
+}
+
+// MARK: - LEGACY (silinecek — bu turda dokunulmadı)
+//
+// Aşağıdaki computed property'ler eski mono-caps + tile-yoğun düzenden
+// kalan yapı. Yeni body bunları çağırmıyor; bir sonraki cleanup turunda
+// silinecek. Şimdilik build kırılmasın diye duruyor.
 
 extension SettingsView {
 

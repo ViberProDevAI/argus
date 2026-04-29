@@ -103,6 +103,7 @@ struct ArgusSanctumView: View {
                                 SanctumCouncilBody(
                                     symbol: symbol,
                                     decision: activeDecision,
+                                    prometheusForecast: viewModel.prometheusForecastBySymbol[symbol],
                                     onOpenArgusAnalysis: {
                                         showArgusAnalysis = true
                                     },

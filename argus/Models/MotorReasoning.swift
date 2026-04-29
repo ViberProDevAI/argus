@@ -50,30 +50,40 @@ enum MotorStance: String, Sendable {
 }
 
 /// Bir motorun Sanctum kartında gösterilecek tüm bilgisi.
+///
+/// 2026-04-25 H-39 — Bazı motorlar (Chiron) sayısal skor üretmez; bunun
+/// yerine bir durum (rejim adı, öğrenme metriği) söyler. Bu yüzden
+/// `valueText` opsiyonel ek bir alan: nil ise UI varsayılan stance arrow
+/// + score gösterir, dolu ise sağ tarafa onu basar. `isVisible: false`
+/// olan motorlar listeden tamamen düşer (Demeter gibi servis verisi
+/// olmayanlar için).
 struct MotorReasoning {
     let motor: MotorEngine
     let score: Double
     let stance: MotorStance
     let summary: String      // 1 cümlelik gerekçe (her zaman dolu)
     let weight: Double?      // Konsey ağırlığı 0-1, yoksa nil
-    let isVisible: Bool      // Skoru hiç yoksa false → kart gizlenir
+    let isVisible: Bool      // false → kart hiç gösterilmez
+    var valueText: String?   // sağ tarafta özel metin (Chiron rejim adı vb.); nil ise stance+score
 
-    static func empty(for motor: MotorEngine) -> MotorReasoning {
+    /// Motor user-facing değilse veya veri yoksa: kart hiç gösterilmez.
+    static func hidden(for motor: MotorEngine) -> MotorReasoning {
         MotorReasoning(
             motor: motor,
             score: 0,
             stance: .neutral,
             summary: "",
             weight: nil,
-            isVisible: false
+            isVisible: false,
+            valueText: nil
         )
     }
 
-    /// Motor enum'da var ve user-facing, ama veri henüz hazır değil.
-    /// Kart "Bekleniyor" durumunda görünür, score 0 (UI'da "—" yazılır).
-    /// 2026-04-25 H-37: Daha önce "skor 0 → motor gizli" davranışı vardı,
-    /// makro/temel dışındaki motorlar gözükmüyordu. Şimdi her zaman
-    /// listede yer alır, sadece içeriği "Bekleniyor".
+    /// Eski isim — geriye uyumluluk için.
+    static func empty(for motor: MotorEngine) -> MotorReasoning { .hidden(for: motor) }
+
+    /// Motor user-facing, veri henüz hazır değil. Kart "Bekleniyor"
+    /// durumunda görünür, skor "—".
     static func pending(motor: MotorEngine, weight: Double?) -> MotorReasoning {
         MotorReasoning(
             motor: motor,
@@ -81,7 +91,47 @@ struct MotorReasoning {
             stance: .neutral,
             summary: "Veri bekleniyor",
             weight: weight,
-            isVisible: true
+            isVisible: true,
+            valueText: nil
+        )
+    }
+
+    /// Watchlist row'unda kullandığımız `PrometheusForecast`'tan Prometheus
+    /// (Tahmin) motoru için reasoning üretir. Aynı veri kaynağı, aynı
+    /// görünüm — anasayfa "↑ %5.2 tahmin" satırı ile Sanctum kartı tutarlı.
+    /// 2026-04-25 H-40
+    static func fromPrometheusForecast(_ forecast: PrometheusForecast, weight: Double?) -> MotorReasoning {
+        guard forecast.isValid else {
+            return .pending(motor: .prometheus, weight: weight)
+        }
+        let pct = forecast.changePercent
+        let conf = forecast.confidence  // 0-100
+
+        let stance: MotorStance
+        if conf < 40 { stance = .wait }
+        else if pct >= 3 { stance = .buy }
+        else if pct >= 1 { stance = .wait }
+        else if pct <= -3 { stance = .sell }
+        else if pct <= -1 { stance = .neutral }
+        else { stance = .neutral }
+
+        let dirText: String
+        if pct >= 0.5 {
+            dirText = String(format: "+%.1f%%", pct)
+        } else if pct <= -0.5 {
+            dirText = String(format: "%.1f%%", pct)
+        } else {
+            dirText = "yatay"
+        }
+
+        return MotorReasoning(
+            motor: .prometheus,
+            score: max(0, min(100, 50 + pct * 5)),
+            stance: stance,
+            summary: "Kanal tahmini \(dirText) · güven %\(Int(conf))",
+            weight: weight,
+            isVisible: true,
+            valueText: nil
         )
     }
 }
@@ -95,11 +145,62 @@ struct MotorReasoning {
 // dönüyor → ilgili kartlar `score == 0` veya `nil` koşuluyla gizleniyor.
 extension ArgusGrandDecision {
     var orionScore: Double { orionDecision.netSupport * 100 }
-    var atlasScore: Double { (atlasDecision?.netSupport ?? 0) * 100 }
-    var aetherScore: Double { aetherDecision.netSupport * 100 }
-    var hermesScore: Double { (hermesDecision?.netSupport ?? 0) * 100 }
+
+    /// Atlas: council kararında varsa onu kullan; yoksa
+    /// `FundamentalScoreStore`'dan symbol için cache'lenmiş skoru çek.
+    /// Council Atlas'i atlamış olsa bile temel skor varsa motor görünür.
+    @MainActor
+    var atlasScore: Double {
+        if let ad = atlasDecision { return ad.netSupport * 100 }
+        return FundamentalScoreStore.shared.getScore(for: symbol)?.totalScore ?? 0
+    }
+
+    /// Aether: council aetherDecision'da netSupport 0 olabilir (nötr karar);
+    /// bu durumda `MacroRegimeService` cache'lenmiş gerçek makro skorunu
+    /// (0-100) tercih et. netSupport != 0 ise council kararına saygı.
+    var aetherScore: Double {
+        let council = aetherDecision.netSupport * 100
+        if abs(council) > 0.001 { return council }
+        if let macro = MacroRegimeService.shared.getCachedRating()?.numericScore {
+            return macro
+        }
+        return 0
+    }
+
+    /// Hermes: council kararında varsa onu kullan; yoksa sembol-bazlı
+    /// haber insight'larından ortalama sentiment skoru üret. Sembolün
+    /// haberi yoksa 0 → motor "Bekleniyor" gösterir.
+    var hermesScore: Double {
+        if let hd = hermesDecision { return hd.netSupport * 100 }
+        let insights = HermesStateViewModel.shared.newsInsightsBySymbol[symbol] ?? []
+        guard !insights.isEmpty else { return 0 }
+        // Her haber için sentiment puanı (-2..+2) × impactScore (0-100) / 100
+        let weighted = insights.map { insight -> Double in
+            let s: Double
+            switch insight.sentiment {
+            case .strongPositive: s = 2
+            case .weakPositive:   s = 1
+            case .neutral:        s = 0
+            case .weakNegative:   s = -1
+            case .strongNegative: s = -2
+            }
+            return s * (insight.impactScore / 100.0)
+        }
+        let avg = weighted.reduce(0, +) / Double(insights.count)  // -2..+2
+        return ((avg + 2) / 4) * 100                              // 0..100
+    }
+
+    /// Demeter için global symbol-bazlı service henüz yok. Skor 0 dönerse
+    /// `MotorReasoning` `.hidden` çekecek ve kart listede görünmeyecek.
     var demeterScore: Double { 0 }
-    var chironResult: ChironResult? { nil }
+
+    /// Chiron her zaman global rejim engine'inden okunur — council kararına
+    /// bağlı değil. Engine henüz çalışmamışsa `globalResult` bir default
+    /// "Dengeli Piyasa" objesi döner, ChironResult non-optional gelir;
+    /// MotorReasoning bunu valueText olarak kullanacak.
+    var chironResult: ChironResult? {
+        ChironRegimeEngine.shared.globalResult
+    }
 
     /// Sanctum başlığı için "konsey skoru" — şu an `confidence` üzerinden okuyoruz.
     /// Yarım kalan iş tamamlandığında (skor + güven ayrımı yapıldığında) bu
@@ -121,7 +222,13 @@ extension ArgusGrandDecision {
 }
 
 // MARK: - ArgusGrandDecision → 7 motor reasoning
+//
+// 2026-04-25 H-39: Bridge ve reasoning fonksiyonları FundamentalScoreStore
+// (@MainActor) ile HermesEventStore + ChironRegimeEngine erişimi yapıyor;
+// onlardan biri @MainActor isolated olduğu için tüm extension @MainActor.
+// SwiftUI view'lar @MainActor olduğu için çağrı sitelerinde sorun yok.
 
+@MainActor
 extension ArgusGrandDecision {
 
     /// Bu hisse için tüm user-facing motorların gerekçeleri.
@@ -140,7 +247,7 @@ extension ArgusGrandDecision {
             reasoningPrometheus(),
             reasoningDemeter(),
             reasoningChiron()
-        ].filter { $0.motor.isUserFacing }
+        ].filter { $0.motor.isUserFacing && $0.isVisible }
     }
 
     /// Konsey ağırlığını 0-1 olarak döndürür; `moduleWeights` yoksa
@@ -299,7 +406,10 @@ extension ArgusGrandDecision {
 
     private func reasoningDemeter() -> MotorReasoning {
         let score = demeterScore
-        if score <= 0 { return .pending(motor: .demeter, weight: weight(forKey: "demeter", fallbackCount: 7)) }
+        // 2026-04-25 H-39: Demeter için global symbol-bazlı veri kaynağı
+        // henüz yok. Skor 0 ise "Bekleniyor" göstermek yerine kartı tamamen
+        // gizliyoruz — veri akışı geldiğinde tek satırla geri açılır.
+        if score <= 0 { return .hidden(for: .demeter) }
         let stance = MotorStance.from(score: score)
         let summary: String = {
             switch stance {
@@ -320,12 +430,15 @@ extension ArgusGrandDecision {
     }
 
     private func reasoningChiron() -> MotorReasoning {
+        // 2026-04-25 H-39: Chiron sayısal skor üretmiyor — rejim adı söyler.
+        // Sağda "↑ 78" gibi sayı yerine `valueText` ile rejim metni: "Yatay
+        // seyir", "Trend", "Riskten kaçış". Stacked bar için pseudo-score
+        // (rejim → 30/50/75) yine üretiliyor (görsel ağırlık paylaşımı için).
         let w = weight(forKey: "chiron", fallbackCount: 7)
         guard let chiron = chironResult else {
             return .pending(motor: .chiron, weight: w)
         }
-        // Chiron skoru üretmiyor, rejim + iki açıklama metni üretiyor.
-        // explanationBody varsa onu olduğu gibi kullan; yoksa şablon.
+
         let regime = chiron.regime
         let pseudoScore: Double
         let stance: MotorStance
@@ -338,6 +451,19 @@ extension ArgusGrandDecision {
         case .neutral:   pseudoScore = 50; stance = .neutral
         }
 
+        // Sağ tarafta gösterilecek rejim adı — kısa ve net.
+        let regimeLabel: String = {
+            switch regime {
+            case .trend:     return "Trend"
+            case .chop:      return "Yatay seyir"
+            case .riskOff:   return "Risk-off"
+            case .newsShock: return "Haber şoku"
+            case .neutral:   return "Dengeli"
+            }
+        }()
+
+        // Detail sheet için tam açıklama (engine kendi metnini üretmişse onu
+        // kullan, yoksa kısa şablon).
         let summary: String = {
             if !chiron.explanationBody.isEmpty { return chiron.explanationBody }
             switch regime {
@@ -354,14 +480,16 @@ extension ArgusGrandDecision {
             score: pseudoScore,
             stance: stance,
             summary: summary,
-            weight: weight(forKey: "chiron", fallbackCount: 7),
-            isVisible: true
+            weight: w,
+            isVisible: true,
+            valueText: regimeLabel
         )
     }
 }
 
 // MARK: - Conflict / Alliance Map
 
+@MainActor
 extension ArgusGrandDecision {
 
     /// "Teknik + Haber ittifakı, Makro itirazı dengelemiyor" tipi

@@ -19,8 +19,30 @@ import SwiftUI
 struct SanctumCouncilBody: View {
     let symbol: String
     let decision: ArgusGrandDecision?
+    /// Watchlist row'unda kullanılan tahmin verisi — Sanctum'da Prometheus
+    /// kartı bu kaynaktan beslenir. Council `phoenixAdvice`'i set etmediği
+    /// için fallback olarak burayı okuyoruz. (2026-04-25 H-40)
+    var prometheusForecast: PrometheusForecast? = nil
     let onOpenArgusAnalysis: () -> Void
     let onSelectMotor: (MotorEngine) -> Void
+
+    /// Motor reasoning'i decision'dan üretir; Prometheus pending durumdaysa
+    /// ve elimizde forecast varsa onu enjekte eder. Watchlist row'undaki
+    /// "↑ %5.2 tahmin" satırı ile aynı veri.
+    private var enrichedReasonings: [MotorReasoning] {
+        guard let d = decision else { return [] }
+        var reasonings = d.motorReasonings
+        if let f = prometheusForecast, f.isValid {
+            let weight = d.weight(forKey: "prometheus", fallbackCount: max(reasonings.count, 1))
+            let pr = MotorReasoning.fromPrometheusForecast(f, weight: weight)
+            if let idx = reasonings.firstIndex(where: { $0.motor == .prometheus }) {
+                reasonings[idx] = pr
+            } else {
+                reasonings.append(pr)
+            }
+        }
+        return reasonings
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -125,7 +147,7 @@ struct SanctumCouncilBody: View {
 
     /// Motor segmentleri normalleştirilmiş ağırlıklarla.
     private var weightedSegments: [(motor: MotorEngine, color: Color, ratio: Double, label: String)] {
-        let reasonings = decision?.motorReasonings ?? []
+        let reasonings = enrichedReasonings
         guard !reasonings.isEmpty else { return [] }
         let fallback = 1.0 / Double(reasonings.count)
         let raw = reasonings.map { $0.weight ?? fallback }
@@ -142,8 +164,8 @@ struct SanctumCouncilBody: View {
 
     @ViewBuilder
     private var motorList: some View {
-        if let d = decision {
-            let reasonings = d.motorReasonings
+        if decision != nil {
+            let reasonings = enrichedReasonings
             if !reasonings.isEmpty {
                 ForEach(Array(reasonings.enumerated()), id: \.element.motor) { idx, r in
                     motorRow(r)
@@ -167,9 +189,12 @@ struct SanctumCouncilBody: View {
     }
 
     private func motorRow(_ r: MotorReasoning) -> some View {
-        // Score 0 → "Veri bekleniyor" durumu. Sembol "—", stance arrow yok,
-        // metin tertiary renk · diğer satırlardan görsel olarak ayrılır.
-        let isPending = r.score <= 0
+        // 2026-04-25 H-39: Üç görünüm:
+        // 1. valueText var (Chiron) → sağda metin (örn. "Yatay seyir"),
+        //    stance rengi metne uygulanır, sayı yok.
+        // 2. score > 0 → standart "↑ 78" stance arrow + skor.
+        // 3. score 0 (pending) → "—" tertiary, motor adı soluk.
+        let isPending = r.score <= 0 && r.valueText == nil
         return Button(action: { onSelectMotor(r.motor) }) {
             HStack(spacing: 8) {
                 Text(r.motor.displayName)
@@ -178,7 +203,12 @@ struct SanctumCouncilBody: View {
                         ? InstitutionalTheme.Colors.textSecondary
                         : InstitutionalTheme.Colors.textPrimary)
                 Spacer()
-                if isPending {
+                if let value = r.valueText {
+                    Text(value)
+                        .font(.system(size: 13))
+                        .foregroundColor(stanceColor(r.stance))
+                        .lineLimit(1)
+                } else if isPending {
                     Text("—")
                         .font(.system(size: 14, design: .monospaced))
                         .foregroundColor(InstitutionalTheme.Colors.textTertiary)

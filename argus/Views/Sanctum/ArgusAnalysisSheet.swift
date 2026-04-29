@@ -140,9 +140,20 @@ struct ArgusAnalysisSheet: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 Spacer()
-                Text("\(r.stance.arrowGlyph) \(r.stance.rawValue) · \(Int(r.score))")
-                    .font(.system(size: 12, design: .monospaced))
-                    .foregroundColor(stanceColor(r.stance))
+                // Chiron gibi sayısal olmayan motorlar için valueText doğrudan gösterilir.
+                if let value = r.valueText {
+                    Text(value)
+                        .font(.system(size: 12))
+                        .foregroundColor(stanceColor(r.stance))
+                } else if r.score <= 0 {
+                    Text("Bekleniyor")
+                        .font(.system(size: 12))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                } else {
+                    Text("\(r.stance.arrowGlyph) \(r.stance.rawValue) · \(Int(r.score))")
+                        .font(.system(size: 12, design: .monospaced))
+                        .foregroundColor(stanceColor(r.stance))
+                }
             }
             if !r.summary.isEmpty {
                 Text(r.summary)
