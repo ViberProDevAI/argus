@@ -52,7 +52,7 @@ final class MacroRegimeService: @unchecked Sendable {
             return cached
         }
         
-        print("🌐 AETHER: Full refresh başlatılıyor...")
+        ArgusLogger.info(.aether, "Full refresh başlatılıyor...")
         let startTime = Date()
 
         
@@ -79,16 +79,16 @@ final class MacroRegimeService: @unchecked Sendable {
         // Decision Logic
         if !fredMissing.isEmpty {
             explain.append("FRED verileri eksik: \(fredMissing.joined(separator: ",")).")
-            print("⚠️ AETHER: FRED eksik = \(fredMissing)")
+            ArgusLogger.warning(.aether, "FRED eksik = \(fredMissing)")
         }
         if !marketMissing.isEmpty {
             explain.append("Piyasa verileri eksik: \(marketMissing.joined(separator: ",")).")
-            print("⚠️ AETHER: Market eksik = \(marketMissing)")
+            ArgusLogger.warning(.aether, "Market eksik = \(marketMissing)")
         }
         
         if detResult.penalty > 0 {
             explain.append("⚠️ STALE veri cezası uygulandı (\(Int(detResult.penalty)) birim).")
-            print("⚠️ AETHER: STALE penalty = \(Int(detResult.penalty))")
+            ArgusLogger.warning(.aether, "STALE penalty = \(Int(detResult.penalty))")
         }
 
         if detResult.shockState != .stable {
@@ -214,29 +214,25 @@ final class MacroRegimeService: @unchecked Sendable {
         self.saveWidgetData(rating: legacy, market: marketData)
         
         // 🔍 AETHER FORENSIC REPORT (ACTIVE)
-        print("\n═══════════════════════════════════════════════════════════════")
-        print("🔍 AETHER FORENSIC CARD REPORT")
-        print("───────────────────────────────────────────────────────────────")
-        print("[01] Enflasyon (CPI):   \(Int(breakdown["cpi"] ?? 0))/100 [\(detResult.statuses["cpi"] ?? "MISSING")]")
-        print("[02] İstihdam (Labor):  \(Int(breakdown["labor"] ?? 0))/100 [\(detResult.statuses["labor"] ?? "MISSING")]")
-        print("[03] Faizler (Rates):   \(Int(breakdown["rates"] ?? 0))/100 [\(detResult.statuses["rates"] ?? "MISSING")]")
-        print("[04] Büyüme (Growth):   \(Int(breakdown["growth"] ?? 0))/100 [\(detResult.statuses["growth"] ?? "MISSING")]")
-        print("[05] Trend (Equity):    \(Int(breakdown["trend"] ?? 0))/100 [\(detResult.statuses["trend"] ?? "MISSING")]")
-        print("[06] Volatilite (VIX):  \(Int(breakdown["vix"] ?? 0))/100 [\(detResult.statuses["vix"] ?? "MISSING")]")
-        print("[07] Altın (GLD):       \(Int(breakdown["gld"] ?? 0))/100 [\(detResult.statuses["gld"] ?? "MISSING")]")
-        print("[08] Kripto (BTC):      \(Int(breakdown["btc"] ?? 0))/100 [\(detResult.statuses["btc"] ?? "MISSING")]")
-        print("[09] Dolar (DXY):       \(Int(breakdown["dxy"] ?? 0))/100 [\(detResult.statuses["dxy"] ?? "MISSING")]")
-        print("[10] Claims:            \(Int(breakdown["claims"] ?? 0))/100 [\(detResult.statuses["claims"] ?? "MISSING")]")
-        print("[11] Credit:            \(Int(breakdown["credit"] ?? 0))/100 [\(detResult.statuses["credit"] ?? "MISSING")]")
+        ArgusLogger.header("🔍 AETHER FORENSIC CARD REPORT")
+        ArgusLogger.info(.aether, "[01] Enflasyon (CPI):   \(Int(breakdown["cpi"] ?? 0))/100 [\(detResult.statuses["cpi"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[02] İstihdam (Labor):  \(Int(breakdown["labor"] ?? 0))/100 [\(detResult.statuses["labor"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[03] Faizler (Rates):   \(Int(breakdown["rates"] ?? 0))/100 [\(detResult.statuses["rates"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[04] Büyüme (Growth):   \(Int(breakdown["growth"] ?? 0))/100 [\(detResult.statuses["growth"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[05] Trend (Equity):    \(Int(breakdown["trend"] ?? 0))/100 [\(detResult.statuses["trend"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[06] Volatilite (VIX):  \(Int(breakdown["vix"] ?? 0))/100 [\(detResult.statuses["vix"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[07] Altın (GLD):       \(Int(breakdown["gld"] ?? 0))/100 [\(detResult.statuses["gld"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[08] Kripto (BTC):      \(Int(breakdown["btc"] ?? 0))/100 [\(detResult.statuses["btc"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[09] Dolar (DXY):       \(Int(breakdown["dxy"] ?? 0))/100 [\(detResult.statuses["dxy"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[10] Claims:            \(Int(breakdown["claims"] ?? 0))/100 [\(detResult.statuses["claims"] ?? "MISSING")]")
+        ArgusLogger.info(.aether, "[11] Credit:            \(Int(breakdown["credit"] ?? 0))/100 [\(detResult.statuses["credit"] ?? "MISSING")]")
         if let pulse = detResult.vixPulse {
-            print("[12] Shock Gate:        \(detResult.shockState.rawValue) (VIX \(String(format: "%.1f", pulse.level)) | 1G \(String(format: "%+.1f%%", pulse.oneDayChangePct)) | 5G \(String(format: "%+.1f%%", pulse.fiveDayChangePct)))")
+            ArgusLogger.info(.aether, "[12] Shock Gate:        \(detResult.shockState.rawValue) (VIX \(String(format: "%.1f", pulse.level)) | 1G \(String(format: "%+.1f%%", pulse.oneDayChangePct)) | 5G \(String(format: "%+.1f%%", pulse.fiveDayChangePct)))")
         } else {
-            print("[12] Shock Gate:        \(detResult.shockState.rawValue)")
+            ArgusLogger.info(.aether, "[12] Shock Gate:        \(detResult.shockState.rawValue)")
         }
-        print("───────────────────────────────────────────────────────────────")
-        print("📊 FINAL SCORE: \(Int(detResult.totalScore))/100 → Grade: \(MacroEnvironmentRating.letterGrade(for: detResult.totalScore))")
-        print("⏱️ Duration: \(Int(duration))ms")
-        print("═══════════════════════════════════════════════════════════════\n")
+        ArgusLogger.info(.aether, "📊 FINAL SCORE: \(Int(detResult.totalScore))/100 → Grade: \(MacroEnvironmentRating.letterGrade(for: detResult.totalScore))")
+        ArgusLogger.info(.aether, "⏱️ Duration: \(Int(duration))ms")
         
         return result
 
@@ -698,13 +694,13 @@ final class MacroRegimeService: @unchecked Sendable {
         let cpiSurprise = ExpectationsStore.shared.getSurpriseImpactSync(for: .cpi)
         if cpiSurprise != 0 {
             cpiScore = min(100, max(0, cpiScore + cpiSurprise))
-            print("📊 AETHER: CPI Sürpriz Etkisi = \(String(format: "%+.1f", cpiSurprise)) puan → Yeni Skor: \(Int(cpiScore))")
+            ArgusLogger.info(.aether, "CPI Sürpriz Etkisi = \(String(format: "%+.1f", cpiSurprise)) puan → Yeni Skor: \(Int(cpiScore))")
         }
         // AETHER v5.2: PCE de enflasyon göstergesi — sürprizi CPI skoruna uygulanır (yarım ağırlık).
         let pceSurprise = ExpectationsStore.shared.getSurpriseImpactSync(for: .pce)
         if pceSurprise != 0 {
             cpiScore = min(100, max(0, cpiScore + pceSurprise * 0.5))
-            print("📊 AETHER: PCE Sürpriz Etkisi = \(String(format: "%+.1f", pceSurprise * 0.5)) puan → CPI Skor: \(Int(cpiScore))")
+            ArgusLogger.info(.aether, "PCE Sürpriz Etkisi = \(String(format: "%+.1f", pceSurprise * 0.5)) puan → CPI Skor: \(Int(cpiScore))")
         }
         process("cpi", cpiScore, fred.cpi.last?.0, "Monthly", config.weights.cpi)
         
@@ -730,7 +726,7 @@ final class MacroRegimeService: @unchecked Sendable {
         let laborSurprise = ExpectationsStore.shared.getSurpriseImpactSync(for: .unemployment)
         if laborSurprise != 0 {
             laborScore = min(100, max(0, laborScore + laborSurprise))
-            print("📊 AETHER: Labor Sürpriz Etkisi = \(String(format: "%+.1f", laborSurprise)) puan → Yeni Skor: \(Int(laborScore))")
+            ArgusLogger.info(.aether, "Labor Sürpriz Etkisi = \(String(format: "%+.1f", laborSurprise)) puan → Yeni Skor: \(Int(laborScore))")
         }
         process("labor", laborScore, fred.unrate.last?.0, "Monthly", config.weights.labor)
         
@@ -782,13 +778,13 @@ final class MacroRegimeService: @unchecked Sendable {
         let payrollsSurprise = ExpectationsStore.shared.getSurpriseImpactSync(for: .payrolls)
         if payrollsSurprise != 0 {
             growthScore = min(100, max(0, growthScore + payrollsSurprise))
-            print("📊 AETHER: Payrolls Sürpriz Etkisi = \(String(format: "%+.1f", payrollsSurprise)) puan → Growth Skor: \(Int(growthScore))")
+            ArgusLogger.info(.aether, "Payrolls Sürpriz Etkisi = \(String(format: "%+.1f", payrollsSurprise)) puan → Growth Skor: \(Int(growthScore))")
         }
         // AETHER v5.2: GDP sürprizi de büyüme skoruna (yarım ağırlık — çeyreklik, düşük frekans).
         let gdpSurprise = ExpectationsStore.shared.getSurpriseImpactSync(for: .gdp)
         if gdpSurprise != 0 {
             growthScore = min(100, max(0, growthScore + gdpSurprise * 0.5))
-            print("📊 AETHER: GDP Sürpriz Etkisi = \(String(format: "%+.1f", gdpSurprise * 0.5)) puan → Growth Skor: \(Int(growthScore))")
+            ArgusLogger.info(.aether, "GDP Sürpriz Etkisi = \(String(format: "%+.1f", gdpSurprise * 0.5)) puan → Growth Skor: \(Int(growthScore))")
         }
         process("growth", growthScore, fred.payems.last?.0, "Monthly", config.weights.growth)
         
@@ -1001,7 +997,7 @@ final class MacroRegimeService: @unchecked Sendable {
         let claimsSurprise = ExpectationsStore.shared.getSurpriseImpactSync(for: .claims)
         if claimsSurprise != 0 {
             claimsScore = min(100, max(0, claimsScore + claimsSurprise))
-            print("📊 AETHER: Claims Sürpriz Etkisi = \(String(format: "%+.1f", claimsSurprise)) puan → Yeni Skor: \(Int(claimsScore))")
+            ArgusLogger.info(.aether, "Claims Sürpriz Etkisi = \(String(format: "%+.1f", claimsSurprise)) puan → Yeni Skor: \(Int(claimsScore))")
         }
         process("claims", claimsScore, fred.claims.last?.0, "Weekly", 1.0)
         
