@@ -44,11 +44,11 @@ actor OrionCouncil {
             )
         }
         
-        print("🏛️ Orion Konseyi Toplanıyor: \(symbol)")
-        
+        ArgusLogger.info(.orion, "Konsey toplanıyor: \(symbol)")
+
         // 1. Collect proposals from all members
         let proposals = await collectProposals(symbol: symbol, candles: candles)
-        print("   📋 \(proposals.count) öneri toplandı")
+        ArgusLogger.info(.orion, "\(proposals.count) öneri toplandı")
         
         // 2. If no proposals, return hold
         guard !proposals.isEmpty else {
@@ -70,7 +70,7 @@ actor OrionCouncil {
         
         // 3. Select the best proposal (highest confidence)
         let bestProposal = proposals.max(by: { $0.confidence < $1.confidence })!
-        print("   🎯 En iyi öneri: \(bestProposal.proposerName) → \(bestProposal.action.rawValue) (Güven: \(Int(bestProposal.confidence * 100))%)")
+        ArgusLogger.info(.orion, "En iyi öneri: \(bestProposal.proposerName) -> \(bestProposal.action.rawValue) (Güven: \(Int(bestProposal.confidence * 100))%)")
         
         // 4. Conduct voting on the best proposal
         let votes = await conductVoting(
@@ -89,7 +89,7 @@ actor OrionCouncil {
             timestamp: timestamp
         )
         
-        print("   📊 Sonuç: \(decision.summary)")
+        ArgusLogger.info(.orion, "Sonuç: \(decision.summary)")
         
         return decision
     }
@@ -138,7 +138,7 @@ actor OrionCouncil {
             )
             
             votes.append(vote)
-            print("      \(vote.decision.emoji) \(vote.voterName): \(vote.decision.rawValue) (Ağırlık: \(String(format: "%.0f", vote.weight * 100))%) - \(vote.reasoning ?? "")")
+            ArgusLogger.info(.orion, "Oy: \(vote.voterName): \(vote.decision.rawValue) (Ağırlık: \(String(format: "%.0f", vote.weight * 100))%) - \(vote.reasoning ?? "")")
         }
         
         return votes
@@ -248,6 +248,6 @@ extension ChironWeightStore {
     /// Update council member weights after learning
     func updateCouncilWeights(symbol: String, engine: AutoPilotEngine, weights: CouncilMemberWeights) async {
         // TODO: Implement persistence for council weights
-        print("🧠 Chiron: Konsey ağırlıkları güncellendi - \(symbol) (\(engine.rawValue))")
+        ArgusLogger.info(.chiron, "Konsey ağırlıkları güncellendi: \(symbol) (\(engine.rawValue))")
     }
 }

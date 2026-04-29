@@ -24,11 +24,11 @@ actor AtlasCouncil {
     func convene(symbol: String, financials: FinancialSnapshot, engine: AutoPilotEngine = .corse) async -> AtlasDecision {
         let timestamp = Date()
         
-        print("🏛️ Atlas Konseyi Toplanıyor: \(symbol)")
-        
+        ArgusLogger.info(.atlas, "Konsey toplanıyor: \(symbol)")
+
         // 1. Collect proposals from all members
         let proposals = await collectProposals(symbol: symbol, financials: financials)
-        print("   📋 \(proposals.count) öneri toplandı")
+        ArgusLogger.info(.atlas, "\(proposals.count) öneri toplandı")
         
         // 2. If no proposals, return hold
         guard !proposals.isEmpty else {
@@ -49,7 +49,7 @@ actor AtlasCouncil {
         
         // 3. Select the best proposal (highest confidence)
         let bestProposal = proposals.max(by: { $0.confidence < $1.confidence })!
-        print("   🎯 En iyi öneri: \(bestProposal.proposerName) → \(bestProposal.action.rawValue) (Güven: \(Int(bestProposal.confidence * 100))%)")
+        ArgusLogger.info(.atlas, "En iyi öneri: \(bestProposal.proposerName) -> \(bestProposal.action.rawValue) (Güven: \(Int(bestProposal.confidence * 100))%)")
         
         // 4. Conduct voting on the best proposal
         let votes = conductVoting(proposal: bestProposal, financials: financials, engine: engine)
@@ -63,7 +63,7 @@ actor AtlasCouncil {
             timestamp: timestamp
         )
         
-        print("   📊 Sonuç: \(decision.summary)")
+        ArgusLogger.info(.atlas, "Sonuç: \(decision.summary)")
         
         return decision
     }
@@ -119,7 +119,7 @@ actor AtlasCouncil {
             )
             
             votes.append(vote)
-            print("      \(vote.decision.emoji) \(vote.voterName): \(vote.decision.rawValue) (Ağırlık: \(String(format: "%.0f", vote.weight * 100))%) - \(vote.reasoning ?? "")")
+            ArgusLogger.info(.atlas, "Oy: \(vote.voterName): \(vote.decision.rawValue) (Ağırlık: \(String(format: "%.0f", vote.weight * 100))%) - \(vote.reasoning ?? "")")
         }
         
         return votes

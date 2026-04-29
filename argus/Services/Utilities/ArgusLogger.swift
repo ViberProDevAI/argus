@@ -193,6 +193,7 @@ extension ArgusLogger {
         case orion = "ORION"
         case argus = "ARGUS"
         case heimdall = "HEIMDALL"
+        case hermes = "HERMES"
         case veri = "VERİ"
     }
     
