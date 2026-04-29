@@ -19,11 +19,13 @@ class TerminalService {
         let candleVal = await MarketDataStore.shared.ensureCandles(symbol: symbol, timeframe: "1day")
         let candles = candleVal.value
         
-        // 3. Prometheus Forecast
+        // 3. Prometheus Forecast — Engine oldest-first istiyor; candles zaten kronolojik.
         var forecast: PrometheusForecast? = nil
-        if let candleData = candles, candleData.count >= 30 {
-            let prices = candleData.map { $0.close }.reversed()
-            forecast = await PrometheusEngine.shared.forecast(symbol: symbol, historicalPrices: Array(prices))
+        if let candleData = candles, candleData.count >= 120 {
+            forecast = await PrometheusEngine.shared.forecast(
+                symbol: symbol,
+                historicalPrices: candleData.map(\.close)
+            )
         }
         
         // 4. Data Health Hesaplama

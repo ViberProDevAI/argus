@@ -122,7 +122,7 @@ struct ArgusCockpitView: View {
                                     .padding(.top, 16)
                                 } else {
                                     ForEach(terminalData) { item in
-                                        NavigationLink(destination: StockDetailView(symbol: item.symbol, viewModel: viewModel)) {
+                                        NavigationLink(destination: ArgusSanctumView(symbol: item.symbol, viewModel: viewModel)) {
                                             TerminalStockRow(
                                                 item: item,
                                                 onOrionTap: { openModule(.orion, for: item.symbol) },

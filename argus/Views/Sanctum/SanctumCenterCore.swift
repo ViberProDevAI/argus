@@ -84,14 +84,11 @@ struct CenterCoreView: View {
             // Metin bloğu · logonun apertür merkezine oturur.
             // Yarı şeffaf deep-bg kapsül okunabilirliği sağlar, aperture
             // kirpik desenini blokladığı alan minimum tutulur.
-            VStack(spacing: 3) {
-                Text("NİHAİ KARAR")
-                    .font(.system(size: 8, weight: .bold, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundStyle(InstitutionalTheme.Colors.holo)
-
+            // 2026-04-24 H-27: "NİHAİ KARAR" mono caps caption silindi —
+            // chip zaten "Konsey hücum" diyor, üstüne ayrı bir başlık
+            // gereksizdi. İkinci satır karar/güven, üçüncü güven yüzdesi.
+            VStack(spacing: 4) {
                 decisionChip
-
                 confidenceText
             }
             .padding(.horizontal, 10)
@@ -110,29 +107,28 @@ struct CenterCoreView: View {
         .onAppear { showDecision = false }
     }
 
-    // MARK: - Aksiyon chip (V5 KONSEY HÜCUM gibi)
+    // MARK: - Aksiyon chip
+    //
+    // 2026-04-24 H-27: Eski "KONSEY HÜCUM" / "KARAR BEKLENİYOR" mono black
+    // tracking pill'leri sentence case'e indirildi. "Konsey hücum" /
+    // "Bekleniyor" — kelime ihtişamı yerine bilgi netliği.
 
     @ViewBuilder
     private var decisionChip: some View {
         if let d = decision {
-            let label = "KONSEY \(d.action.rawValue.uppercased())"
-            Text(label)
-                .font(.system(size: 9, weight: .black, design: .monospaced))
-                .tracking(0.4)
+            let label = "Konsey \(d.action.rawValue.lowercased())"
+            Text(label.prefix(1).uppercased() + label.dropFirst())
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(actionColor(for: d.action))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 2)
                 .background(
                     Capsule()
-                        .fill(actionColor(for: d.action).opacity(0.2))
-                        .overlay(
-                            Capsule().stroke(actionColor(for: d.action).opacity(0.5), lineWidth: 0.5)
-                        )
+                        .fill(actionColor(for: d.action).opacity(0.18))
                 )
         } else {
-            Text("KARAR BEKLENİYOR")
-                .font(.system(size: 8.5, weight: .bold, design: .monospaced))
-                .tracking(0.3)
+            Text("Bekleniyor")
+                .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(InstitutionalTheme.Colors.textTertiary)
         }
     }
@@ -141,7 +137,7 @@ struct CenterCoreView: View {
     private var confidenceText: some View {
         if let d = decision {
             Text("Güven %\(Int(d.confidence * 100))")
-                .font(.system(size: 9.5, design: .monospaced))
+                .font(.system(size: 10, design: .monospaced))
                 .foregroundStyle(InstitutionalTheme.Colors.textSecondary)
         } else {
             EmptyView()

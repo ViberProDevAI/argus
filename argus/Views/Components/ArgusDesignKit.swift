@@ -110,20 +110,25 @@ struct ArgusSectionHeader<Trailing: View>: View {
         self.trailing = trailing
     }
 
+    // 2026-04-24 H-27: Eski header `title.uppercased()` + mono caps + tracking
+    // 1.4 ile tüm uygulamada başlık formatını dikte ediyordu — call site
+    // "İzleme listesi" yazsa bile "İZLEME LİSTESİ" çıkıyordu. Yeni hâl
+    // input'a saygı gösterir: ne yazarsan onu çizer. Tipografi 14pt
+    // semibold, mono yok, tracking yok. Eski ALL CAPS string'li çağrılar
+    // (örn. "GLOBAL İZLEME") yine ALL CAPS görünür ama mono'dan kurtulur —
+    // yumuşak geçiş.
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(title.uppercased())
-                    .font(.system(.caption, design: .monospaced))
-                    .fontWeight(.bold)
-                    .tracking(1.4)
-                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     .accessibilityAddTraits(.isHeader)
 
                 if let subtitle, !subtitle.isEmpty {
                     Text(subtitle)
-                        .font(.caption2)
-                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                        .font(.system(size: 12))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }

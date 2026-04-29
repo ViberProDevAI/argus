@@ -20,28 +20,10 @@ final class ArgusDataService {
         return try await yahoo.fetchQuote(symbol: symbol)
     }
     
-    func fetchQuotes(symbols: [String]) async throws -> [String: Quote] {
-        print("📡 Batch Quote: \(symbols.count) sembol")
-        var result: [String: Quote] = [:]
-        
-        // 50'lik gruplar halinde batch çek (Yahoo limiti ~50-100 sembol)
-        let chunks = symbols.chunked(into: 50)
-        for chunk in chunks {
-            do {
-                let batchResult = try await yahoo.fetchBatchQuotes(symbols: chunk)
-                result.merge(batchResult) { _, new in new }
-            } catch {
-                print("⚠️ Batch failed, falling back to single requests: \(error)")
-                // Fallback: Tek tek çek (eski yöntem)
-                for symbol in chunk {
-                    if let quote = try? await yahoo.fetchQuote(symbol: symbol) {
-                        result[symbol] = quote
-                    }
-                }
-            }
-        }
-        return result
-    }
+    /// Phase 6 PR-A (2026-04-29): `fetchQuotes(symbols:)` silindi (orphan'dı).
+    /// Batch quote artık `MarketDataStore.refreshQuotes(symbols:)` →
+    /// `HeimdallOrchestrator.requestQuotesBatch(symbols:)` yolu üzerinden
+    /// canonical akışla çalışır. Tek source-of-truth.
     
     // MARK: - Candles
     

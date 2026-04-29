@@ -40,7 +40,7 @@ struct DiscoverView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(viewModel.topGainers, id: \.symbol) { quote in
-                                        NavigationLink(destination: StockDetailView(symbol: quote.symbol ?? "---", viewModel: viewModel)) {
+                                        NavigationLink(destination: ArgusSanctumView(symbol: quote.symbol ?? "---", viewModel: viewModel)) {
                                             DiscoverMarketCard(
                                                 quote: quote,
                                                 type: .gainer,
@@ -62,7 +62,7 @@ struct DiscoverView: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 12) {
                                     ForEach(viewModel.topLosers, id: \.symbol) { quote in
-                                        NavigationLink(destination: StockDetailView(symbol: quote.symbol ?? "---", viewModel: viewModel)) {
+                                        NavigationLink(destination: ArgusSanctumView(symbol: quote.symbol ?? "---", viewModel: viewModel)) {
                                             DiscoverMarketCard(
                                                 quote: quote,
                                                 type: .loser,
@@ -84,7 +84,7 @@ struct DiscoverView: View {
                             
                             LazyVStack(spacing: 0) {
                                 ForEach(viewModel.mostActive, id: \.symbol) { quote in
-                                    NavigationLink(destination: StockDetailView(symbol: quote.symbol ?? "---", viewModel: viewModel)) {
+                                    NavigationLink(destination: ArgusSanctumView(symbol: quote.symbol ?? "---", viewModel: viewModel)) {
                                         DiscoverMarketRow(quote: quote)
                                     }
                                     Divider()

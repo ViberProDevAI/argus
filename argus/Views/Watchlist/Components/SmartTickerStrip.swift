@@ -234,9 +234,26 @@ private struct SafeHavenStatusBar: View {
 
 struct MarqueeTicker: View {
     let items: [TickerItem]
-    let pixelsPerSecond: Double = 42
+    private let pixelsPerSecond: Double = 42
 
+    // 2026-04-25 H-31 — `.task { }` async loop. Önceki üç deneme
+    // (CADisplayLink, withAnimation.repeatForever, TimelineView) bu
+    // view hierarchy'de bir şekilde state cycle'a değişiklik
+    // iletemiyordu. async loop main actor üzerinde Task.sleep
+    // ritmiyle offset @State'ini sürekli günceller — SwiftUI her
+    // mutation'da redraw mecbur. View ekrandan kalkınca .task
+    // otomatik iptal eder, leak yok.
+    @State private var offset: CGFloat = 0
     @State private var contentWidth: CGFloat = 0
+
+    /// GeometryReader ölçümü çalışmaması durumunda bantın hareketsiz
+    /// kalmaması için fallback. Tahmini her item ~140pt + 56pt leading
+    /// buffer; gerçek ölçüm gelince üzerine yazılır.
+    private var effectiveContentWidth: CGFloat {
+        if contentWidth > 10 { return contentWidth }
+        let estimated = CGFloat(displayItems.count) * 140 + 56
+        return max(estimated, 600)
+    }
 
     private var displayItems: [TickerItem] {
         items.isEmpty ? Self.placeholderItems : items
@@ -261,35 +278,24 @@ struct MarqueeTicker: View {
         ZStack(alignment: .leading) {
             InstitutionalTheme.Colors.surface1
 
-            // KAYAN İÇERİK + ÖLÇÜM TEK KATMANDA.
-            // GeometryReader sadece ilk kopyaya bağlı; ikinci kopya görsel.
-            // TimelineView her display refresh'te yeni context.date verir;
-            // offset bu zaman üzerinden matematiksel olarak hesaplanır,
-            // state mutation yok → reset/flicker yok.
-            TimelineView(.animation) { context in
-                let cycleOffset: CGFloat = {
-                    guard contentWidth > 10 else { return 0 }
-                    let secs = context.date.timeIntervalSince1970
-                    let total = secs * pixelsPerSecond
-                    let mod = total.truncatingRemainder(dividingBy: Double(contentWidth))
-                    return CGFloat(-mod)
-                }()
-
-                HStack(spacing: 0) {
-                    tickerRow(items: displayItems)
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: TickerWidthKey.self,
-                                    value: geo.size.width
-                                )
-                            }
-                        )
-                    tickerRow(items: displayItems)
-                }
-                .fixedSize(horizontal: true, vertical: false)
-                .offset(x: cycleOffset)
+            // KAYAN İÇERİK — iki yan yana kopya, offset @State ile sola itilir.
+            // İlk kopyanın altında GeometryReader contentWidth'i ölçer;
+            // .task async loop offset'i 60fps ritmiyle azaltır, contentWidth'e
+            // ulaşınca wrap eder.
+            HStack(spacing: 0) {
+                tickerRow(items: displayItems)
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(
+                                key: TickerWidthKey.self,
+                                value: geo.size.width
+                            )
+                        }
+                    )
+                tickerRow(items: displayItems)
             }
+            .fixedSize(horizontal: true, vertical: false)
+            .offset(x: offset)
             .frame(maxWidth: .infinity, alignment: .leading)
             .mask(
                 LinearGradient(
@@ -303,25 +309,11 @@ struct MarqueeTicker: View {
                 )
             )
 
-            // Sol köşe sabit "CANLI" pill — scroll etmez, üstte kalır.
-            HStack(spacing: 5) {
-                ArgusDot(color: InstitutionalTheme.Colors.aurora, size: 5)
-                Text("CANLI")
-                    .font(.system(size: 9, weight: .black, design: .monospaced))
-                    .tracking(1)
-                    .foregroundColor(InstitutionalTheme.Colors.aurora)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(InstitutionalTheme.Colors.background)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .stroke(InstitutionalTheme.Colors.aurora.opacity(0.35), lineWidth: 0.5)
-            )
-            .padding(.leading, 8)
+            // 2026-04-25 H-31 (T2 visual): "CANLI" mono caps pill kaldırıldı.
+            // Yerine sadece küçük bir dot — bandın canlı veri taşıdığı bir
+            // bakışta okunur, ama yazı/kutu/border yok. Sade.
+            ArgusDot(color: InstitutionalTheme.Colors.aurora, size: 6)
+                .padding(.leading, 14)
         }
         .frame(height: 36)
         .clipped()
@@ -345,13 +337,35 @@ struct MarqueeTicker: View {
                 contentWidth = width
             }
         }
+        .task {
+            // Async animasyon loop — view ekranda olduğu sürece çalışır,
+            // ekrandan kalkınca SwiftUI Task'ı otomatik iptal eder.
+            // Task.sleep ile ~60fps ritim, dt-based offset.
+            let frameNs: UInt64 = 16_666_666 // ~16.67ms = 60fps
+            var lastTime = Date()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: frameNs)
+                let now = Date()
+                let dt = now.timeIntervalSince(lastTime)
+                lastTime = now
+
+                let width = effectiveContentWidth
+                guard width > 10 else { continue }
+
+                let dx = CGFloat(dt * pixelsPerSecond)
+                offset -= dx
+                if offset <= -width {
+                    offset += width
+                }
+            }
+        }
     }
 
     @ViewBuilder
     private func tickerRow(items: [TickerItem]) -> some View {
         HStack(spacing: 0) {
-            // CANLI pill'in altında okunamayacak içerik için leading buffer.
-            Spacer().frame(width: 56)
+            // Sol kenar dot'unun altına denk gelmesin diye küçük leading buffer.
+            Spacer().frame(width: 28)
             ForEach(items) { item in
                 TickerCell(item: item)
                 tickerSeparator
@@ -372,69 +386,33 @@ struct MarqueeTicker: View {
 private struct TickerCell: View {
     let item: TickerItem
 
+    // 2026-04-25 H-31 (T2): leading arrow + ⚓ emoji + percent kapsülü kaldırıldı.
+    // Sembol mono medium, fiyat mono regular, yüzde değişim sadece renkli text
+    // (kapsülsüz). Safe haven recommended → sembol aurora; contraindicated →
+    // sembol soluk; renk dilini emojinin yerine geçirdi.
     var body: some View {
         HStack(spacing: 6) {
-            // Safe haven rozet (⚓ / ✗) veya durum dotu
-            leadingBadge
-
-            // Label (büyük, mono caps)
             Text(item.label)
-                .font(.system(size: 11, weight: .black, design: .monospaced))
-                .tracking(0.4)
+                .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundColor(labelColor)
 
-            // Fiyat (varsa)
             if let price = item.price, price > 0 {
                 Text(formatPrice(price))
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                    .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
-            // Yüzde pill
             if let pct = item.percentChange {
                 Text(formattedChange(pct))
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(changeColor(pct))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 3, style: .continuous)
-                            .fill(changeColor(pct).opacity(0.16))
-                    )
             } else {
                 Text("—")
-                    .font(.system(size: 10, design: .monospaced))
+                    .font(.system(size: 12, design: .monospaced))
                     .foregroundColor(InstitutionalTheme.Colors.textTertiary)
             }
         }
         .opacity(item.status == .safeContraindicated ? 0.5 : 1.0)
-    }
-
-    @ViewBuilder
-    private var leadingBadge: some View {
-        if item.isSafeHavenCandidate {
-            switch item.status {
-            case .safeRecommended:
-                Text("⚓")
-                    .font(.system(size: 9))
-                    .foregroundColor(InstitutionalTheme.Colors.aurora)
-            case .safeContraindicated:
-                Image(systemName: "xmark")
-                    .font(.system(size: 7, weight: .bold))
-                    .foregroundColor(InstitutionalTheme.Colors.crimson)
-            default:
-                ArgusDot(color: InstitutionalTheme.Colors.textTertiary, size: 4)
-            }
-        } else {
-            // Core indeks — yukarı/aşağı minik ok
-            if let pct = item.percentChange {
-                Image(systemName: pct >= 0 ? "arrow.up.right" : "arrow.down.right")
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(changeColor(pct))
-            } else {
-                ArgusDot(color: InstitutionalTheme.Colors.textTertiary, size: 4)
-            }
-        }
     }
 
     private var labelColor: Color {

@@ -249,6 +249,120 @@ struct ArgusIconButton: View {
     }
 }
 
+// MARK: - ArgusInsightRow (V5.H-26 — anasayfa & detay satırı)
+//
+// 2026-04-24 — "Şu motorun şu anki durumu" satırlarını tek bir yerden çiz.
+// Aether kartı, Chiron rejim kartı, BIST nabız satırı, sektör nabzı vs.
+// hepsi aynı dilden konuşsun:
+//
+//   ┌─────────────────────────────────────────────┐
+//   │ [LEAD]  Başlık                       [TAIL] │
+//   │         Alt-açıklama                        │
+//   └─────────────────────────────────────────────┘
+//
+// • LEAD: Skor halkası, motor logosu, ikon — opsiyonel @ViewBuilder.
+// • Başlık: 14pt sentence-case, semibold. ALL CAPS yok.
+// • Alt-açıklama: 12pt secondary text, tek satır.
+// • TAIL: Mini chip(ler), sayı, chevron — opsiyonel @ViewBuilder.
+// • Border: motor tint @ 0.3 opacity (Aether kartı pattern'i).
+//
+// Kullanım:
+//
+//     ArgusInsightRow(
+//         title: "Aether",
+//         subtitle: "Kararsız makro · Nötr",
+//         tintMotor: .aether,
+//         lead: { scoreRing },
+//         tail: { miniChips },
+//         action: { showAetherDetail = true }
+//     )
+
+struct ArgusInsightRow<Lead: View, Tail: View>: View {
+    let title: String
+    let subtitle: String?
+    var tintMotor: MotorEngine? = nil
+    var customTint: Color? = nil
+    let lead: () -> Lead
+    let tail: () -> Tail
+    var action: (() -> Void)? = nil
+
+    init(
+        title: String,
+        subtitle: String? = nil,
+        tintMotor: MotorEngine? = nil,
+        customTint: Color? = nil,
+        @ViewBuilder lead: @escaping () -> Lead = { EmptyView() },
+        @ViewBuilder tail: @escaping () -> Tail = { EmptyView() },
+        action: (() -> Void)? = nil
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.tintMotor = tintMotor
+        self.customTint = customTint
+        self.lead = lead
+        self.tail = tail
+        self.action = action
+    }
+
+    private var borderColor: Color {
+        if let custom = customTint { return custom.opacity(0.3) }
+        if let motor = tintMotor {
+            return InstitutionalTheme.Colors.Motors.color(for: motor).opacity(0.3)
+        }
+        return InstitutionalTheme.Colors.border
+    }
+
+    var body: some View {
+        Group {
+            if let action {
+                Button(action: action) { content }
+                    .buttonStyle(.plain)
+            } else {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
+        HStack(spacing: 12) {
+            lead()
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    .lineLimit(1)
+
+                if let subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 8)
+
+            tail()
+
+            if action != nil {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(InstitutionalTheme.Colors.surface1)
+        .overlay(
+            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
+    }
+}
+
 // MARK: - Tap target extension
 //
 // SwiftUI'da `.frame(minWidth: 44, minHeight: 44)` her zaman yeterli

@@ -60,8 +60,62 @@ final class HeimdallOrchestrator {
         }
     }
 
+    // MARK: - Quote Batch (Phase 6, PR-A)
+    //
+    // Yahoo `v7/finance/quote?symbols=A,B,C,...` endpoint'i tek istekte 50 sembole
+    // kadar quote döner. `MarketDataStore.batchEnsureQuotes` watchlist refresh'i
+    // gibi N sembollük senaryolarda 50× istek azalması için bu yolu kullanır.
+    //
+    // Tek inflight slot harcanır (50 sembol için 1 slot) — devasa bir kazanç.
+    // Tek-sembol `requestQuote` korunur (detay sayfası gibi tekil senaryolar için).
+    func requestQuotesBatch(symbols: [String], context: UsageContext = .interactive) async throws -> [String: Quote] {
+        guard !symbols.isEmpty else { return [:] }
+
+        let provider = "yahoo"
+        let endpoint = "/quote"
+        let circuitProvider = circuitKey(provider: provider, endpoint: "quote")
+
+        // Circuit Breaker Check
+        guard await HeimdallCircuitBreaker.shared.canRequest(provider: circuitProvider) else {
+            await HeimdallLogger.shared.warn("circuit_blocked", provider: provider, errorClass: "circuit_open")
+            throw HeimdallCoreError(category: .rateLimited, code: 503, message: "Circuit open for \(provider)/quote", bodyPrefix: "")
+        }
+
+        await RateLimiter.shared.waitIfNeeded()
+        let start = Date()
+
+        do {
+            let result = try await yahoo.fetchBatchQuotes(symbols: symbols)
+            let latency = Int(Date().timeIntervalSince(start) * 1000)
+
+            await HeimdallCircuitBreaker.shared.reportSuccess(provider: circuitProvider)
+            await HeimdallLogger.shared.info(
+                "fetch_success",
+                provider: provider,
+                endpoint: endpoint,
+                symbol: "BATCH(\(symbols.count))",
+                latencyMs: latency
+            )
+            await HealthStore.shared.reportSuccess(provider: provider, latency: Double(latency))
+            return result
+        } catch {
+            if !isLocalThrottle(error) {
+                await HeimdallCircuitBreaker.shared.reportFailure(provider: circuitProvider, error: error)
+                await HealthStore.shared.reportError(provider: provider, error: error)
+            }
+            await HeimdallLogger.shared.error(
+                "fetch_failed",
+                provider: provider,
+                errorClass: classifyError(error),
+                errorMessage: error.localizedDescription,
+                endpoint: endpoint
+            )
+            throw error
+        }
+    }
+
     // MARK: - Fundamentals
-    
+
     func requestFundamentals(symbol: String, context: UsageContext = .interactive) async throws -> FinancialsData {
         let provider = "yahoo"
         let endpoint = "/fundamentals"

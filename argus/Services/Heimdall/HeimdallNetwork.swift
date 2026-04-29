@@ -10,6 +10,29 @@ final class HeimdallRateLimiter {
     private let lock = DispatchQueue(label: "argus.heimdall.ratelimiter.lock", qos: .userInitiated)
     private var timestamps: [ProviderTag: [Date]] = [:]
 
+    // MARK: - Y3-HOTFIX Phase 4 + Phase 5: Inflight (eşzamanlılık) limiti.
+    //
+    // Phase 4 (cap=6): sliding-window cap'in burst sönümleyicisi.
+    //
+    // Phase 5 (2026-04-29, cap=4): Loglarda 41-59 sn latency gözlendi. Yahoo aslında
+    // 200ms-2sn cevap veriyor; gecikme inflight kuyruğunda bekleme. Cap 6 + Yahoo
+    // ortalama 1.5sn cevap = 4 req/sn throughput. 400+ pending istek → 100 sn drain.
+    //
+    // Ayrıca yüksek inflight Yahoo'yu boğdukça kendi cevap süresi 1.5sn → 5sn'e
+    // çıkıyor (Yahoo da rate kontrolü yapıyor olabilir). Daha düşük cap = Yahoo'yu
+    // boğmama = daha hızlı cevap. Throughput az düşer ama latency dramatik iyileşir.
+    private let yahooInflight = InflightSemaphore(value: 4)
+    private let defaultInflight = InflightSemaphore(value: 2)
+    private let localInflight = InflightSemaphore(value: 32) // localScanner için yüksek cap
+
+    private func inflightSemaphore(for provider: ProviderTag) -> InflightSemaphore {
+        switch provider {
+        case .yahoo:        return yahooInflight
+        case .localScanner: return localInflight
+        default:            return defaultInflight
+        }
+    }
+
     /// Ücretsiz tier limitleri baz alınarak seçildi. Değişirse burayı güncellemek yeter.
     /// Bilmediğimiz provider için 60/min varsayıyoruz — çoğu public endpoint için güvenli.
     ///
@@ -70,6 +93,14 @@ final class HeimdallRateLimiter {
     /// `lock.sync` kısa kritik bölüm; bekleme süresi dışarıda yapıldığı için
     /// queue'yu bloke etmiyor.
     func acquireSlot(for provider: ProviderTag, timeout: TimeInterval = 30) async throws {
+        // 1) Burst freni: aynı anda havadaki istek sayısı bir cap'i aşmasın.
+        //    Bu inflight semaphore FIFO; adil kuyruk = starvation yok.
+        let semaphore = inflightSemaphore(for: provider)
+        await semaphore.acquire()
+
+        // 2) Sliding window: dakikalık tavanı respect et. Inflight cap zaten burst'ü
+        //    sönümlediği için burada beklemek nadir; düştüğünde de timeout dolmadan
+        //    geçer çünkü bu task tek başına waiting.
         let deadline = Date().addingTimeInterval(timeout)
         var attempt = 0
         while Date() < deadline {
@@ -79,12 +110,21 @@ final class HeimdallRateLimiter {
             let jittered = Double.random(in: (base * 0.6)...(base * 1.2))
             try? await Task.sleep(nanoseconds: UInt64(jittered * 1_000_000_000))
         }
+
+        // Sliding window timeout → semaphore'u serbest bırak ki bekleyenler ilerlesin.
+        await semaphore.release()
         throw HeimdallCoreError(
             category: .rateLimited,
             code: HeimdallNetwork.localThrottleCode,
             message: "Local rate cap wait timeout (\(Int(timeout))s) for \(provider.rawValue)",
             bodyPrefix: "wait-timeout"
         )
+    }
+
+    /// İstek tamamlandığında (başarı/başarısızlık fark etmez) inflight slotunu serbest bırak.
+    /// `HeimdallNetwork.request` defer içinde çağırır.
+    func releaseSlot(for provider: ProviderTag) async {
+        await inflightSemaphore(for: provider).release()
     }
 }
 
@@ -126,13 +166,22 @@ enum HeimdallNetwork {
             endpoint: url.path
         ) {
 
-            // Y3-HOTFIX Phase 3: Wait-and-serve. Slot açılana kadar bounded bekle.
-            // Eski fail-fast guard retry döngüsünün DIŞINDAYDI; burst'te slot alamayan
-            // ~150 çağrı tek seferde 1059 yiyordu. Şimdi `acquireSlot` ya slot alır
-            // ya da 30sn sonra timeout'a düşüp `.rateLimited` + 1059 fırlatır.
-            // Sentinel kod korunuyor → HealthStore + CircuitBreaker self-throttle
-            // cascade koruması hâlâ geçerli.
+            // Y3-HOTFIX Phase 3+4: Wait-and-serve + inflight cap.
+            // Phase 3: Slot açılana kadar bounded bekle (sliding window cap).
+            // Phase 4 (2026-04-29): Burst freni — `acquireSlot` artık önce inflight
+            // semaphore'a giriyor (Yahoo: 6 paralel max). 50+ task aynı anda gelirse
+            // adil FIFO kuyruğa girip sırayla geçiyor; 30sn timeout artık nadir.
+            //
+            // Slot acquire'dan sonra hangi yoldan çıksak çıkalım (success / throw /
+            // cancel) inflight slot'u **mutlaka** release edilmeli; Task.detached
+            // çağrılarında Swift bu defer'i async olarak çalıştırır → fire-and-forget
+            // ama eninde sonunda actor metodu çalışır, kayıp yok.
             try await HeimdallRateLimiter.shared.acquireSlot(for: provider, timeout: 30)
+            defer {
+                Task.detached {
+                    await HeimdallRateLimiter.shared.releaseSlot(for: provider)
+                }
+            }
 
             var request: URLRequest
             if let explicit = explicitRequest {

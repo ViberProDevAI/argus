@@ -51,8 +51,27 @@ struct ArgusSanctumView: View {
     @State private var showTradeSheet = false
     @State private var tradeAction: TradeAction = .buy
     @State private var hasAppliedLaunchOverride = false
-    
+    @State private var showArgusAnalysis = false
+
     enum TradeAction { case buy, sell }
+
+    /// MotorEngine → SanctumModuleType ters eşleşme (HoloPanel için).
+    /// SanctumModuleType.motor zaten ileri yönde mevcut; biz tersini üretiyoruz.
+    private func sanctumModule(from motor: MotorEngine) -> SanctumModuleType? {
+        switch motor {
+        case .atlas:      return .atlas
+        case .orion:      return .orion
+        case .aether:     return .aether
+        case .hermes:     return .hermes
+        case .athena:     return .athena
+        case .demeter:    return .demeter
+        case .chiron:     return .chiron
+        case .prometheus: return .prometheus
+        case .council:    return .council
+        case .phoenix:    return .prometheus  // Phoenix = Tahmin altında Prometheus ile birleşik
+        default:          return nil
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -72,37 +91,31 @@ struct ArgusSanctumView: View {
                         LoadingQuoteView()
                     }
                 } else {
+                    // 2026-04-25 H-36 — Sticky top nav + content scrollview.
+                    // Top nav: back chevron + sembol/meta + Argus app-icon
+                    // butonu (analiz aç) + drawer (line.3.horizontal). Eski
+                    // floating backButtonOverlay kaldırıldı.
                     VStack(spacing: 0) {
-                        SanctumHeader(symbol: symbol, quote: vm.quote)
-                        footerHelper // Pantheon modülleri - Header altında (küçük toplar)
-                        Spacer().frame(height: 40)
-                        SanctumModuleGrid(
-                            symbol: symbol,
-                            viewModel: viewModel,
-                            decision: activeDecision,
-                            bistModules: bistModules,
-                            showDecision: $showDecision,
-                            onSelectModule: { mod in
-                                withAnimation(.spring()) {
-                                    self.selectedModule = mod
-                                    self.showDecision = false
-                                }
-                            },
-                            onSelectBistModule: { mod in
-                                withAnimation(.spring()) {
-                                    self.selectedBistModule = mod
-                                    self.showDecision = false
-                                }
+                        sanctumTopNav
+                        ScrollView {
+                            VStack(spacing: 16) {
+                                SanctumHeader(symbol: symbol, quote: vm.quote)
+                                SanctumCouncilBody(
+                                    symbol: symbol,
+                                    decision: activeDecision,
+                                    onOpenArgusAnalysis: {
+                                        showArgusAnalysis = true
+                                    },
+                                    onSelectMotor: { motor in
+                                        if let mod = sanctumModule(from: motor) {
+                                            withAnimation(.spring()) {
+                                                self.selectedModule = mod
+                                            }
+                                        }
+                                    }
+                                )
                             }
-                        )
-                        SanctumDecisionPanel(
-                            decision: activeDecision,
-                            isBist: isBistSymbol,
-                            isVisible: showDecision
-                                && selectedModule == nil
-                                && selectedBistModule == nil
-                        )
-                        Spacer(minLength: 8)
+                        }
                     }
                 }
             }
@@ -110,9 +123,6 @@ struct ArgusSanctumView: View {
             .scaleEffect((selectedModule != nil || selectedBistModule != nil) ? 0.95 : 1.0)
             .animation(.spring(), value: selectedModule)
             .animation(.spring(), value: selectedBistModule)
-            
-            // 3. Overlays
-            backButtonOverlay
             
             // 4. HoloPanel (Module Details)
             if let module = selectedModule {
@@ -197,6 +207,13 @@ struct ArgusSanctumView: View {
                 symbol: symbol,
                 viewModel: viewModel,
                 action: tradeAction
+            )
+            .preferredColorScheme(.dark)
+        }
+        .sheet(isPresented: $showArgusAnalysis) {
+            ArgusAnalysisSheet(
+                symbol: symbol,
+                decision: activeDecision
             )
             .preferredColorScheme(.dark)
         }
@@ -412,47 +429,75 @@ struct ArgusSanctumView: View {
     }
 
     // MARK: - Subviews (Computed Properties)
-    
-    // 1. BACK BUTTON (Ghost Style)
-    private var backButtonOverlay: some View {
-        VStack {
-            HStack(spacing: 0) {
-                Button(action: handleBackAction) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(.body, design: .default).weight(.medium))
-                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Geri")
 
-                Spacer()
-
-                Button(action: { router.navigate(to: .analystReport(symbol: symbol)) }) {
-                    Image("AnalystIcon")
-                        .renderingMode(.template)
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 20, height: 20)
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Analist raporu")
-
-                Button(action: { showDrawer = true }) {
-                    Image(systemName: "ellipsis")
-                        .font(.system(.body, design: .default).weight(.medium))
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Menüyü aç")
+    // 2026-04-25 H-36 · Sticky top nav (P1 layout, kullanıcı onayı):
+    //   sol: chevron.left + sembol + borsa altyazısı
+    //   sağ: Argus app-icon (analiz aç) + line.3.horizontal (drawer)
+    // Eski floating backButtonOverlay (chevron + AnalystIcon + ellipsis)
+    // kaldırıldı; bunun yerine sticky bar nav-bar standardını izliyor.
+    private var sanctumTopNav: some View {
+        HStack(spacing: 8) {
+            Button(action: handleBackAction) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
             }
-            .padding(.horizontal, 8)
-            .padding(.top, 52)
+            .buttonStyle(.plain)
+            .accessibilityLabel("Geri")
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(symbol)
+                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Text(exchangeMeta)
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            }
+            .padding(.leading, 2)
+
             Spacer()
+
+            Button(action: { showArgusAnalysis = true }) {
+                Image("ArgusAppIcon")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 36, height: 36)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle().stroke(InstitutionalTheme.Colors.holo.opacity(0.3), lineWidth: 0.5)
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Argus analizi")
+
+            Button(action: { showDrawer = true }) {
+                Image(systemName: "line.3.horizontal")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    .frame(width: 36, height: 36)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Menüyü aç")
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(InstitutionalTheme.Colors.surface1)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(InstitutionalTheme.Colors.border)
+                .frame(height: 0.5)
+        }
+    }
+
+    /// "NASDAQ · Global" gibi alt başlık. BIST sembolleri için "BIST · Sirkiye".
+    private var exchangeMeta: String {
+        if symbol.uppercased().hasSuffix(".IS") {
+            return "BIST · Sirkiye"
+        }
+        return "NASDAQ · Global"
     }
     
     // 2. HEADER → Views/Sanctum/SanctumHeader.swift

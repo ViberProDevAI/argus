@@ -51,6 +51,13 @@ struct HoloPanelView: View {
                     chironCorseWeights = await ChironWeightStore.shared.getWeights(symbol: symbol, engine: .corse)
                 }
             }
+            .onAppear {
+                // Phase 6 PR-C.2: AutoPilot pause-on-focus.
+                MarketDataStore.shared.setUserFocus(symbol)
+            }
+            .onDisappear {
+                MarketDataStore.shared.clearUserFocus()
+            }
             
             // System Info Card Overlay
             if showInfoCard {
@@ -286,7 +293,7 @@ struct HoloPanelView: View {
                 .padding(.horizontal)
 
                 // NEW: Prometheus - 5 Day Forecast (Moved to Bottom)
-                if !vm.candles.isEmpty, vm.candles.count >= 30, vm.orionAnalysis == nil {
+                if !vm.candles.isEmpty, vm.candles.count >= 120, vm.orionAnalysis == nil {
                     ForecastCard(
                         symbol: symbol,
                         historicalPrices: vm.candles.map { $0.close }

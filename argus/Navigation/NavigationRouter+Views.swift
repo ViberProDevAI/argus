@@ -19,7 +19,7 @@ extension NavigationRouter {
 
         // MARK: - Market Views
         case .stockDetail(let symbol):
-            StockDetailView(symbol: symbol, viewModel: viewModel)
+            ArgusSanctumView(symbol: symbol, viewModel: viewModel)
 
         case .etfDetail(let symbol):
             ArgusEtfDetailView(symbol: symbol, viewModel: viewModel)

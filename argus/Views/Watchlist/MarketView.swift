@@ -83,7 +83,7 @@ struct MarketView: View {
 
                 // Programmatic Navigation (DeepLinkManager)
                 NavigationLink(
-                    destination: StockDetailView(
+                    destination: ArgusSanctumView(
                         symbol: deepLinkManager.selectedStockSymbol ?? "",
                         viewModel: viewModel
                     ),
@@ -125,34 +125,22 @@ struct MarketView: View {
 
     private var topBar: some View {
         VStack(spacing: 0) {
-            // Tab Row: GLOBAL / SİRKİYE
+            // Tab Row: Global / Sirkiye (sentence case — H-26)
             HStack(spacing: 0) {
-                marketTabButton(title: "GLOBAL", mode: .global)
-                marketTabButton(title: "SİRKİYE", mode: .bist)
+                marketTabButton(title: "Global", mode: .global)
+                marketTabButton(title: "Sirkiye", mode: .bist)
             }
             .padding(.horizontal, 14)
             .padding(.top, 12)
             .padding(.bottom, 10)
             .background(InstitutionalTheme.Colors.surface1)
 
-            // Command Header — Ayarlar ile bütüncül dil (kompakt, tek satırda sığar)
-            VStack(spacing: 8) {
-                HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 6) {
-                            Rectangle()
-                                .fill(InstitutionalTheme.Colors.primary)
-                                .frame(width: 3, height: 20)
-                            Text("PİYASA")
-                                .font(.system(size: 22, weight: .black, design: .monospaced))
-                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                                .tracking(2)
-                        }
-                        Text("İZLEME · SİNYAL · KEŞİF")
-                            .font(.system(size: 9, weight: .semibold, design: .monospaced))
-                            .tracking(1.2)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    }
+            // Command Header — sentence-case, mono caption stack çıkartıldı.
+            VStack(spacing: 6) {
+                HStack(alignment: .center) {
+                    Text("Piyasa")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     Spacer()
                     HStack(spacing: 4) {
                         headerIconButton(
@@ -181,20 +169,17 @@ struct MarketView: View {
                     }
                 }
 
-                // V5 Pulse şeridi — ArgusDot + ArgusHair + tarih
-                HStack(spacing: 8) {
+                // Status satırı — yalın dot + "Açık" + saat. Mono caps caption yok.
+                HStack(spacing: 6) {
                     ArgusDot(color: InstitutionalTheme.Colors.aurora, size: 6)
-                    Text("PİYASA AKTİF")
-                        .font(InstitutionalTheme.Typography.dataMicro)
-                        .tracking(1.2)
-                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                        .layoutPriority(1)
-                    ArgusHair()
-                    Text(Date().formatted(.dateTime.day().month(.abbreviated).hour().minute()))
-                        .font(InstitutionalTheme.Typography.dataMicro)
+                    Text("Açık")
+                        .font(.system(size: 12))
                         .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    Spacer()
+                    Text(Date().formatted(.dateTime.hour().minute()))
+                        .font(.system(size: 12))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         .lineLimit(1)
-                        .fixedSize()
                 }
             }
             .padding(.horizontal, 14)
@@ -233,9 +218,7 @@ struct MarketView: View {
         Button(action: { withAnimation(.easeInOut(duration: 0.18)) { selectedMarket = mode } }) {
             VStack(spacing: 6) {
                 Text(title)
-                    .font(.system(.subheadline, design: .monospaced))
-                    .fontWeight(isSelected ? .bold : .medium)
-                    .tracking(1.1)
+                    .font(.system(size: 15, weight: isSelected ? .semibold : .medium))
                     .foregroundColor(
                         isSelected
                             ? InstitutionalTheme.Colors.textPrimary
@@ -406,7 +389,11 @@ struct GlobalCockpitView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Aether HUD
+            // 2026-04-24 H-30: Aether ve Chiron kartları "Piyasa" hibrit
+            // kartında birleşti — anasayfada tek satır, sıfat zinciri ile
+            // hem skor hem rejim hissi. ChironNeuralLink struct'ı kodda
+            // duruyor, detay sayfası ya da ileriki bir kullanım için
+            // hazır kalıyor; sadece anasayfa render'ından çıktı.
             AetherDashboardHUD(
                 rating: viewModel.macroRating,
                 onTap: { showAetherDetail = true }
@@ -419,20 +406,25 @@ struct GlobalCockpitView: View {
                 }
             }
 
-            // Chiron Neural Link
-            ChironNeuralLink(showEducation: $showEducation)
-                .padding(.horizontal, 16)
-                .padding(.top, 4)
-
             // SmartTicker Strip
             SmartTickerStrip(viewModel: viewModel)
                 .padding(.top, 16)
 
-            // Watchlist Section Header: GLOBAL İZLEME + LIVE/DELAY pill
-            ArgusSectionHeader("GLOBAL İZLEME") {
-                LiveStatusPill(isLive: viewModel.isLiveMode)
+            // 2026-04-24 H-26: "GLOBAL İZLEME" mono caps + "LIVE" pill yerine
+            // sade sentence-case başlık + canlılık dot'u. Bant zaten "CANLI"
+            // pill'i taşıyor, ikinci kez tekrarlamaya gerek yok.
+            HStack(spacing: 8) {
+                Text("İzleme listesi")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Spacer()
+                if viewModel.isLiveMode {
+                    ArgusDot(color: InstitutionalTheme.Colors.aurora, size: 6)
+                }
             }
-            .padding(.top, 12)
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 4)
 
             // Watchlist
             if watchlist.isEmpty {
@@ -441,7 +433,7 @@ struct GlobalCockpitView: View {
             } else {
                 LazyVStack(spacing: 0) {
                     ForEach(watchlist, id: \.self) { symbol in
-                        NavigationLink(destination: StockDetailView(symbol: symbol, viewModel: viewModel)) {
+                        NavigationLink(destination: ArgusSanctumView(symbol: symbol, viewModel: viewModel)) {
                             CrystalWatchlistRow(
                                 symbol: symbol,
                                 quote: watchlistVM.quotes[symbol],
@@ -477,16 +469,16 @@ struct BistCockpitView: View {
         VStack(spacing: 12) {
             // Sirkiye Cockpit Header (SirkiyeDashboardView zaten "SİRKİYE KORTEKS" başlığını kendi kartında sunuyor,
             // burada yalnızca grup başlığı koruyoruz)
-            ArgusSectionHeader("SİRKİYE KOKPİTİ", subtitle: "Makro rejim + BIST canlı nabız") {
+            ArgusSectionHeader("Sirkiye kokpiti", subtitle: "Makro rejim + BIST canlı nabız") {
                 Image(systemName: "eye.fill")
-                    .font(.system(.caption, design: .default))
-                    .foregroundColor(InstitutionalTheme.Colors.primary)
+                    .font(.system(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
             }
 
             SirkiyeDashboardView(viewModel: viewModel)
 
             // Watchlist Section
-            ArgusSectionHeader("BIST TAKİP (TL)")
+            ArgusSectionHeader("BIST takip", subtitle: "Türk lirası")
                 .padding(.top, 8)
 
             if watchlist.isEmpty {
@@ -499,7 +491,7 @@ struct BistCockpitView: View {
             } else {
                 LazyVStack(spacing: 0) {
                     ForEach(watchlist, id: \.self) { symbol in
-                        NavigationLink(destination: StockDetailView(symbol: symbol, viewModel: viewModel)) {
+                        NavigationLink(destination: ArgusSanctumView(symbol: symbol, viewModel: viewModel)) {
                             BistCrystalRow(
                                 symbol: symbol,
                                 quote: watchlistVM.quotes[symbol],

@@ -195,7 +195,7 @@ struct SignalSection: View {
             .padding(.horizontal, 16)
 
             ForEach(signals) { signal in
-                NavigationLink(destination: StockDetailView(symbol: signal.symbol, viewModel: viewModel)) {
+                NavigationLink(destination: ArgusSanctumView(symbol: signal.symbol, viewModel: viewModel)) {
                     AISignalCard(signal: signal, orion: viewModel.orionScores[signal.symbol])
                 }
                 .buttonStyle(.plain)

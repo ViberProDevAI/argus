@@ -49,7 +49,7 @@ struct PrometheusPanelView: View {
                         .tracking(1)
                         .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 }
-                Text("Bilimsel zaman çizgisi ve karar mantığı")
+                Text("Kısa vadeli trend projeksiyonu (Damped Holt)")
                     .font(InstitutionalTheme.Typography.caption)
                     .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
@@ -136,7 +136,8 @@ struct PrometheusPanelView: View {
 
     private func confidenceTone(_ value: Double) -> ArgusChipTone {
         if value >= 70 { return .aurora }
-        if value >= 50 { return .titan }
+        if value >= 50 { return .motor(.prometheus) }
+        if value >= 30 { return .titan }
         return .crimson
     }
 
@@ -314,8 +315,11 @@ struct PrometheusPanelView: View {
     private func loadForecast() async {
         isLoading = true
         defer { isLoading = false }
-        let newestFirst = Array(candles.map(\.close).reversed())
-        forecast = await PrometheusEngine.shared.forecast(symbol: symbol, historicalPrices: newestFirst)
+        // Engine artık oldest-first kapanış serisi bekliyor — codebase konvansiyonu ile aynı.
+        forecast = await PrometheusEngine.shared.forecast(
+            symbol: symbol,
+            historicalPrices: candles.map(\.close)
+        )
     }
 
     private func buildChartData(forecast: PrometheusForecast, history: [Candle]) -> PrometheusChartData {

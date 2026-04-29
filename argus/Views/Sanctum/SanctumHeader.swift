@@ -16,42 +16,60 @@ struct SanctumHeader: View {
     let symbol: String
     let quote: Quote?
 
+    // 2026-04-25 H-36: Büyük sembol Sanctum top nav'a taşındı; bu header
+    // artık sadece fiyat ve yüzde değişim taşıyor. Sola hizalı, top nav'ın
+    // hemen altında yaşar — duplikasyon yok.
     var body: some View {
-        VStack(spacing: 6) {
-            Text(symbol)
-                .font(.system(.title, design: .monospaced))
-                .fontWeight(.black)
-                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                .tracking(2)
-                .shadow(color: SanctumTheme.hologramBlue.opacity(0.4), radius: 12)
-                .accessibilityAddTraits(.isHeader)
+        if let quote {
+            let change = quote.percentChange ?? 0
+            let priceColor: Color = change >= 0
+                ? SanctumTheme.auroraGreen
+                : SanctumTheme.crimsonRed
+            let isBist = symbol.uppercased().hasSuffix(".IS")
+            let currency = isBist ? "₺" : "$"
 
-            if let quote {
-                let change = quote.percentChange ?? 0
-                let priceColor: Color = change >= 0
-                    ? SanctumTheme.auroraGreen
-                    : SanctumTheme.crimsonRed
+            VStack(alignment: .leading, spacing: 4) {
+                Text(String(format: "\(currency)%.2f", quote.currentPrice))
+                    .font(.system(size: 32, weight: .semibold, design: .monospaced))
+                    .monospacedDigit()
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
                 HStack(spacing: 8) {
-                    Text(String(format: "%.2f", quote.currentPrice))
-                        .font(.system(.headline, design: .monospaced))
-                        .fontWeight(.semibold)
+                    Text(String(format: "%@%.2f", change >= 0 ? "+" : "", quote.change))
+                        .font(.system(size: 13, design: .monospaced))
                         .monospacedDigit()
                         .foregroundColor(priceColor)
-
                     Text(String(format: "%@%.2f%%", change >= 0 ? "+" : "", change))
-                        .font(.system(.footnote, design: .monospaced))
-                        .fontWeight(.medium)
+                        .font(.system(size: 13, design: .monospaced))
                         .monospacedDigit()
-                        .foregroundColor(priceColor.opacity(0.7))
+                        .foregroundColor(priceColor)
+                    Spacer()
+                    Text("Son · \(formattedTime)")
+                        .font(.system(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(Text(
-                    "Fiyat \(String(format: "%.2f", quote.currentPrice)), " +
-                    "değişim \(String(format: "%+.2f", change)) yüzde"
-                ))
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(Text(
+                "Fiyat \(String(format: "%.2f", quote.currentPrice)), " +
+                "değişim \(String(format: "%+.2f", change)) yüzde"
+            ))
+        } else {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("—")
+                    .font(.system(size: 32, weight: .semibold, design: .monospaced))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.top, 100)
+    }
+
+    private var formattedTime: String {
+        Date().formatted(.dateTime.hour().minute())
     }
 }

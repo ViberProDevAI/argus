@@ -42,16 +42,22 @@ enum InstitutionalTheme {
         static let borderSubtle   = border
 
         // MARK: - Motor paleti (V5 motor renkleri)
+        //
+        // 2026-04-24 H-25: "AI-tell" renkleri yasaklandı. Mor (chiron lavanta,
+        // chronos soluk lavanta) ve magenta-pembe (hermes) palettden çıkarıldı;
+        // SaaS/AI brand'lerini çağrıştırmayan, daha grounded enstitüsyonel
+        // tonlarla değiştirildi. Diğer renkler kullanıcı UI'sinde görünüyordu;
+        // bu kayıtlar tek source-of-truth — tüm uygulamaya otomatik yayılır.
         enum Motors {
-            static let orion       = Color(hex: "60A5FA")
-            static let atlas       = Color(hex: "93C5FD")
-            static let aether      = Color(hex: "22D3EE")
-            static let hermes      = Color(hex: "F472B6")
-            static let athena      = Color(hex: "FDE68A")
-            static let demeter     = Color(hex: "84CC16")
-            static let chiron      = Color(hex: "A78BFA")
-            static let prometheus  = Color(hex: "FB923C")
-            static let alkindus    = Color(hex: "94A3B8")
+            static let orion       = Color(hex: "60A5FA")  // mavi
+            static let atlas       = Color(hex: "93C5FD")  // açık mavi
+            static let aether      = Color(hex: "22D3EE")  // cyan
+            static let hermes      = Color(hex: "E5A47B")  // terracotta (eski: F472B6 magenta — AI-tell)
+            static let athena      = Color(hex: "FDE68A")  // soluk altın
+            static let demeter     = Color(hex: "84CC16")  // lime
+            static let chiron      = Color(hex: "C8A971")  // warm tan/parchment (eski: A78BFA mor — AI-tell)
+            static let prometheus  = Color(hex: "FB923C")  // turuncu
+            static let alkindus    = Color(hex: "94A3B8")  // slate
             /// V5'te ayrık asset yok, Prometheus alevi reuse.
             static let phoenix     = prometheus
             static let council     = primary
@@ -75,7 +81,7 @@ enum InstitutionalTheme {
                 // Rezerv motorlar — V5'te asset yok, mantıksal tercihler:
                 case .poseidon:   return Color(hex: "38BDF8") // açık turkuaz
                 case .titan:      return titan                  // altın
-                case .chronos:    return Color(hex: "E0E7FF") // soluk lavanta
+                case .chronos:    return Color(hex: "B0C4D4") // soluk steel mavi (eski: E0E7FF lavanta — AI-tell)
                 case .hephaestus: return Color(hex: "F97316") // kızıl turuncu
                 }
             }

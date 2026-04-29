@@ -170,11 +170,10 @@ extension TradingViewModel {
                 }
 
                 for await (symbol, candles) in group {
-                    guard let candles, candles.count >= 30 else { continue }
-                    let pricesNewestFirst = Array(candles.map(\.close).reversed())
+                    guard let candles, candles.count >= 120 else { continue }
                     let forecast = await PrometheusEngine.shared.forecast(
                         symbol: symbol,
-                        historicalPrices: pricesNewestFirst
+                        historicalPrices: candles.map(\.close)
                     )
                     forecastUpdates[symbol] = forecast
                 }

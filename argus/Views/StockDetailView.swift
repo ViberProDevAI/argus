@@ -39,7 +39,13 @@ struct StockDetailView: View {
             #if DEBUG
             print(" UI DEBUG: StockDetailView appeared for \(symbol)")
             #endif
+            // Phase 6 PR-C.2: AutoPilot pause-on-focus. Detay açıkken scan duraksın.
+            MarketDataStore.shared.setUserFocus(symbol)
             checkType()
+        }
+        .onDisappear {
+            // Detay kapanınca odaklanmayı temizle — AutoPilot tekrar serbest.
+            MarketDataStore.shared.clearUserFocus()
         }
         .onChange(of: viewModel.argusDecisions[symbol]?.assetType) { oldValue, newValue in
             #if DEBUG

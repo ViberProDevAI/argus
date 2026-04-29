@@ -191,16 +191,18 @@ struct ForecastCard: View {
     }
 
     private func confidenceTone(_ c: Double) -> ArgusChipTone {
-        if c >= 80 { return .aurora }
-        if c >= 60 { return .motor(.prometheus) }
-        return .titan
+        if c >= 70 { return .aurora }
+        if c >= 50 { return .motor(.prometheus) }
+        if c >= 30 { return .titan }
+        return .crimson
     }
 
     private func loadForecast() async {
         isLoading = true
+        // Engine oldest-first istiyor; ForecastCard prop'u zaten kronolojik (oldest-first).
         forecast = await PrometheusEngine.shared.forecast(
             symbol: symbol,
-            historicalPrices: Array(historicalPrices.reversed())
+            historicalPrices: historicalPrices
         )
         isLoading = false
     }
@@ -219,17 +221,19 @@ struct ForecastCard: View {
     }
 
     private func generateInsight(trend: PrometheusTrend, confidence: Double) -> String {
+        // Şartlı dil: model son trendi sönümlü olarak uzatıyor; "kesinlikle olacak" iddiası yok.
+        let qualifier = confidence < 50 ? " Güven düşük; tek başına işlem sinyali olarak kullanılmamalı." : ""
         switch trend {
         case .strongBullish:
-            return "Fiyatın önümüzdeki 5 gün içinde sert yükseliş ivmesini koruması bekleniyor. Momentum güçlü."
+            return "Mevcut trend devam ederse ufuk sonunda yukarı yönlü projeksiyon güçlü." + qualifier
         case .bullish:
-            return "Yükseliş trendinin devamı öngörülüyor. Kısa vadeli geri çekilmeler alım fırsatı olabilir."
+            return "Son trendin sönümlü uzantısı yukarı yönlü; kısa vadeli geri çekilmeler bu projeksiyonu doğrudan değiştirmez." + qualifier
         case .neutral:
-            return "Belirgin bir yön yok. Fiyatın mevcut aralıkta yatay seyretmesi bekleniyor."
+            return "Belirgin bir yön yok. Projeksiyon mevcut seviyenin etrafında kalıyor." + qualifier
         case .bearish:
-            return "Zayıflama sinyalleri var. Fiyatın aşağı yönlü baskı altında kalması muhtemel."
+            return "Son trendin sönümlü uzantısı aşağı yönlü." + qualifier
         case .strongBearish:
-            return "Keskin düşüş riski yüksek. Algoritma satış baskısının artacağını öngörüyor."
+            return "Mevcut serinin lineer projeksiyonu belirgin aşağı yönlü; bant genişliği riski büyütüyor." + qualifier
         }
     }
 }

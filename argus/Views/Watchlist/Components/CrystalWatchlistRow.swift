@@ -21,36 +21,42 @@ struct CrystalWatchlistRow: View {
             avatar
 
             // 2. Kimlik + neden
+            //
+            // 2026-04-24 H-26: Eski layout sembolü iki kere gösteriyordu —
+            // üstte bold "ADBE", altta gri "ADBE". Yeni: üstte şirket adı
+            // (varsa), altta sembol mono küçük. Sinyal varsa neden, sembol
+            // yerine alt satıra geçer ama sembol her zaman bir yerde okunur
+            // kalır (avatar'ın üstündeki büyük yazı sembolün alfanumerik
+            // formuna gerek bırakmıyor).
             VStack(alignment: .leading, spacing: 2) {
-                Text(symbol)
-                    .font(.system(size: 14, weight: .bold))
+                Text(displayName)
+                    .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    .lineLimit(1)
 
                 if let sig = signal, !sig.reason.isEmpty {
                     Text(sig.reason)
-                        .font(.system(size: 11))
+                        .font(.system(size: 12))
                         .foregroundColor(reasonColor(sig))
                         .lineLimit(1)
                 } else {
-                    Text(quote?.shortName ?? "Yükleniyor")
-                        .font(.system(size: 11))
+                    Text(symbolDisplay)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
                         .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         .lineLimit(1)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // 3. Aksiyon pill (V5 pill — radius 8, mono 10pt/700)
+            // 3. Aksiyon pill (sadece AI sinyali varsa)
+            // 2026-04-25 H-33: Tahmin (Prometheus) artık burada değil —
+            // priceBlock'un altına üçüncü satır olarak iniyor (Q3 layout).
+            // Slot sadece sinyal pill'i için, sinyal yoksa boş kalmıyor.
             if let sig = signal {
                 actionPill(for: sig)
-            } else if let f = forecast {
-                PrometheusBadge(forecast: f)
-                    .frame(width: 70)
-            } else {
-                Color.clear.frame(width: 48)
             }
 
-            // 4. Fiyat + % kapsülü
+            // 4. Fiyat + % + (varsa) tahmin satırı
             priceBlock
         }
         .padding(.vertical, 10)
@@ -69,50 +75,63 @@ struct CrystalWatchlistRow: View {
         CompanyLogoView(symbol: symbol, size: 36, cornerRadius: 18)
     }
 
-    // MARK: - Action pill
-
-    private func actionPill(for sig: AISignal) -> some View {
-        let label = localizedAction(sig)
-        let (bg, fg) = pillColors(for: sig)
-        return Text(label)
-            .font(.system(size: 10, weight: .black, design: .monospaced))
-            .tracking(0.5)
-            .foregroundColor(fg)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(bg)
-            )
-            .frame(width: 56, alignment: .center)
+    // MARK: - Display helpers
+    //
+    // 2026-04-24 H-26: "ADBE / ADBE" tekrarını kırmak için. Quote.shortName
+    // doluysa onu göster (örn. "Adobe"); değilse sembolü göster — her durumda
+    // alt satırda sembol mono küçük olarak okunur kalıyor.
+    private var displayName: String {
+        if let name = quote?.shortName, !name.isEmpty, name != symbol {
+            return name
+        }
+        return cleanedSymbol
     }
 
-    private func pillColors(for sig: AISignal) -> (Color, Color) {
+    /// Alt satır — sembol kanonik formda (`ADBE`, `THYAO.IS`).
+    private var symbolDisplay: String { cleanedSymbol }
+
+    /// `ADBE` → `ADBE`, `THYAO.IS` → `THYAO`. BIST suffix'i alt satırda
+    /// gerek yok, üstteki şirket adı zaten "Türk Hava Yolları" gibi geliyor.
+    private var cleanedSymbol: String {
+        symbol.uppercased().replacingOccurrences(of: ".IS", with: "")
+    }
+
+    // MARK: - Action pill
+
+    // 2026-04-25 H-33: ALL CAPS mono black tracking → sentence case 11pt
+    // semibold capsule. Renkler 0.16 opacity tone fill — ticker bandı,
+    // chiron rejim chip'i ile aynı dilde.
+    private func actionPill(for sig: AISignal) -> some View {
+        let label = localizedAction(sig)
+        let tone = pillTone(for: sig)
+        return Text(label)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(tone)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(tone.opacity(0.16))
+            )
+    }
+
+    private func pillTone(for sig: AISignal) -> Color {
         switch sig.action {
-        case .buy:
-            return (InstitutionalTheme.Colors.aurora, Color(hex: "0A1F0A"))
-        case .sell:
-            return (InstitutionalTheme.Colors.crimson.opacity(0.2),
-                    InstitutionalTheme.Colors.crimson)
-        case .hold:
-            return (Color(white: 0.25).opacity(0.5),
-                    InstitutionalTheme.Colors.textPrimary)
-        case .wait:
-            return (InstitutionalTheme.Colors.Motors.chiron.opacity(0.2),
-                    InstitutionalTheme.Colors.Motors.chiron)
-        case .skip:
-            return (InstitutionalTheme.Colors.textTertiary.opacity(0.2),
-                    InstitutionalTheme.Colors.textTertiary)
+        case .buy:  return InstitutionalTheme.Colors.aurora
+        case .sell: return InstitutionalTheme.Colors.crimson
+        case .hold: return InstitutionalTheme.Colors.textSecondary
+        case .wait: return InstitutionalTheme.Colors.Motors.chiron
+        case .skip: return InstitutionalTheme.Colors.textTertiary
         }
     }
 
     private func localizedAction(_ sig: AISignal) -> String {
         switch sig.action {
-        case .buy:  return "AL"
-        case .sell: return "SAT"
-        case .hold: return "BEKLE"
-        case .wait: return "İZLE"
-        case .skip: return "PAS"
+        case .buy:  return "Al"
+        case .sell: return "Sat"
+        case .hold: return "Bekle"
+        case .wait: return "İzle"
+        case .skip: return "Pas"
         }
     }
 
@@ -126,6 +145,10 @@ struct CrystalWatchlistRow: View {
     }
 
     // MARK: - Price block
+    //
+    // 2026-04-25 H-33: Yüzde değişim renkli kapsülden çıkıp düz renkli
+    // text'e geçti (ticker bandı + Aether kartı ile aynı dil). Tahmin
+    // (Prometheus) varsa üçüncü satır olarak ufak mono — "↑ 5.2% tahmin".
 
     private var priceBlock: some View {
         Group {
@@ -136,20 +159,16 @@ struct CrystalWatchlistRow: View {
                     ? InstitutionalTheme.Colors.aurora
                     : InstitutionalTheme.Colors.crimson
 
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: 2) {
                     Text(String(format: "\(currency)%.2f", q.currentPrice))
-                        .font(.system(size: 14, weight: .black, design: .monospaced))
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
                     Text(String(format: "%+.2f%%", q.percentChange))
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .font(.system(size: 11, design: .monospaced))
                         .foregroundColor(changeColor)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                .fill(changeColor.opacity(0.18))
-                        )
+
+                    PrometheusBadge(forecast: forecast)
                 }
                 .frame(minWidth: 82, alignment: .trailing)
             } else {

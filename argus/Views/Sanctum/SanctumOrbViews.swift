@@ -25,23 +25,21 @@ struct OrbView: View {
     @ObservedObject var viewModel: TradingViewModel
     let symbol: String
 
+    // 2026-04-24 H-27: Eski orb 10px blur glow + 1.5px parlak stroke + mono
+    // caps tracking ile "AI panel" estetiğindeydi. Yeni hâl institutional:
+    // tek 1pt stroke, glow yok. Caption sentence case "Athena · 65" — düşük
+    // motor color opacity (state'e göre hâlâ değişiyor) ve mono kalır
+    // (rakam okuma rahat olsun) ama tracking minimal.
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
-                // Glow katmanı — state'e bağlı yoğunluk.
-                // Active: 0.45 (V5 default), Pending: 0.18, Empty: 0.08.
-                Circle()
-                    .fill(module.color.opacity(orbState.haloOpacity))
-                    .frame(width: 54, height: 54)
-                    .blur(radius: 10)
-
                 // Ana orb
                 Circle()
                     .fill(InstitutionalTheme.Colors.surface2)
                     .frame(width: 48, height: 48)
 
                 Circle()
-                    .stroke(module.color.opacity(orbState.borderOpacity), lineWidth: 1.5)
+                    .stroke(module.color.opacity(orbState.borderOpacity), lineWidth: 1)
                     .frame(width: 48, height: 48)
 
                 // V5 logo — motor tipinden üretilen MotorLogo
@@ -51,9 +49,9 @@ struct OrbView: View {
 
             // Caption — motor adı + state-aware değer
             Text(captionText)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(module.color.opacity(orbState.captionOpacity))
-                .tracking(0.5)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(InstitutionalTheme.Colors.textSecondary.opacity(orbState.captionOpacity))
+                .lineLimit(1)
         }
         .accessibilityLabel(Text("\(displayName). \(orbState.accessibilityValue)"))
     }
@@ -61,21 +59,24 @@ struct OrbView: View {
     // MARK: - Caption & Display Helpers
 
     private var captionText: String {
-        "\(displayName.uppercased()) · \(orbState.valueText)"
+        "\(displayName) · \(orbState.valueText)"
     }
 
+    /// Sentence-case motor / BIST modül adı (örn. "Athena", "Sirkiye").
+    /// Eski hal `module.rawValue` ALL CAPS dönüyor, biz aşağıda `Text`
+    /// tarafında uppercase'i kapattık — burada da capitalized form üretilir.
     private var displayName: String {
         if symbol.uppercased().hasSuffix(".IS") {
             switch module {
-            case .aether: return "SIRKIYE"
-            case .orion:  return "TAHTA"
-            case .atlas:  return "KASA"
-            case .hermes: return "KULIS"
-            case .chiron: return "KISMET"
-            default:      return module.rawValue
+            case .aether: return "Sirkiye"
+            case .orion:  return "Tahta"
+            case .atlas:  return "Kasa"
+            case .hermes: return "Kulis"
+            case .chiron: return "Kısmet"
+            default:      return module.rawValue.capitalized
             }
         }
-        return module.rawValue
+        return module.rawValue.capitalized
     }
 
     // MARK: - Orb State (V5.H-20 dual-source cascade)
@@ -158,7 +159,7 @@ struct OrbView: View {
             if let argus {
                 return .active(valueText: "\(Int(round(argus.orionScore)))")
             }
-            return .pending(label: "BEKLİYOR")
+            return .pending(label: "Bekliyor")
 
         case .atlas:
             if let grand, let a = grand.atlasDecision {
@@ -168,7 +169,7 @@ struct OrbView: View {
             if let argus, argus.atlasScore > 0 {
                 return .active(valueText: "\(Int(round(argus.atlasScore)))")
             }
-            return .pending(label: "BEKLİYOR")
+            return .pending(label: "Bekliyor")
 
         case .aether:
             if let grand {
@@ -178,7 +179,7 @@ struct OrbView: View {
             if let argus, argus.aetherScore > 0 {
                 return .active(valueText: "\(Int(round(argus.aetherScore)))")
             }
-            return .pending(label: "BEKLİYOR")
+            return .pending(label: "Bekliyor")
 
         case .hermes:
             if let grand, let h = grand.hermesDecision {
@@ -191,9 +192,9 @@ struct OrbView: View {
             // Haber sayısı "hermes çizgi ama veri var" dertini çözer.
             let newsCount = viewModel.newsInsightsBySymbol[symbol]?.count ?? 0
             if newsCount > 0 {
-                return .pending(label: "\(newsCount) HABER")
+                return .pending(label: "\(newsCount) haber")
             }
-            return .pending(label: "BEKLİYOR")
+            return .pending(label: "Bekliyor")
 
         case .prometheus:
             // Phoenix status-aware: aktif → yön oku + güven yüzdesi;
@@ -210,9 +211,9 @@ struct OrbView: View {
                     let pct = Int(round(phoenix.confidence * 100))
                     return .active(valueText: "\(arrow)%\(pct)")
                 case .inactive:
-                    return .pending(label: "PASİF")
+                    return .pending(label: "Pasif")
                 case .insufficientData:
-                    return .pending(label: "VERİ KISITLI")
+                    return .pending(label: "Veri kısıtlı")
                 case .error:
                     return .empty
                 }
@@ -222,7 +223,7 @@ struct OrbView: View {
                 let pct = Int(round(grand.confidence * 100))
                 return .active(valueText: "%\(pct)")
             }
-            return .pending(label: "BEKLİYOR")
+            return .pending(label: "Bekliyor")
 
         case .athena, .demeter, .chiron, .council:
             // Bu orb'lar halkada gösterilmiyor; defensive default.
@@ -236,29 +237,25 @@ struct OrbView: View {
 struct BistOrbView: View {
     let module: SanctumBistModuleType
 
+    // 2026-04-24 H-27: Glow + parlak stroke + mono caps caption → institutional dile çekildi.
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
-                Circle()
-                    .fill(module.color.opacity(0.45))
-                    .frame(width: 54, height: 54)
-                    .blur(radius: 10)
-
                 Circle()
                     .fill(InstitutionalTheme.Colors.surface2)
                     .frame(width: 48, height: 48)
 
                 Circle()
-                    .stroke(module.color.opacity(0.7), lineWidth: 1.5)
+                    .stroke(module.color.opacity(0.55), lineWidth: 1)
                     .frame(width: 48, height: 48)
 
                 MotorLogo(module.motor, size: 28)
             }
 
-            Text(module.rawValue)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundStyle(module.color)
-                .tracking(0.5)
+            Text(module.rawValue.capitalized)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(InstitutionalTheme.Colors.textSecondary)
+                .lineLimit(1)
         }
     }
 }

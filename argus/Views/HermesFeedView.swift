@@ -98,7 +98,7 @@ struct HermesFeedView: View {
                 if !feedState.insights.isEmpty && feedState.events.isEmpty {
                     ForEach(feedState.insights) { insight in
                         if insight.symbol != "MARKET" && insight.symbol != "GENERAL" {
-                            NavigationLink(destination: StockDetailView(symbol: insight.symbol, viewModel: viewModel)) {
+                            NavigationLink(destination: ArgusSanctumView(symbol: insight.symbol, viewModel: viewModel)) {
                                 HermesInsightCard(insight: insight)
                             }
                             .buttonStyle(PlainButtonStyle())

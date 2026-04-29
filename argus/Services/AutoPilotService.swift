@@ -28,13 +28,27 @@ final class AutoPilotService: Sendable {
     /// Scans the provided list of symbols for high-conviction setups.
     /// Returns a list of Signals. Execution happens in ViewModel.
     func scanMarket(
-        symbols: [String], 
-        equity: Double, 
+        symbols: [String],
+        equity: Double,
         bistEquity: Double, // NEW: TL Equity for BIST
-        buyingPower: Double, 
+        buyingPower: Double,
         bistBuyingPower: Double,
         portfolio: [String: Trade]
     ) async -> (signals: [TradeSignal], logs: [ScoutLog]) {
+        // Phase 6 PR-C.2 (2026-04-29): Pause-on-Focus.
+        //
+        // Kullanıcı bir sembol detayında odaklıyken AutoPilot tarama YAPMAZ.
+        // Sebep: detay sayfası 1-2 batch quote + candle + fundamentals isteği
+        // atıyor; AutoPilot 50 sembol × ~3 endpoint paralel scan başlatırsa
+        // detay isteği inflight kuyruğunun arkasında kalıp "hazırlanıyor"
+        // sonsuza dek görünür. Detay kapatılınca scan tekrar serbest.
+        if let focused = await MainActor.run(body: { MarketDataStore.shared.userFocusedSymbol }) {
+            ArgusLogger.info(.autopilot, "scanMarket atlandı: kullanıcı '\(focused)' sembolünde odaklı, bant genişliği detay isteklerine bırakıldı")
+            print("⏸️ AutoPilotService: User focus aktif (\(focused)), tarama atlandı")
+            let skipLog = ScoutLog(symbol: "—", status: "ATLA", reason: "Kullanıcı detay açık (\(focused))", score: 0)
+            return ([], [skipLog])
+        }
+
         // KRİTİK: Stuck isScanning flag'ı tespiti + otomatik reset.
         //
         // Eski sürümde bir scan async closure içinde çökerse (task cancel, exception,

@@ -135,3 +135,6 @@ Scripts/borsapy_server/__pycache__/
 *.cer
 *.key
 *.pem
+
+# Local development notes (not for repo)
+tasks/

@@ -11,10 +11,25 @@ actor HeimdallCircuitBreaker {
     private var states: [String: CircuitState] = [:]
     
     // MARK: - Configuration
+    //
+    // Phase 5 (2026-04-29): Eşik 5→12, cooldown 60→15s, success 2→1.
+    //
+    // Eski ayarlar (5/60/2) AutoPilot'un 50+ sembollük taramasında çok agresifti:
+    // Yahoo geçici 502 verdiğinde 5 art arda hata anında oluşuyor → CB OPEN →
+    // 60 saniye boyunca **TÜM** uygulamada Yahoo candles erişimi 503 yiyor →
+    // 304 sembol tek bir burst'te skip oluyor (loglarda doğrulandı).
+    //
+    // Yeni mantık:
+    //   • failureThreshold 12: AutoPilot taramasında geçici provider hıçkırıklarına
+    //     daha toleranslı (6 timeframe × 2 sembol = 12 olası hatayı tolere eder).
+    //   • openTimeout 15s: Yahoo arızası kısa-süreli olur, 60s'de Yahoo geri dönmüş
+    //     olabilir; 15s sonra HALF_OPEN'da test isteği geçer, başarılıysa CLOSED.
+    //   • successThreshold 1: Half-open'da tek başarılı istek yetsin; 2 istek bekleme
+    //     half-open süresini gereksiz uzatıyor.
     struct Config {
-        let failureThreshold: Int = 5          // 5 hata → OPEN
-        let successThreshold: Int = 2          // 2 başarı → CLOSED
-        let openTimeout: TimeInterval = 60     // 1 dk sonra HALF_OPEN
+        let failureThreshold: Int = 12         // 12 hata → OPEN (was 5)
+        let successThreshold: Int = 1          // 1 başarı → CLOSED (was 2)
+        let openTimeout: TimeInterval = 15     // 15 sn sonra HALF_OPEN (was 60)
         let resetTimeout: TimeInterval = 300   // 5 dk sonra otomatik reset
     }
     

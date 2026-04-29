@@ -1,5 +1,11 @@
 import SwiftUI
 
+// 2026-04-24 H-27: Eski panel "239.23 SAT / AL 239.23" şeklinde fiyatı her
+// iki butonda tekrar ediyordu — fiyat zaten SanctumHeader'da en üstte. Yeni
+// panel sade "Sat" ve "Al" — eylem netleşti, fiyat tek yerde yaşıyor.
+// Aurora glow shadow kaldırıldı (AI-tell), butonlar institutional dilde:
+// fill + stroke + sentence case label.
+
 struct SanctumTradePanel: View {
     let symbol: String
     let currentPrice: Double
@@ -7,59 +13,36 @@ struct SanctumTradePanel: View {
     let onSell: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
-            Button(action: onSell) {
-                HStack(spacing: 6) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(String(format: "%.2f", currentPrice))
-                            .font(InstitutionalTheme.Typography.dataSmall)
-                            .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
-                            .monospacedDigit()
-                    }
-                    Text("SAT")
-                        .font(InstitutionalTheme.Typography.micro)
-                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(SanctumTheme.crimsonRed.opacity(0.2))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(SanctumTheme.crimsonRed.opacity(0.45), lineWidth: 1)
-                        )
-                )
-            }
-
-            Spacer()
-            Spacer()
-
-            Button(action: onBuy) {
-                HStack(spacing: 6) {
-                    Text("AL")
-                        .font(InstitutionalTheme.Typography.micro)
-                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text(String(format: "%.2f", currentPrice))
-                            .font(InstitutionalTheme.Typography.dataSmall)
-                            .foregroundColor(InstitutionalTheme.Colors.textPrimary.opacity(0.85))
-                            .monospacedDigit()
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(SanctumTheme.auroraGreen.opacity(0.2))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .stroke(SanctumTheme.auroraGreen.opacity(0.45), lineWidth: 1)
-                        )
-                )
-                .shadow(color: SanctumTheme.auroraGreen.opacity(0.2), radius: 4, x: 0, y: 0)
-            }
+        HStack(spacing: 12) {
+            tradeButton(
+                label: "Sat",
+                tint: SanctumTheme.crimsonRed,
+                action: onSell
+            )
+            tradeButton(
+                label: "Al",
+                tint: SanctumTheme.auroraGreen,
+                action: onBuy
+            )
         }
         .padding(.horizontal, 16)
+    }
+
+    private func tradeButton(label: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(tint.opacity(0.18))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .stroke(tint.opacity(0.45), lineWidth: 1)
+                        )
+                )
+        }
     }
 }

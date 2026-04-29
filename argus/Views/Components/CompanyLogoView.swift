@@ -208,7 +208,7 @@ struct CompanyLogoView: View {
         case 1: return [Color(hex: "3B0A0A"), Color(hex: "EF4444")]
         case 2: return [Color(hex: "112437"), Color(hex: "60A5FA")]
         case 3: return [Color(hex: "0B1426"), Color(hex: "22D3EE")]
-        case 4: return [Color(hex: "1A1525"), Color(hex: "A78BFA")]
+        case 4: return [Color(hex: "2A1F0A"), Color(hex: "C8A971")] // warm tan (eski: A78BFA mor — AI-tell)
         default: return [Color(hex: "1F2A0A"), Color(hex: "22C55E")]
         }
     }
