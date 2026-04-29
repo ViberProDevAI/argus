@@ -149,49 +149,37 @@ actor ArgusGrandCouncil {
             print("📐 Orion V3: \(detectedPatterns.count) formasyon tespit edildi.")
         }
         
-        // 2. Gather all council decisions (Parallel execution could be optimized here)
-        let orionDecision: CouncilDecision
-        
-        if isBist {
-            print("🇹🇷 Orion TR (Turquoise) Devrede - \(symbol)")
-            orionDecision = await OrionBistEngine.shared.analyze(symbol: symbol, candles: candles)
-        } else {
-            orionDecision = await OrionCouncil.shared.convene(symbol: symbol, candles: candles, engine: engine)
-        }
-        
-        var atlasDecision: AtlasDecision? = nil
-        if let snap = snapshot {
-            if isBist {
-                print("🇹🇷 Atlas TR (Turquoise) Devrede - \(symbol)")
-                atlasDecision = await AtlasBistEngine.shared.analyze(symbol: symbol, financials: snap)
-            } else {
-                atlasDecision = await AtlasCouncil.shared.convene(symbol: symbol, financials: snap, engine: engine)
-            }
-        }
-        
-        // 3. Aether (Macro) - Project Turquoise Integration (Sirkiye)
-        let aetherDecision: AetherDecision
-        
-        if isBist, let bistInput = sirkiyeInput {
-            print("🇹🇷 Sirkiye (Politik Korteks) Devrede - \(symbol)")
-            aetherDecision = await SirkiyeEngine.shared.analyze(input: bistInput)
-        } else {
-            aetherDecision = await AetherCouncil.shared.convene(macro: macro)
-        }
-        
-        var hermesDecision: HermesDecision? = nil
-        
-        if isBist {
-            // [ADAPTER] BIST Sentiment -> Hermes Snapshot
-            // BIST için native sentiment analizini çalıştırıp Hermes formatına çeviriyoruz
-            if let payload = try? await BISTSentimentEngine.shared.analyzeSentimentPayload(for: symbol) {
-                let adaptedSnapshot = BISTSentimentAdapter.adapt(result: payload.result, articles: payload.articles)
-                hermesDecision = await HermesCouncil.shared.convene(symbol: symbol, news: adaptedSnapshot)
-                print("🇹🇷 Hermes (Adapter): BIST Sentiment Entegre Edildi. Skor: \(Int(payload.result.overallScore))")
-            }
-        } else if let newsData = news {
-            hermesDecision = await HermesCouncil.shared.convene(symbol: symbol, news: newsData)
-        }
+        // 2. Gather all council decisions in parallel.
+        // Each council is an independent actor; running them concurrently
+        // shaves roughly the cost of the slowest member off the convene path.
+        async let orionFuture = resolveOrionDecision(
+            symbol: symbol,
+            candles: candles,
+            engine: engine,
+            isBist: isBist
+        )
+        async let atlasFuture = resolveAtlasDecision(
+            symbol: symbol,
+            snapshot: snapshot,
+            engine: engine,
+            isBist: isBist
+        )
+        async let aetherFuture = resolveAetherDecision(
+            symbol: symbol,
+            macro: macro,
+            sirkiyeInput: sirkiyeInput,
+            isBist: isBist
+        )
+        async let hermesFuture = resolveHermesDecision(
+            symbol: symbol,
+            news: news,
+            isBist: isBist
+        )
+
+        let orionDecision = await orionFuture
+        let atlasDecision = await atlasFuture
+        let aetherDecision = await aetherFuture
+        let hermesDecision = await hermesFuture
         
         // 2.5 Get Weights (Non-blocking now)
         let weights = ChironCouncilLearningService.shared.getCouncilWeights(symbol: symbol, engine: engine)
@@ -941,6 +929,70 @@ actor ArgusGrandCouncil {
         default:
             return "General"
         }
+    }
+
+    // MARK: - Council Resolvers (Parallel-friendly helpers)
+    // Each resolver wraps the conditional path for one council so the
+    // four can be launched concurrently with `async let`.
+
+    private func resolveOrionDecision(
+        symbol: String,
+        candles: [Candle],
+        engine: AutoPilotEngine,
+        isBist: Bool
+    ) async -> CouncilDecision {
+        if isBist {
+            print("🇹🇷 Orion TR (Turquoise) Devrede - \(symbol)")
+            return await OrionBistEngine.shared.analyze(symbol: symbol, candles: candles)
+        }
+        return await OrionCouncil.shared.convene(symbol: symbol, candles: candles, engine: engine)
+    }
+
+    private func resolveAtlasDecision(
+        symbol: String,
+        snapshot: FinancialSnapshot?,
+        engine: AutoPilotEngine,
+        isBist: Bool
+    ) async -> AtlasDecision? {
+        guard let snap = snapshot else { return nil }
+        if isBist {
+            print("🇹🇷 Atlas TR (Turquoise) Devrede - \(symbol)")
+            return await AtlasBistEngine.shared.analyze(symbol: symbol, financials: snap)
+        }
+        return await AtlasCouncil.shared.convene(symbol: symbol, financials: snap, engine: engine)
+    }
+
+    private func resolveAetherDecision(
+        symbol: String,
+        macro: MacroSnapshot,
+        sirkiyeInput: SirkiyeEngine.SirkiyeInput?,
+        isBist: Bool
+    ) async -> AetherDecision {
+        if isBist, let bistInput = sirkiyeInput {
+            print("🇹🇷 Sirkiye (Politik Korteks) Devrede - \(symbol)")
+            return await SirkiyeEngine.shared.analyze(input: bistInput)
+        }
+        return await AetherCouncil.shared.convene(macro: macro)
+    }
+
+    private func resolveHermesDecision(
+        symbol: String,
+        news: HermesNewsSnapshot?,
+        isBist: Bool
+    ) async -> HermesDecision? {
+        if isBist {
+            guard let payload = try? await BISTSentimentEngine.shared.analyzeSentimentPayload(for: symbol) else {
+                return nil
+            }
+            let adapted = BISTSentimentAdapter.adapt(result: payload.result, articles: payload.articles)
+            let decision = await HermesCouncil.shared.convene(symbol: symbol, news: adapted)
+            print("🇹🇷 Hermes (Adapter): BIST Sentiment Entegre Edildi. Skor: \(Int(payload.result.overallScore))")
+            return decision
+        }
+        if let newsData = news {
+            return await HermesCouncil.shared.convene(symbol: symbol, news: newsData)
+        }
+        return nil
     }
 }
 
