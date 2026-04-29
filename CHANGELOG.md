@@ -98,8 +98,10 @@ Tam kapsamlı OWASP iOS audit — rapor: `tasks/security-audit-2026-04-23.md`.
 - `KeychainManager`: `kSecAttrAccessibleWhenUnlocked` → `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`
 
 **Karar bekleyen bulgular:**
-- Face ID toggle ölü kod: `SettingsViewModel.isFaceIDEnabled` açılıyor ama `SecureViewModifier` hiçbir ekranda çağrılmıyor. Ya `.secured()` ile Portfolio/Settings ekranlarına bağla, ya da toggle+service sil (yanıltıcı güvenlik oluşturmasın).
 - Git history'de revoke edilmiş Gemini key izi (2 commit). Key geçersiz, pratik risk yok; hijyen için `git filter-repo` yapılabilir.
+
+**Bu turda kapatılan:**
+- Face ID toggle + `SecureViewModifier` + `SecurityService` ölü kod silindi (yanıltıcı güvenlik yüzeyi kaldırıldı). Wire-up tercih edildiğinde temiz bir tabandan başlanabilir.
 
 ### 8. Bildirim / Sinyal / Keşif İyileştirmeleri
 
