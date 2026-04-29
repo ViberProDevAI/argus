@@ -143,6 +143,12 @@ enum HeimdallNetwork {
     /// mode'unda warning → error. Şimdiden işaretleyip migration sırasında sıkıntı çıkmasın.
     nonisolated static let localThrottleCode = 1059
 
+    /// Phase 7 PR-3 (2026-04-29): Sembol-bazlı lokal blok sentinel kodu.
+    /// Yahoo'nun premium-paywall'ladığı sembolleri (TSLA, SPGI, vb.) tekrar tekrar
+    /// denememek için. `SymbolBlocklist` 24 saat soğuma süresince bu hatayı atar.
+    /// Circuit breaker'a yansıtılmaz; sadece UI cache fallback'e düşer.
+    nonisolated static let symbolBlockedCode = 1060
+
     /// Performs a network request with full Heimdall Telepresence tracing.
     static func request(
         url: URL,

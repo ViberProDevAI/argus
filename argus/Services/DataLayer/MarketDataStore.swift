@@ -156,16 +156,35 @@ final class MarketDataStore: ObservableObject {
     // MARK: - Generic Fetch Orchestration
     
     /// Ensures we have fresh Quote data. Returns the data (cached or fetched).
+    ///
+    /// Phase 6 PR-D (2026-04-29) — Stale-While-Revalidate.
+    /// Cache stale ama mevcut bir değer varsa eski veri **anında** döner ve arka
+    /// planda fresh fetch tetiklenir. Kullanıcı asla "Hazırlanıyor" boş ekran
+    /// görmez (cache'inde değer varsa). Yalnızca cache hiç yok ya da çok eski
+    /// (4× TTL) ise blocking fetch yapılır.
     @discardableResult
     func ensureQuote(symbol: String) async -> DataValue<Quote> {
         // 1. Check Cache
         if let current = quotes[symbol] {
             let age = -current.provenance.fetchedAt.timeIntervalSinceNow
+
+            // 1a. Fresh: hemen dön.
             if current.isFresh && age < quoteTTL {
                 return current
             }
+
+            // 1b. Stale-while-revalidate: değer var, makul yaşta (<4× TTL),
+            //     in-flight task yok → eski veriyi anında dön + arka planda yenile.
+            if current.value != nil,
+               age < quoteTTL * 4,
+               quoteTasks[symbol] == nil {
+                Task { [weak self] in
+                    _ = await self?.fetchAndStoreQuote(symbol: symbol)
+                }
+                return current
+            }
         }
-        
+
         // 2. Check In-Flight (Dedup)
         if let existingTask = quoteTasks[symbol] {
             do {
@@ -175,14 +194,74 @@ final class MarketDataStore: ObservableObject {
                 return processQuoteFailure(symbol: symbol, error: error)
             }
         }
-        
-        // 3. Launch New Task
+
+        // 3. Phase 7 PR-Q+: Daily candle cache'inden türet.
+        //    Cache hiç yok ama daily candle var → ek istek atmadan quote ürer.
+        //    Detay panelinden ya da daha önce çekilmiş bir candles var ise
+        //    quote için ayrıca network gitmeye gerek yok. Arka planda yine
+        //    fresh quote fetch tetiklenir (UI'a sonra gelir).
+        if let derived = quoteFromDailyCache(symbol: symbol) {
+            let val = processQuoteSuccess(symbol: symbol, quote: derived, source: "Derived-Candle")
+            Task { [weak self] in
+                _ = await self?.fetchAndStoreQuote(symbol: symbol)
+            }
+            return val
+        }
+
+        // 4. Blocking fetch — hiçbir kaynak yok.
+        return await fetchAndStoreQuote(symbol: symbol)
+    }
+
+    /// Phase 7 PR-Q+: Daily candle cache'inden quote türetir.
+    /// 1d/1day master cache'inde en az 2 bar varsa son kapanış = current,
+    /// önceki bar = previous close → quote inşa edilir. Currency sembol
+    /// pattern'ından infer edilir (`.IS` → TRY, `-USD` → USD, default USD).
+    /// Yetersiz veri / kötü prev → nil.
+    private func quoteFromDailyCache(symbol: String) -> Quote? {
+        let candidates = ["\(symbol)_1day"]
+        for key in candidates {
+            guard let candleList = candles[key]?.value, candleList.count >= 2 else { continue }
+            guard let last = candleList.last else { continue }
+            let prev = candleList[candleList.count - 2]
+            guard prev.close > 0 else { continue }
+
+            let change = last.close - prev.close
+            let pct = (change / prev.close) * 100
+
+            let upper = symbol.uppercased()
+            let inferredCurrency: String = {
+                if upper.hasSuffix(".IS") { return "TRY" }
+                if upper.contains("-USD") { return "USD" }
+                if upper.hasSuffix("=X") { return "USD" }
+                if upper.hasSuffix("=F") { return "USD" }
+                return "USD"
+            }()
+
+            var q = Quote(
+                c: last.close,
+                d: change,
+                dp: pct,
+                currency: inferredCurrency,
+                shortName: nil,
+                symbol: symbol
+            )
+            q.previousClose = prev.close
+            q.timestamp = Date()
+            return q
+        }
+        return nil
+    }
+
+    /// Yeni bir quote fetch task'i başlatır, sonucu cache'e yazar ve döndürür.
+    /// `ensureQuote` (foreground) ve stale-while-revalidate (background) yolları
+    /// tarafından paylaşılır — fetch logic tek source-of-truth.
+    @discardableResult
+    private func fetchAndStoreQuote(symbol: String) async -> DataValue<Quote> {
         let task = Task<Quote, Error> {
             return try await HeimdallOrchestrator.shared.requestQuote(symbol: symbol)
         }
-        
         quoteTasks[symbol] = task
-        
+
         do {
             let result = try await task.value
             quoteTasks[symbol] = nil
@@ -363,22 +442,27 @@ final class MarketDataStore: ObservableObject {
     /// sonraki 5 backoff'ta zaten beklerken yeni chunk geliyor. Eskiden 304
     /// sembolün hepsi aynı anda paralel gönderiliyordu → acquireSlot kuyruğu
     /// patlayıp 200+ istek 30s'de timeout oluyordu ("kimisi boş" semptomu).
-    // Phase 6 PR-A (2026-04-29): Watchlist refresh tek bir Yahoo batch isteğine düşürüldü.
+    // Phase 6 PR-A ROLLBACK (2026-04-29):
     //
-    // Eski yol (Phase 5): 50 sembol → 4'lük chunk × paralel ensureQuote → 50 ayrı
-    // Yahoo `/quote` isteği. 50 inflight slot tüketiyor, watchlist refresh 30-60 sn.
+    // Yahoo `v7/finance/quote?symbols=A,B,C` batch endpoint'ini engelledi
+    // (HTTP 401 "User is unable to access this feature" — bit.ly/yahoo-finance-api-feedback).
+    // Production loglarında onlarca 401 alındı. PR-A iyi niyetli ama fiilen
+    // ÇALIŞMAYAN bir yola gitti. `requestQuotesBatch` artık çağrılmıyor (deprecated).
     //
-    // Yeni yol: Yahoo'nun `v7/finance/quote?symbols=...` endpoint'i tek istekte
-    // 50 sembol döner. `HeimdallOrchestrator.requestQuotesBatch` üzerinden tek
-    // inflight slot, tek CB raporu, tek loglama. 50 sembollük watchlist için
-    // istek sayısı **50 → 1**.
+    // Yeni yaklaşım: Phase 5'in chunked yaklaşımına dön — N sembol için
+    // 8'lik chunk × inflight semaphore (Yahoo cap=4) ile akar şekilde dağılan
+    // single quote istekleri. Tek-sembol endpoint hâlâ çalışıyor.
     //
-    // Yahoo'nun pratik limiti tek istekte ~50 sembol. Bu yüzden chunk size 50;
-    // watchlist 100+ sembol olursa 2 batch atılır.
-    private static let batchSize = 50
+    // Phase 5'ten farklılıklar:
+    //  • Chunk 4 → 8 (PR-D SWR çoğu çağrıyı zaten kesiyor; daha büyük chunk OK)
+    //  • Delay 2sn → 800ms (inflight semaphore + SWR yastığı yeterli; uzun delay
+    //    artık gereksiz)
+    private static let chunkSize = 8
+    private static let chunkDelayNs: UInt64 = 800_000_000 // 800 ms
 
-    /// Watchlist gibi N>1 senaryolarda tüm sembolleri tek (veya birkaç) Yahoo
-    /// batch isteğiyle çeker. Cache fresh olanlar atlanır.
+    /// Watchlist gibi N>1 senaryolarda sembolleri chunked paralel olarak çeker.
+    /// SWR ve in-flight coalescing `ensureQuote` içinde devrede; aynı sembol için
+    /// duplikate fetch yok. Cache fresh olanlar zaten orada filtreleniyor.
     func ensureQuotes(symbols: [String]) async {
         let needsFetch = symbols.filter { sym in
             if let current = quotes[sym] {
@@ -389,35 +473,20 @@ final class MarketDataStore: ObservableObject {
         }
         guard !needsFetch.isEmpty else { return }
 
-        // 50'lik batch'ler — Yahoo limiti.
-        let chunks = stride(from: 0, to: needsFetch.count, by: MarketDataStore.batchSize).map {
-            Array(needsFetch[$0..<min($0 + MarketDataStore.batchSize, needsFetch.count)])
+        let chunks = stride(from: 0, to: needsFetch.count, by: MarketDataStore.chunkSize).map {
+            Array(needsFetch[$0..<min($0 + MarketDataStore.chunkSize, needsFetch.count)])
         }
 
-        for batch in chunks {
-            do {
-                let results = try await HeimdallOrchestrator.shared.requestQuotesBatch(symbols: batch)
-                // Cache'e tek tek yaz (mevcut processQuoteSuccess pattern'ı).
-                for (sym, quote) in results {
-                    _ = processQuoteSuccess(symbol: sym, quote: quote, source: "Yahoo-Batch")
-                }
-                // Batch'te dönmeyen semboller (delisted, geçersiz, vs.) failure işle.
-                for sym in batch where results[sym] == nil {
-                    _ = processQuoteFailure(
-                        symbol: sym,
-                        error: HeimdallCoreError(
-                            category: .symbolNotFound,
-                            code: 404,
-                            message: "Batch'te dönmedi",
-                            bodyPrefix: ""
-                        )
-                    )
-                }
-            } catch {
-                // Batch tamamen başarısız: o batch'teki her sembol için failure.
+        for (index, batch) in chunks.enumerated() {
+            await withTaskGroup(of: Void.self) { group in
                 for sym in batch {
-                    _ = processQuoteFailure(symbol: sym, error: error)
+                    group.addTask { [weak self] in
+                        _ = await self?.ensureQuote(symbol: sym)
+                    }
                 }
+            }
+            if index < chunks.count - 1 {
+                try? await Task.sleep(nanoseconds: MarketDataStore.chunkDelayNs)
             }
         }
     }

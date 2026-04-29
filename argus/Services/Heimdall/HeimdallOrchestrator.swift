@@ -24,50 +24,94 @@ final class HeimdallOrchestrator {
         return false
     }
 
+    /// Phase 7 PR-3: Auth/entitlement hatası mı?
+    /// Bu kategoride sembol-spesifik paywall var; SymbolBlocklist'e raporlanır.
+    private func isAuthOrEntitlementError(_ error: Error) -> Bool {
+        if let h = error as? HeimdallCoreError {
+            return h.category == .authInvalid || h.category == .entitlementDenied
+        }
+        return false
+    }
+
+    /// Phase 7 PR-3: Sembol kara listede ise atılan sentinel hata.
+    /// Provider'a network çağrısı yapılmadan, hızlıca dönen lokal hata.
+    private func symbolBlockedError(provider: String, endpoint: String, symbol: String, reason: String) -> HeimdallCoreError {
+        HeimdallCoreError(
+            category: .authInvalid,
+            code: HeimdallNetwork.symbolBlockedCode,
+            message: "Symbol \(symbol) locally blocked on \(provider)/\(endpoint): \(reason)",
+            bodyPrefix: "symbol-blocked"
+        )
+    }
+
     // MARK: - Quote
     
     func requestQuote(symbol: String, context: UsageContext = .interactive) async throws -> Quote {
         let provider = "yahoo"
         let endpoint = "/quote"
         let circuitProvider = circuitKey(provider: provider, endpoint: "quote")
-        
+
+        // Phase 7 PR-3: Sembol kara listede mi? Network'e gitmeden hızlıca dön.
+        if await SymbolBlocklist.shared.isBlocked(symbol),
+           let reason = await SymbolBlocklist.shared.reasonFor(symbol) {
+            throw symbolBlockedError(provider: provider, endpoint: endpoint, symbol: symbol, reason: reason)
+        }
+
         // Circuit Breaker Check
         guard await HeimdallCircuitBreaker.shared.canRequest(provider: circuitProvider) else {
             await HeimdallLogger.shared.warn("circuit_blocked", provider: provider, errorClass: "circuit_open")
             throw HeimdallCoreError(category: .rateLimited, code: 503, message: "Circuit open for \(provider)/quote", bodyPrefix: "")
         }
-        
+
         await RateLimiter.shared.waitIfNeeded()
         let start = Date()
-        
+
         do {
             let quote = try await yahoo.fetchQuote(symbol: symbol)
             let latency = Int(Date().timeIntervalSince(start) * 1000)
-            
+
             await HeimdallCircuitBreaker.shared.reportSuccess(provider: circuitProvider)
+            await SymbolBlocklist.shared.reportSuccess(symbol: symbol)
             await HeimdallLogger.shared.info("fetch_success", provider: provider, endpoint: endpoint, symbol: symbol, latencyMs: latency)
             await HealthStore.shared.reportSuccess(provider: provider, latency: Double(latency))
-            
+
             return quote
         } catch {
             // Y3-HOTFIX: lokal fren ≠ provider arızası — circuit'i kirletme.
-            if !isLocalThrottle(error) {
+            // Phase 7 PR-5 (2026-04-29): Sembol-spesifik auth/entitlement hataları
+            // da provider arızası DEĞİL — Yahoo provider sağlam ama o sembol
+            // paywalled. CB'yi sembol kara listesi yerine geçiremeyiz.
+            if !isLocalThrottle(error) && !isAuthOrEntitlementError(error) {
                 await HeimdallCircuitBreaker.shared.reportFailure(provider: circuitProvider, error: error)
                 await HealthStore.shared.reportError(provider: provider, error: error)
+            }
+            // Phase 7 PR-3: Auth/entitlement hatası → SymbolBlocklist'e raporla.
+            // 2 ardışık hatadan sonra sembol 24 saatlik kara listeye alınır.
+            if isAuthOrEntitlementError(error) {
+                await SymbolBlocklist.shared.reportFailure(symbol: symbol, reason: "quote auth/paywall")
             }
             await HeimdallLogger.shared.error("fetch_failed", provider: provider, errorClass: classifyError(error), errorMessage: error.localizedDescription, endpoint: endpoint)
             throw error
         }
     }
 
-    // MARK: - Quote Batch (Phase 6, PR-A)
+    // MARK: - Quote Batch (DEPRECATED — Yahoo paywalled, do not call)
     //
-    // Yahoo `v7/finance/quote?symbols=A,B,C,...` endpoint'i tek istekte 50 sembole
-    // kadar quote döner. `MarketDataStore.batchEnsureQuotes` watchlist refresh'i
-    // gibi N sembollük senaryolarda 50× istek azalması için bu yolu kullanır.
+    // ⚠️ Yahoo (en geç 2025) `v7/finance/quote?symbols=...` çoklu-sembol formuna
+    // **HTTP 401 Unauthorized** döndürmeye başladı:
     //
-    // Tek inflight slot harcanır (50 sembol için 1 slot) — devasa bir kazanç.
-    // Tek-sembol `requestQuote` korunur (detay sayfası gibi tekil senaryolar için).
+    //   "User is unable to access this feature"
+    //   bit.ly/yahoo-finance-api-feedback
+    //
+    // Tek-sembol form (`?symbols=AAPL`) hâlâ çalışıyor; çoklu engellendi.
+    // PR-A bu yolu denedi ama production'da 401 fırtınası ürettiği için geri
+    // alındı (Phase 6 PR-A Rollback). Method burada duruyor ki Yahoo politikası
+    // gevşerse veya başka batch destekleyen bir provider eklendiğinde tekrar
+    // wire'lanabilsin.
+    //
+    // Kanonik akış: `MarketDataStore.ensureQuotes(symbols:)` → chunked paralel
+    // tek-sembol `requestQuote` çağrıları (inflight semaphore ile rate-limit'li).
+    @available(*, deprecated, message: "Yahoo batch quote endpoint paywalled (HTTP 401). Use ensureQuotes which routes through single-symbol requestQuote.")
     func requestQuotesBatch(symbols: [String], context: UsageContext = .interactive) async throws -> [String: Quote] {
         guard !symbols.isEmpty else { return [:] }
 
@@ -99,7 +143,9 @@ final class HeimdallOrchestrator {
             await HealthStore.shared.reportSuccess(provider: provider, latency: Double(latency))
             return result
         } catch {
-            if !isLocalThrottle(error) {
+            // Phase 7 PR-5: Auth/entitlement hataları sembol-spesifik (paywall),
+            // provider arızası değil → CB'yi tetikleme.
+            if !isLocalThrottle(error) && !isAuthOrEntitlementError(error) {
                 await HeimdallCircuitBreaker.shared.reportFailure(provider: circuitProvider, error: error)
                 await HealthStore.shared.reportError(provider: provider, error: error)
             }
@@ -120,7 +166,23 @@ final class HeimdallOrchestrator {
         let provider = "yahoo"
         let endpoint = "/fundamentals"
         let circuitProvider = circuitKey(provider: provider, endpoint: "fundamentals")
-        
+
+        // Phase 7 PR-3: Sembol kara listede ise cache fallback'e düş, yeni istek yok.
+        if await SymbolBlocklist.shared.isBlocked(symbol) {
+            if let cached = await getCachedFundamentals(symbol: symbol) {
+                await HeimdallLogger.shared.warn(
+                    "cache_fallback_used",
+                    provider: provider,
+                    errorClass: "symbol_blocked",
+                    errorMessage: "Fundamentals served from cache (symbol blocked)",
+                    endpoint: endpoint
+                )
+                return cached
+            }
+            let reason = await SymbolBlocklist.shared.reasonFor(symbol) ?? "blocked"
+            throw symbolBlockedError(provider: provider, endpoint: endpoint, symbol: symbol, reason: reason)
+        }
+
         guard await HeimdallCircuitBreaker.shared.canRequest(provider: circuitProvider) else {
             if let cached = await getCachedFundamentals(symbol: symbol) {
                 await HeimdallLogger.shared.warn(
@@ -142,13 +204,20 @@ final class HeimdallOrchestrator {
             let data = try await yahoo.fetchFundamentals(symbol: symbol)
             let latency = Int(Date().timeIntervalSince(start) * 1000)
             await HeimdallCircuitBreaker.shared.reportSuccess(provider: circuitProvider)
+            await SymbolBlocklist.shared.reportSuccess(symbol: symbol)
             await HeimdallLogger.shared.info("fetch_success", provider: provider, endpoint: endpoint, symbol: symbol, latencyMs: latency)
             DataCacheService.shared.save(value: data, kind: .fundamentals, symbol: symbol, source: "Yahoo")
             return data
         } catch {
             // Y3-HOTFIX: lokal fren ≠ provider arızası — circuit'i kirletme.
-            if !isLocalThrottle(error) {
+            // Phase 7 PR-5: Auth/entitlement hataları sembol-spesifik (paywall),
+            // provider arızası değil → CB'yi tetikleme.
+            if !isLocalThrottle(error) && !isAuthOrEntitlementError(error) {
                 await HeimdallCircuitBreaker.shared.reportFailure(provider: circuitProvider, error: error)
+            }
+            // Phase 7 PR-3: Auth/entitlement hatası → SymbolBlocklist'e raporla.
+            if isAuthOrEntitlementError(error) {
+                await SymbolBlocklist.shared.reportFailure(symbol: symbol, reason: "fundamentals auth/paywall")
             }
             await HeimdallLogger.shared.error("fetch_failed", provider: provider, errorClass: classifyError(error), errorMessage: error.localizedDescription, endpoint: endpoint)
             if shouldFallbackToCachedFundamentals(error),
@@ -180,24 +249,37 @@ final class HeimdallOrchestrator {
         let provider = "yahoo"
         let endpoint = "/candles"
         let circuitProvider = circuitKey(provider: provider, endpoint: "candles")
-        
+
+        // Phase 7 PR-3: Sembol kara listede ise hızlıca dön.
+        if await SymbolBlocklist.shared.isBlocked(symbol),
+           let reason = await SymbolBlocklist.shared.reasonFor(symbol) {
+            throw symbolBlockedError(provider: provider, endpoint: endpoint, symbol: symbol, reason: reason)
+        }
+
         guard await HeimdallCircuitBreaker.shared.canRequest(provider: circuitProvider) else {
             throw HeimdallCoreError(category: .rateLimited, code: 503, message: "Circuit open for \(provider)/candles", bodyPrefix: "")
         }
-        
+
         await RateLimiter.shared.waitIfNeeded()
         let start = Date()
-        
+
         do {
             let candles = try await yahoo.fetchCandles(symbol: symbol, timeframe: timeframe, limit: limit)
             let latency = Int(Date().timeIntervalSince(start) * 1000)
             await HeimdallCircuitBreaker.shared.reportSuccess(provider: circuitProvider)
+            await SymbolBlocklist.shared.reportSuccess(symbol: symbol)
             await HeimdallLogger.shared.info("fetch_success", provider: provider, endpoint: endpoint, symbol: symbol, latencyMs: latency)
             return candles
         } catch {
             // Y3-HOTFIX: lokal fren ≠ provider arızası — circuit'i kirletme.
-            if !isLocalThrottle(error) {
+            // Phase 7 PR-5: Auth/entitlement hataları sembol-spesifik (paywall),
+            // provider arızası değil → CB'yi tetikleme.
+            if !isLocalThrottle(error) && !isAuthOrEntitlementError(error) {
                 await HeimdallCircuitBreaker.shared.reportFailure(provider: circuitProvider, error: error)
+            }
+            // Phase 7 PR-3: Auth/entitlement hatası → SymbolBlocklist'e raporla.
+            if isAuthOrEntitlementError(error) {
+                await SymbolBlocklist.shared.reportFailure(symbol: symbol, reason: "candles auth/paywall")
             }
             await HeimdallLogger.shared.error("fetch_failed", provider: provider, errorClass: classifyError(error), errorMessage: error.localizedDescription, endpoint: endpoint)
             throw error
