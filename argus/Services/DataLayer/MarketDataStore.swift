@@ -303,17 +303,35 @@ final class MarketDataStore: ObservableObject {
     
     func ensureCandles(symbol: String, timeframe: String) async -> DataValue<[Candle]> {
         // Phase 5 (2026-04-29): Cache key normalizasyonu.
-        // "1day", "1d", "1G", "1D" → tek kanonik ad. Coalescing aynı sembol için
-        // tek task açar, paralel duplikate fetch'leri eler.
         let canonicalTimeframe = Self.normalizeTimeframe(timeframe)
         let key = "\(symbol)_\(canonicalTimeframe)"
 
-        // 1. Cache
-        if let current = candles[key], current.isFresh {
-            return current
+        // Phase 7+ (2026-04-29): Candle TTL + SWR.
+        // `DataValue.isFresh` 15 saniye sonra stale sayıyordu — günlük mum 15 sn'de
+        // değişmez, ama eskiden ensureCandles 15 sn sonra tekrar fetch'e gidiyordu.
+        // Prometheus + Orion peş peşe açılınca aynı candle 2-3 kez fetch ediliyor →
+        // ikincisi rate-limit / cancel yiyince Orion fail → "Analiz Başarısız" hatası.
+        //
+        // Yeni: timeframe-bazlı TTL + stale-while-revalidate. Cache'te değer varsa
+        // anında dön; eski ise arkada yenile.
+        if let current = candles[key], let value = current.value, !value.isEmpty {
+            let age = -current.provenance.fetchedAt.timeIntervalSinceNow
+            let ttl = Self.candleTTL(for: canonicalTimeframe)
+
+            // Fresh: hemen dön.
+            if age < ttl { return current }
+
+            // Stale: eski değeri DÖNDÜR + arka planda yenile (SWR).
+            // In-flight task varsa yeni başlatma — coalescing.
+            if candleTasks[key] == nil && age < ttl * 4 {
+                Task { [weak self] in
+                    _ = await self?.fetchAndStoreCandles(symbol: symbol, timeframe: timeframe, canonicalKey: key)
+                }
+                return current
+            }
         }
 
-        // 2. Coalesce
+        // 2. Coalesce — in-flight task varsa onu bekle.
         if let task = candleTasks[key] {
             let _ = await task.result
             return candles[key] ?? .missing(reason: "Task failed")
@@ -342,26 +360,59 @@ final class MarketDataStore: ObservableObject {
             return val
         }
 
-        // 4. Fetch (master daily, ya da intraday — provider'a gider).
+        // 4. Blocking fetch — cache hiç yok ya da çok eski.
+        return await fetchAndStoreCandles(symbol: symbol, timeframe: timeframe, canonicalKey: key)
+    }
+
+    /// Yeni bir candles fetch task'i başlatır, sonucu cache'e yazar ve döndürür.
+    /// `ensureCandles` (foreground) ve stale-while-revalidate (background) yolları
+    /// tarafından paylaşılır — fetch logic tek source-of-truth.
+    @discardableResult
+    private func fetchAndStoreCandles(symbol: String, timeframe: String, canonicalKey: String) async -> DataValue<[Candle]> {
         let task = Task<[Candle], Error> {
             let limit = candleLimit(for: timeframe)
             return try await HeimdallOrchestrator.shared.requestCandles(symbol: symbol, timeframe: timeframe, limit: limit)
         }
-
-        candleTasks[key] = task
+        candleTasks[canonicalKey] = task
 
         do {
             let data = try await task.value
-            candleTasks[key] = nil
+            candleTasks[canonicalKey] = nil
             let val = DataValue.fresh(data)
-            candles[key] = val
+            candles[canonicalKey] = val
             return val
         } catch {
-            candleTasks[key] = nil
-            print("📉 Store: Candles failed for \(key): \(error)")
+            candleTasks[canonicalKey] = nil
+            print("📉 Store: Candles failed for \(canonicalKey): \(error)")
+            // SWR: cache'te eski değer varsa stale olarak koru.
+            // Ki üst seviye ensureCandles "no value" yerine eski candle'ı dönsün.
+            if let old = candles[canonicalKey], let value = old.value, !value.isEmpty {
+                let staleVal = DataValue(value: value, provenance: old.provenance, status: .stale)
+                candles[canonicalKey] = staleVal
+                return staleVal
+            }
             let missing = DataValue<[Candle]>.missing(reason: error.localizedDescription)
-            candles[key] = missing
+            candles[canonicalKey] = missing
             return missing
+        }
+    }
+
+    /// Phase 7+ (2026-04-29): Timeframe-bazlı cache TTL.
+    /// Daha önce DataValue.isFresh 15 saniye sabitti — daily candle 15 sn'de
+    /// değişmez ama 15 sn sonra cache stale sayılıp tekrar fetch'e gidiyordu.
+    /// Bu da "ABBV detayı açıldığında Orion analiz başarısız" semptomunun ana
+    /// sebebiydi (Prometheus daily fetch + Orion daily fetch arasındaki 15 sn'de
+    /// ikinci fetch rate-limit yiyince tüm 6 timeframe fail).
+    private static func candleTTL(for canonicalTimeframe: String) -> TimeInterval {
+        switch canonicalTimeframe {
+        case "5m":               return 60          // 1 dk — intraday hızlı bayatlar
+        case "15m":              return 180         // 3 dk
+        case "1h":               return 600         // 10 dk
+        case "4h":               return 1800        // 30 dk
+        case "1day":             return 1800        // 30 dk — gün ortasında son bar değişir
+        case "1week", "1month",
+             "3month":           return 3600        // 1 saat — uzun vade nadiren değişir
+        default:                 return 300         // 5 dk default
         }
     }
 
