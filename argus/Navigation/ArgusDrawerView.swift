@@ -128,9 +128,9 @@ struct ArgusDrawerView: View {
 
     // MARK: - Header
 
-    // 2026-04-23 V5.H-13: Kullanıcı kimliği (Dayı · PRO) bloğu kaldırıldı —
-    // karşılama mesajları istenmemişti. Yerine iyi biçimlendirilmiş Argus
-    // marka bloğu: büyük aperture logosu + ARGUS kelime işareti + sürüm
+    // 2026-04-23 V5.H-13: Kullanıcı profil bloğu kaldırıldı — karşılama
+    // mesajları istenmemişti. Yerine iyi biçimlendirilmiş Argus marka
+    // bloğu: büyük aperture logosu + ARGUS kelime işareti + sürüm
     // satırı. Drawer üstü daha sakin, kurumsal.
     private var headerSection: some View {
         HStack(spacing: 14) {
