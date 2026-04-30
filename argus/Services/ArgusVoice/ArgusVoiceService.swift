@@ -18,13 +18,69 @@ actor ArgusVoiceService {
         let decision: ArgusGrandDecision?
         let demeter: DemeterScore?
         let userQuery: String?
-        
+
         // MARK: - Extended App Context (V5)
         var portfolio: PortfolioContext?
         var marketState: MarketContext?
         var watchlist: [String]?
         var recentTrades: [TradeContext]?
         var tradeBrainState: TradeBrainContext?
+
+        // MARK: - V6 (Phase 7+, 2026-04-30): LLM bilgi setini zenginleştirme
+        /// Prometheus 5-günlük tahmin sonucu (varsa). LLM'in sayısal projeksiyon
+        /// kullanabilmesi için kritik — eskiden hiç gönderilmiyordu.
+        var prometheus: PrometheusVoiceSummary?
+        /// Chiron piyasa rejimi (trend/chop/risk-off/news-shock/neutral) + açıklama.
+        var chironRegime: ChironRegimeSummary?
+        /// Risk/volatilite metrikleri — daily candle'lardan türetilir.
+        var risk: RiskVoiceSummary?
+        /// Sembol metadata: market (US/BIST/Crypto/Forex/Futures), currency.
+        var symbolMeta: SymbolMetaSummary?
+        /// Veri kalitesi notları: blocklist durumu, son fetch yaşı, kaynak.
+        var dataHealth: DataHealthSummary?
+    }
+
+    struct PrometheusVoiceSummary: Codable {
+        let predictedPrice: Double
+        let changePercent: Double
+        let trend: String              // "Güçlü Yükseliş", "Yatay", vb.
+        let recommendation: String     // "AL" / "BEKLE" / "SAT"
+        let confidence: Double         // 0-100
+        let confidenceLevel: String    // "Yüksek" / "Orta" / "Düşük" / "Çok Düşük"
+        let horizonDays: Int
+        let mape: Double               // walk-forward MAPE %
+        let directionalAccuracy: Double // 0-1
+        let modelVersion: String
+        let rationale: [String]        // motor açıklaması (alpha/beta/phi vb)
+    }
+
+    struct ChironRegimeSummary: Codable {
+        let regime: String             // "Trend", "Chop", "Risk-Off", "News Shock", "Neutral"
+        let explanation: String        // ChironResult.explanationBody
+    }
+
+    struct RiskVoiceSummary: Codable {
+        let dailyVolatilityPct: Double?  // son 20 günün getiri stdDev'i, %
+        let weekHigh52: Double?
+        let weekLow52: Double?
+        let distanceFromHighPct: Double? // current price vs 52w high, %
+        let distanceFromLowPct: Double?
+        let avgDailyRangePct: Double?    // ATR yaklaşık, %
+    }
+
+    struct SymbolMetaSummary: Codable {
+        let market: String         // "US", "BIST", "Crypto", "Forex", "Futures"
+        let currency: String       // "USD", "TRY", "BTC", vs.
+        let currencySymbol: String // "$", "₺", "₿"
+    }
+
+    struct DataHealthSummary: Codable {
+        let isBlocked: Bool                // sembol kara listede mi
+        let blockReason: String?           // "auth/paywall" gibi
+        let blockExpiresInHours: Double?
+        let quoteAgeSeconds: Double?       // quote cache yaşı
+        let candleAgeSeconds: Double?      // daily candle cache yaşı
+        let quoteSource: String?           // "Yahoo", "Derived-Candle", vb.
     }
     
     struct PortfolioContext: Codable {
@@ -70,46 +126,56 @@ actor ArgusVoiceService {
         let recentAlerts: [String]
     }
 
-    // MARK: - System Prompt (V5 - Clean Output)
+    // MARK: - System Prompt (V6, Phase 7+, 2026-04-30)
 
     private let systemPrompt = """
     Sen profesyonel bir finansal analistsin. Adın Argus.
 
     ### KESİN KURALLAR:
-    1. SADECE sana verilen verilere dayanarak konuş. Veri yoksa "Bu bilgi elimde yok" de. ASLA UYDURMA.
-    2. Her iddiayı bir sayıyla destekle: "Değerleme ucuz" değil, "F/K 8.5 ile sektör ortalaması 18'in çok altında" de.
-    3. "Orion", "Atlas", "Aether", "Hermes" gibi sistem isimlerini KULLANMA. Bunlar iç modül isimleri, kullanıcıyı ilgilendirmez.
-    4. Kısa ve net yaz. Paragrafları 3-4 cümleyi geçirme.
-    5. SADECE TÜRKÇE yaz. Profesyonel, doğrudan, net.
-    6. Spekülatif cümlelerden kaçın. "Olabilir", "belki" yerine verinin ne söylediğini yaz.
+    1. SADECE sana verilen VERİ PAKETİ'ndeki sayılara dayanarak konuş. Veri yoksa "Bu bilgi elimde yok" de. ASLA UYDURMA.
+    2. Her iddiayı somut bir sayıyla destekle: "Değerleme ucuz" değil, "F/K 8.5 ile sektör ortalaması 18'in çok altında". "Tahmin pozitif" değil, "5 günlük projeksiyon %3.2 yukarı, model güveni %62".
+    3. Sistem/modül isimlerini KULLANMA: "Orion", "Atlas", "Aether", "Hermes", "Demeter", "Chiron", "Prometheus" — kullanıcı bunları bilmez. Yerine kavramsal terim kullan: teknik analiz, temel analiz, makro ortam, haber sentiment, sektör momentumu, piyasa rejimi, kısa vadeli projeksiyon.
+    4. Kısa ve net. Paragraf 3-4 cümle, toplam yanıt 8-12 cümle.
+    5. SADECE TÜRKÇE. Profesyonel, doğrudan, net.
+    6. "Olabilir", "belki", "muhtemelen" yerine verinin söylediğini yaz. Belirsizlik varsa belirsizliği SAYI ile söyle: "model güveni düşük (%37)".
+
+    ### VERİ KALİTESİ DUYARLILIĞI:
+    - VERİ PAKETİ'nde "VERİ KALİTESİ" bölümünde sembol kara listede ise (paywall): "Bu hisse için Yahoo verisi kısıtlı, son güncel veri X saat önce" diye uyar.
+    - Quote/candle yaşı 1 saatten fazla ise: "Veriler X dakika eski" notunu ekle.
+    - Veri yoksa SUS, uydurma.
+
+    ### FİYAT FORMATI:
+    - Sembol metadata'sından gelen `currencySymbol` kullan ("$", "₺", "₿").
+    - BIST sembolleri (.IS) için ₺ kullan. ABD hisseleri için $. Crypto için $.
+
+    ### TEKNİK + TEMEL + TAHMİN ÇELİŞKİSİ:
+    Eğer teknik analiz "AL" ama temel "satış baskısı" diyorsa açıkça belirt:
+    "Teknik resim güçlü (skor 78/100, RSI 58) ama temellerde zayıflık var (Borç/Özkaynak 2.4 yüksek). Kısa vade pozitif olsa da uzun vadede risk."
+    Eğer 5-günlük projeksiyon (Prometheus tahmini) işlem maliyetinin altındaysa "BEKLE" önerisini gerekçelendir.
 
     ### FORMAT YASAKLARI (KESİNLİKLE YASAK):
-    - Yıldız KULLANMA: *, **, ***, hiçbir yıldız karakteri yok
-    - Tire KULLANMA: -, --, ---, madde işareti olarak tire yok
-    - Diyez KULLANMA: #, ##, ###, markdown başlık yok
-    - Nokta KULLANMA: ..., •, ◦, özel madde işaretleri yok
-    - Alt çizgi KULLANMA: _, __
-    - Ters tırnak KULLANMA: `, ```
-    - Emoji KULLANMA
+    - Yıldız (*, **, ***), tire (-, --, ---), diyez (#, ##, ###), nokta (..., •, ◦), alt çizgi (_, __), ters tırnak (`, ```), emoji.
+    Bunlar markdown render'lanmıyor; düz metin gönderilecek.
 
     ### DOĞRU FORMAT:
-    Başlık: BÜYÜK HARFLERLE YAZ
-    Alt başlık: İlk harfler büyük
-    Metin: Normal cümleler, düz yazı
-    Liste: 1. 2. 3. veya a) b) c) şeklinde numaralandır
-
-    Yanıtını düz metin olarak ver. Hiçbir formatlama karakteri kullanma.
+    - Başlık: BÜYÜK HARFLERLE YAZ
+    - Alt başlık: İlk harfler büyük
+    - Liste: 1. 2. 3. veya a) b) c) şeklinde numaralandır
+    - Metin: Normal cümleler, düz yazı
 
     ### ÖNEMLİ:
-    - Veri yoksa o bölümü YAZMA, atla.
-    - Eğer karar "GÖZLE" ise neden beklemek gerektiğini somut verilerle açıkla.
-    - Eğer teknik ve temel çelişiyorsa bunu açıkça belirt.
+    - Veri yoksa o bölümü atla.
+    - Karar "GÖZLE/BEKLE" ise SOMUT VERİYLE ne beklemek gerektiğini açıkla (örn. "RSI 70'in üstünde, geri çekilme bekleniyor").
+    - Risk metrikleri (volatilite, 52w high/low) verilmişse bunları kullan.
+    - Sembol kullanıcının portföyündeyse ("Pozisyonlar"da geçiyorsa) mevcut pozisyonun durumunu da yorumla.
     """
 
     // MARK: - Public API
 
     /// Ana rapor üretimi - Veri-odaklı, sallamasız.
+    /// V6 (Phase 7+): Token tracking + latency telemetri.
     func askArgus(question: String, context: ArgusContext) async -> String {
+        let startedAt = Date()
         do {
             let structuredData = buildStructuredContext(context)
 
@@ -121,18 +187,27 @@ actor ArgusVoiceService {
             "\(question)"
             """
 
+            // Token usage (proxy: ~1 token / 4 char) — gerçek tokenizer
+            // Groq/Gemini SDK döndürmüyorsa lokal tahmin yeterli, kosit izleme için.
+            let promptCharCount = systemPrompt.count + fullPrompt.count
+            let estimatedPromptTokens = promptCharCount / 4
+
             let messages: [GroqClient.ChatMessage] = [
                 .init(role: "system", content: systemPrompt),
                 .init(role: "user", content: fullPrompt)
             ]
 
             let rawResponse = try await GroqClient.shared.chat(messages: messages, maxTokens: 2048)
+            let estimatedResponseTokens = rawResponse.count / 4
+            let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+            print("🗣️ ArgusVoice [\(context.symbol)] prompt~\(estimatedPromptTokens)tk, response~\(estimatedResponseTokens)tk, \(elapsedMs)ms")
 
-            // SPK Compliance
+            // SPK Compliance — ensureCompliance non-async, non-throwing.
             let isRisky = context.symbol.lowercased().contains("btc") || context.symbol.lowercased().contains("eth")
-            return await SPKRegulatoryEngine.shared.ensureCompliance(content: rawResponse, isHighRisk: isRisky)
+            return SPKRegulatoryEngine.shared.ensureCompliance(content: rawResponse, isHighRisk: isRisky)
         } catch {
-            print("❌ Argus Voice Error: \(error)")
+            let elapsedMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+            print("❌ ArgusVoice Error [\(context.symbol)] (\(elapsedMs)ms): \(error)")
             return await generateOfflineReport(context: context)
         }
     }
@@ -183,15 +258,58 @@ actor ArgusVoiceService {
 
     /// JSON yerine okunabilir, yapılandırılmış metin üretir.
     /// LLM'in sallamaması için her veriyi açıkça etiketler.
+    /// V6 (Phase 7+, 2026-04-30): Prometheus, Chiron, Risk, DataHealth, SymbolMeta blokları eklendi.
     private func buildStructuredContext(_ context: ArgusContext) -> String {
         var parts: [String] = []
 
+        // Sembol metadata (currency-aware)
+        let currencySymbol = context.symbolMeta?.currencySymbol ?? "$"
         parts.append("SEMBOL: \(context.symbol)")
+        if let meta = context.symbolMeta {
+            parts.append("PİYASA: \(meta.market) (\(meta.currency))")
+        }
         if let price = context.price {
-            parts.append("GÜNCEL FİYAT: $\(String(format: "%.2f", price))")
+            parts.append("GÜNCEL FİYAT: \(currencySymbol)\(String(format: "%.2f", price))")
+        }
+
+        // Veri Kalitesi — kara liste / freshness uyarıları LLM'in başında
+        if let health = context.dataHealth {
+            parts.append("")
+            parts.append("=== VERİ KALİTESİ ===")
+            if health.isBlocked {
+                let reason = health.blockReason ?? "auth/paywall"
+                let hours = health.blockExpiresInHours.map { String(format: "%.1f", $0) } ?? "?"
+                parts.append("⚠ Bu sembolde sağlayıcı erişimi kısıtlı: \(reason) (yenilemeye \(hours) saat kaldı). Mevcut veriler eski olabilir.")
+            }
+            if let qAge = health.quoteAgeSeconds, qAge > 60 {
+                parts.append("Quote yaşı: \(Int(qAge)) sn")
+            }
+            if let cAge = health.candleAgeSeconds, cAge > 600 {
+                parts.append("Daily candle yaşı: \(Int(cAge / 60)) dk")
+            }
+            if let src = health.quoteSource {
+                parts.append("Quote kaynağı: \(src)")
+            }
+        }
+
+        // Prometheus 5-günlük projeksiyon — V6: kritik yeni blok
+        if let p = context.prometheus {
+            parts.append("")
+            parts.append("=== KISA VADELİ PROJEKSİYON (\(p.horizonDays) GÜN) ===")
+            parts.append("Tahmini Fiyat: \(currencySymbol)\(String(format: "%.2f", p.predictedPrice))")
+            parts.append("Beklenen Değişim: \(p.changePercent >= 0 ? "+" : "")\(String(format: "%.2f", p.changePercent))%")
+            parts.append("Yön: \(p.trend)")
+            parts.append("Model Önerisi: \(p.recommendation)")
+            parts.append("Güven: %\(Int(p.confidence)) (\(p.confidenceLevel))")
+            parts.append("Walk-Forward Doğruluk: MAPE %\(String(format: "%.2f", p.mape)), Yön İsabeti %\(String(format: "%.1f", p.directionalAccuracy * 100))")
+            if !p.rationale.isEmpty {
+                parts.append("Model Notu: \(p.rationale.last ?? "")")
+            }
         }
 
         guard let d = context.decision else {
+            // Karar yoksa Prometheus + meta zaten dolu, yeterli context çıkmış olabilir.
+            // Geri kalan bloklar için karar şart.
             return parts.joined(separator: "\n")
         }
 
@@ -242,6 +360,28 @@ actor ArgusVoiceService {
             }
         }
 
+        // Risk / Volatilite — V6: pozisyon boyutlandırma + stop önerisi için kritik
+        if let r = context.risk {
+            parts.append("")
+            parts.append("=== RİSK / VOLATİLİTE ===")
+            if let v = r.dailyVolatilityPct {
+                let tier = v < 1.5 ? "Düşük" : v < 3.0 ? "Orta" : "Yüksek"
+                parts.append("Günlük Volatilite (20g σ): %\(String(format: "%.2f", v)) (\(tier))")
+            }
+            if let high = r.weekHigh52, let low = r.weekLow52 {
+                parts.append("52 Hafta Aralığı: \(currencySymbol)\(String(format: "%.2f", low)) - \(currencySymbol)\(String(format: "%.2f", high))")
+            }
+            if let dh = r.distanceFromHighPct {
+                parts.append("52w Tepe'den Uzaklık: \(String(format: "%.1f", dh))%")
+            }
+            if let dl = r.distanceFromLowPct {
+                parts.append("52w Dip'ten Uzaklık: +\(String(format: "%.1f", dl))%")
+            }
+            if let adr = r.avgDailyRangePct {
+                parts.append("Ortalama Günlük Aralık (ATR-yakın): %\(String(format: "%.2f", adr))")
+            }
+        }
+
         // Makro Ortam
         let aether = d.aetherDecision
         parts.append("")
@@ -250,6 +390,31 @@ actor ArgusVoiceService {
         parts.append("Rejim: \(aether.netSupport > 0.6 ? "Risk-On (Destekleyici)" : aether.netSupport < 0.4 ? "Risk-Off (Baskılayıcı)" : "Nötr")")
         if let proposal = aether.winningProposal {
             parts.append("Makro Değerlendirme: \(proposal.reasoning)")
+        }
+
+        // Piyasa Rejimi (Chiron) — V6
+        if let chiron = context.chironRegime {
+            parts.append("")
+            parts.append("=== PİYASA REJİMİ ===")
+            parts.append("Aktif Rejim: \(chiron.regime)")
+            if !chiron.explanation.isEmpty {
+                parts.append("Açıklama: \(chiron.explanation)")
+            }
+        }
+
+        // Sektör Skoru (Demeter) — V6: askArgus'a girmiyordu, şimdi giriyor
+        if let dem = context.demeter {
+            parts.append("")
+            parts.append("=== SEKTÖR SKORU ===")
+            parts.append("Sektör: \(dem.sector.name)")
+            parts.append("Toplam Puan: \(Int(dem.totalScore))/100 (Derece: \(dem.grade))")
+            parts.append("Momentum: \(Int(dem.momentumScore))/100")
+            parts.append("Şok Etkisi: \(Int(dem.shockImpactScore))/100")
+            parts.append("Rejim Uyumu: \(Int(dem.regimeScore))/100")
+            if !dem.activeShocks.isEmpty {
+                let shocks = dem.activeShocks.map { "\($0.type.displayName) \($0.direction.symbol)" }.joined(separator: ", ")
+                parts.append("Aktif Şoklar: \(shocks)")
+            }
         }
 
         // Haberler
@@ -370,9 +535,21 @@ actor ArgusVoiceService {
     
     // MARK: - Full App Context Builder
     
-    /// Uygulamanın tam durumunu çeker - Voice'un her şeye erişimi var
+    /// Uygulamanın tam durumunu çeker - Voice'un her şeye erişimi var.
+    /// V6 (Phase 7+, 2026-04-30): Prometheus tahmini, Chiron rejim, risk metrikleri,
+    /// sembol metadata ve veri kalitesi de toplanıyor.
     func buildFullAppContext(symbol: String? = nil) async -> ArgusContext {
+        // Async store'lardan veri çek (MainActor.run dışında — actor cross-hop).
         let regimeContext = await RegimeMemoryService.shared.getRegimeContext()
+        let chironResult: ChironResult? = await MainActor.run { ChironRegimeEngine.shared.globalResult }
+        let blockData: (isBlocked: Bool, reason: String?, expiresInHours: Double?) = await {
+            guard let s = symbol else { return (false, nil, nil) }
+            let blocked = await SymbolBlocklist.shared.isBlocked(s)
+            guard blocked else { return (false, nil, nil) }
+            let reason = await SymbolBlocklist.shared.reasonFor(s)
+            let cooldown = await SymbolBlocklist.shared.remainingCooldown(s)
+            return (true, reason, cooldown.map { $0 / 3600.0 })
+        }()
         return await MainActor.run { () -> ArgusContext in
             // Portföy
             let portfolioStore = PortfolioStore.shared
@@ -435,20 +612,165 @@ actor ArgusVoiceService {
             
             // Decision for symbol if provided
             let decision = symbol.map { SignalStateViewModel.shared.grandDecisions[$0] }
-            
+
+            // V6: Prometheus forecast — SignalViewModel'da @Published.
+            let prometheusSummary: PrometheusVoiceSummary? = {
+                guard let s = symbol,
+                      let f = SignalViewModel.shared.prometheusForecastBySymbol[s],
+                      f.isValid else { return nil }
+                return PrometheusVoiceSummary(
+                    predictedPrice: f.predictedPrice,
+                    changePercent: f.changePercent,
+                    trend: f.trend.rawValue,
+                    recommendation: f.recommendation.rawValue,
+                    confidence: f.confidence,
+                    confidenceLevel: f.confidenceLevel,
+                    horizonDays: f.horizonDays,
+                    mape: f.validationMAPE,
+                    directionalAccuracy: f.directionalAccuracy,
+                    modelVersion: f.modelVersion,
+                    rationale: f.rationale
+                )
+            }()
+
+            // V6: Demeter sektör skoru.
+            // Demeter list'i sektör bazında; sembol→sektör mapping ileride
+            // SymbolResolver üzerinden bağlanmalı. Şimdilik genel piyasa görünümü
+            // olarak en güçlü ve en zayıf sektörü gösterebilmek için ilk skoru
+            // taşıyoruz; gerçek symbol-aware mapping eklendiğinde güncellenir.
+            let demeterSummary: DemeterScore? = symbol.flatMap { _ in
+                SignalStateViewModel.shared.demeterScores.first
+            }
+
+            // V6: Chiron rejim
+            let chironSummary: ChironRegimeSummary? = chironResult.map {
+                ChironRegimeSummary(regime: $0.regime.rawValue, explanation: $0.explanationBody)
+            }
+
+            // V6: Risk metrikleri — daily candle'lardan hesapla.
+            let riskSummary: RiskVoiceSummary? = symbol.flatMap { sym in
+                Self.computeRiskSummary(symbol: sym)
+            }
+
+            // V6: Sembol metadata
+            let symbolMetaSummary: SymbolMetaSummary? = symbol.map { Self.inferSymbolMeta(symbol: $0) }
+
+            // V6: Veri kalitesi (blocklist + cache yaşları)
+            let dataHealthSummary: DataHealthSummary? = symbol.map { sym in
+                let quoteAge: Double? = MarketDataStore.shared.quotes[sym]?.provenance.fetchedAt.timeIntervalSinceNow.magnitude
+                let candleAge: Double? = MarketDataStore.shared.candles["\(sym)_1day"]?.provenance.fetchedAt.timeIntervalSinceNow.magnitude
+                let quoteSrc: String? = MarketDataStore.shared.quotes[sym]?.provenance.source
+                return DataHealthSummary(
+                    isBlocked: blockData.isBlocked,
+                    blockReason: blockData.reason,
+                    blockExpiresInHours: blockData.expiresInHours,
+                    quoteAgeSeconds: quoteAge,
+                    candleAgeSeconds: candleAge,
+                    quoteSource: quoteSrc
+                )
+            }
+
             return ArgusContext(
                 symbol: symbol ?? "GENEL",
                 price: symbol.flatMap { MarketDataStore.shared.liveQuotes[$0]?.currentPrice },
                 decision: decision ?? nil,
-                demeter: nil,
+                demeter: demeterSummary,
                 userQuery: nil,
                 portfolio: portfolio,
                 marketState: market,
                 watchlist: watchlist,
                 recentTrades: Array(recentTrades),
-                tradeBrainState: tbState
+                tradeBrainState: tbState,
+                prometheus: prometheusSummary,
+                chironRegime: chironSummary,
+                risk: riskSummary,
+                symbolMeta: symbolMetaSummary,
+                dataHealth: dataHealthSummary
             )
         }
+    }
+
+    // MARK: - V6 Helpers (Phase 7+, 2026-04-30)
+
+    /// Sembol pattern'inden market + currency infer eder.
+    /// `.IS` → BIST/TRY, `-USD` → Crypto/USD, `=X` → Forex/USD, `=F` → Futures/USD,
+    /// `^` prefix → Index/USD, default → US/USD.
+    private static func inferSymbolMeta(symbol: String) -> SymbolMetaSummary {
+        let upper = symbol.uppercased()
+        if upper.hasSuffix(".IS") {
+            return SymbolMetaSummary(market: "BIST", currency: "TRY", currencySymbol: "₺")
+        }
+        if upper.hasSuffix("-USD") {
+            return SymbolMetaSummary(market: "Crypto", currency: "USD", currencySymbol: "$")
+        }
+        if upper.hasSuffix("=X") {
+            return SymbolMetaSummary(market: "Forex", currency: "USD", currencySymbol: "$")
+        }
+        if upper.hasSuffix("=F") {
+            return SymbolMetaSummary(market: "Futures", currency: "USD", currencySymbol: "$")
+        }
+        if upper.hasPrefix("^") {
+            return SymbolMetaSummary(market: "Index", currency: "USD", currencySymbol: "$")
+        }
+        return SymbolMetaSummary(market: "US", currency: "USD", currencySymbol: "$")
+    }
+
+    /// Daily candle cache'inden risk/volatilite metrikleri hesaplar.
+    /// MainActor.run içinde çağrıldığı için isolation güvenli.
+    @MainActor
+    private static func computeRiskSummary(symbol: String) -> RiskVoiceSummary? {
+        let key = "\(symbol)_1day"
+        guard let candles = MarketDataStore.shared.candles[key]?.value, candles.count >= 20 else {
+            return nil
+        }
+
+        // Günlük volatilite — son 20 günün getiri stdDev'i, %.
+        let tail = Array(candles.suffix(21))
+        var returns: [Double] = []
+        for i in 1..<tail.count where tail[i - 1].close > 0 {
+            returns.append((tail[i].close - tail[i - 1].close) / tail[i - 1].close)
+        }
+        let dailyVolatilityPct: Double? = {
+            guard returns.count >= 2 else { return nil }
+            let mean = returns.reduce(0, +) / Double(returns.count)
+            let variance = returns.reduce(0) { $0 + pow($1 - mean, 2) } / Double(returns.count - 1)
+            return sqrt(variance) * 100.0
+        }()
+
+        // 52-week high / low — son 252 bar (yaklaşık 1 yıl).
+        let yearWindow = candles.suffix(252)
+        let weekHigh52 = yearWindow.map(\.high).max()
+        let weekLow52 = yearWindow.map(\.low).min()
+        let lastClose = candles.last?.close
+
+        let distanceFromHighPct: Double? = {
+            guard let h = weekHigh52, let c = lastClose, h > 0 else { return nil }
+            return ((c - h) / h) * 100.0
+        }()
+        let distanceFromLowPct: Double? = {
+            guard let l = weekLow52, let c = lastClose, l > 0 else { return nil }
+            return ((c - l) / l) * 100.0
+        }()
+
+        // Ortalama günlük aralık (ATR-yakın) — son 14 günün (high-low)/close ortalaması, %.
+        let atrWindow = Array(candles.suffix(14))
+        let avgDailyRangePct: Double? = {
+            let ranges = atrWindow.compactMap { c -> Double? in
+                guard c.close > 0 else { return nil }
+                return ((c.high - c.low) / c.close) * 100.0
+            }
+            guard !ranges.isEmpty else { return nil }
+            return ranges.reduce(0, +) / Double(ranges.count)
+        }()
+
+        return RiskVoiceSummary(
+            dailyVolatilityPct: dailyVolatilityPct,
+            weekHigh52: weekHigh52,
+            weekLow52: weekLow52,
+            distanceFromHighPct: distanceFromHighPct,
+            distanceFromLowPct: distanceFromLowPct,
+            avgDailyRangePct: avgDailyRangePct
+        )
     }
 
     // MARK: - Offline Fallback (Veri-Odaklı, Sallamasız)
@@ -486,14 +808,8 @@ actor ArgusVoiceService {
             for v in d.vetoes { report += "- \(v.reason)\n" }
         }
 
-        // Try to pass through compliance engine if available; otherwise return raw report.
-        do {
-            // If the compliance engine is async, we await here because this function supports async.
-            return try await SPKRegulatoryEngine.shared.ensureCompliance(content: report, isHighRisk: false)
-        } catch {
-            // In case the compliance engine cannot be awaited or throws, return the raw report to avoid build-time async errors.
-            return report
-        }
+        // Compliance engine non-async, non-throwing.
+        return SPKRegulatoryEngine.shared.ensureCompliance(content: report, isHighRisk: false)
     }
 
     // MARK: - Helpers
