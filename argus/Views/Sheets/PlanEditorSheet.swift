@@ -43,7 +43,7 @@ struct PlanEditorSheet: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("PLAN ÖZETİ")) {
                     HStack {

@@ -76,43 +76,25 @@ struct ArgusDrawerView: View {
 
             HStack(spacing: 0) {
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 22) {
                         headerSection
                         searchSection
 
                         if !searchText.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                sectionHeader("ARAMA SONUÇLARI")
-                                VStack(spacing: 8) {
-                                    ForEach(filteredItems) { item in
-                                        navigationItem(icon: item.icon, title: item.title, subtitle: item.subtitle, action: item.action)
-                                    }
-                                }
-                            }
+                            groupedSection(title: "Arama sonuçları", items: filteredItems)
                         } else {
                             ForEach(sections) { section in
-                                VStack(alignment: .leading, spacing: 12) {
-                                    sectionHeader(section.title)
-                                    VStack(spacing: 8) {
-                                        ForEach(section.items) { item in
-                                            navigationItem(icon: item.icon, title: item.title, subtitle: item.subtitle, action: item.action)
-                                        }
-                                    }
-                                }
+                                groupedSection(title: section.title, items: section.items)
                             }
                         }
 
                         Spacer().frame(height: 32)
                     }
-                    .padding(20)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 18)
                 }
-                .frame(width: 332)
-                .background(InstitutionalTheme.Colors.surface1)
-                .overlay(alignment: .leading) {
-                    Rectangle()
-                        .fill(InstitutionalTheme.Colors.primary)
-                        .frame(width: 2)
-                }
+                .frame(width: 320)
+                .background(InstitutionalTheme.Colors.background)
 
                 Spacer()
             }
@@ -126,85 +108,99 @@ struct ArgusDrawerView: View {
         }
     }
 
-    // MARK: - Header
-
-    // 2026-04-23 V5.H-13: Kullanıcı profil bloğu kaldırıldı — karşılama
-    // mesajları istenmemişti. Yerine iyi biçimlendirilmiş Argus marka
-    // bloğu: büyük aperture logosu + ARGUS kelime işareti + sürüm
-    // satırı. Drawer üstü daha sakin, kurumsal.
-    private var headerSection: some View {
-        HStack(spacing: 14) {
-            MotorLogo(.argus, size: 48)
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("ARGUS")
-                    .font(.system(size: 18, weight: .heavy, design: .monospaced))
-                    .tracking(2.4)
-                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                HStack(spacing: 6) {
-                    ArgusDot(color: InstitutionalTheme.Colors.aurora, size: 5)
-                    Text("INSTITUTIONAL · V1.0")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .tracking(1.2)
-                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+    /// Bölüm başlığı + grouped list — iOS Settings list diline yakın.
+    /// 2026-04-30 H-43 fix: Array(items.enumerated()) + id:\.element.id
+    /// kombinasyonu Button binding'ini bazen koparıyordu (tıklama
+    /// işlemiyor). ForEach(items) + son-eleman karşılaştırmasıyla divider
+    /// gösterimine geçtim. Identity stabil, tıklamalar dirilir.
+    @ViewBuilder
+    private func groupedSection(title: String, items: [DrawerItem]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            sectionHeader(title)
+            VStack(spacing: 0) {
+                ForEach(items) { item in
+                    navigationItem(icon: item.icon,
+                                   title: item.title,
+                                   subtitle: item.subtitle,
+                                   action: item.action)
+                    if item.id != items.last?.id {
+                        Rectangle()
+                            .fill(InstitutionalTheme.Colors.borderSubtle)
+                            .frame(height: 0.5)
+                            .padding(.leading, 44)
+                    }
                 }
             }
+            .background(InstitutionalTheme.Colors.surface1)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
+    // MARK: - Header (2026-04-30 H-43 sade)
+    //
+    // ARGUS heavy mono caps tracking 2.4 + INSTITUTIONAL · V1.0 micro caps + dot
+    // + 48pt logo + alt hairline → sade tek satır: küçük dairesel logo +
+    // "Argus" 17pt medium + sağda close. Sürüm satırı ayarlar > hakkında
+    // sayfasında zaten var, drawer üstünden kalkıyor.
+    private var headerSection: some View {
+        HStack(spacing: 12) {
+            MotorLogo(.argus, size: 28)
+
+            Text("Argus")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
             Spacer()
 
             Button { isPresented = false } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: 15, weight: .regular))
                     .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     .frame(width: 32, height: 32)
-                    .background(InstitutionalTheme.Colors.surface2)
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }
         .padding(.vertical, 4)
-        .overlay(ArgusHair(), alignment: .bottom)
     }
 
     // MARK: - Search
 
     private var searchSection: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                .font(.subheadline)
+                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                .font(.system(size: 14))
 
-            TextField("İşlem veya ekran ara...", text: $searchText)
+            TextField("Ara…", text: $searchText)
                 .textFieldStyle(PlainTextFieldStyle())
                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                .font(InstitutionalTheme.Typography.caption)
+                .font(.system(size: 14))
 
             if !searchText.isEmpty {
                 Button { searchText = "" } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        .font(.subheadline)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                        .font(.system(size: 14))
                 }
             }
         }
-        .padding(12)
-        .background(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm).fill(InstitutionalTheme.Colors.surface2))
-        .overlay(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm).stroke(InstitutionalTheme.Colors.borderStrong, lineWidth: 1))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(InstitutionalTheme.Colors.surface1)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     // MARK: - Components
 
     @ViewBuilder
     private func iconView(for icon: String) -> some View {
-        // V5 ortak: asset isimleri MotorEngine'e çevrilip MotorLogo ile
-        // render edilir (Chiron ve ArgusEye SVG vektör, diğerleri PNG).
-        // Böylece SF ikon/asset karışıklığı yok, her yerde aynı estetik.
         if let motor = motorFromIconName(icon) {
-            MotorLogo(motor, size: 22)
+            MotorLogo(motor, size: 20)
         } else {
             Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundColor(InstitutionalTheme.Colors.primary)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
     }
 
@@ -226,44 +222,35 @@ struct ArgusDrawerView: View {
     }
 
     private func sectionHeader(_ title: String) -> some View {
-        HStack(spacing: 8) {
-            Text(title)
-                .font(InstitutionalTheme.Typography.micro)
-                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                .tracking(1)
-            Rectangle()
-                .fill(InstitutionalTheme.Colors.primary.opacity(0.25))
-                .frame(height: 1)
-        }
+        Text(title)
+            .font(.system(size: 12))
+            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            .padding(.leading, 4)
     }
 
     private func navigationItem(icon: String, title: String, subtitle: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 iconView(for: icon)
-                    .frame(width: 28, height: 28)
-                VStack(alignment: .leading, spacing: 2) {
+                    .frame(width: 22, height: 22)
+                VStack(alignment: .leading, spacing: 1) {
                     Text(title)
-                        .font(InstitutionalTheme.Typography.bodyStrong)
-                        .fontWeight(.medium)
+                        .font(.system(size: 14, weight: .regular))
                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     Text(subtitle)
-                        .font(InstitutionalTheme.Typography.micro)
+                        .font(.system(size: 11))
                         .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .lineLimit(1)
                 }
-                Spacer()
+                Spacer(minLength: 8)
                 Image(systemName: "chevron.right")
-                    .font(.caption2)
-                    .foregroundColor(InstitutionalTheme.Colors.textSecondary.opacity(0.6))
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm).fill(InstitutionalTheme.Colors.surface2))
-            .overlay(
-                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm)
-                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
-            )
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
     }
@@ -334,11 +321,11 @@ struct ArgusDrawerView: View {
         }
 
         if hadLearningItems {
-            updated.insert(DrawerSection(title: "ÖĞRENME", items: [academyItem]), at: 0)
+            updated.insert(DrawerSection(title: "Öğrenme", items: [academyItem]), at: 0)
             return updated
         }
 
-        updated.append(DrawerSection(title: "ÖĞRENME", items: [academyItem]))
+        updated.append(DrawerSection(title: "Öğrenme", items: [academyItem]))
         return updated
     }
 
@@ -358,9 +345,9 @@ struct ArgusDrawerView: View {
         ArgusDrawerView(isPresented: .constant(true)) { _ in
             [
                 ArgusDrawerView.DrawerSection(
-                    title: "ORNEK",
+                    title: "Örnek",
                     items: [
-                        ArgusDrawerView.DrawerItem(title: "Demo", subtitle: "Ornek aksiyon", icon: "gearshape", action: {})
+                        ArgusDrawerView.DrawerItem(title: "Demo", subtitle: "Örnek aksiyon", icon: "gearshape", action: {})
                     ]
                 )
             ]

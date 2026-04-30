@@ -43,7 +43,7 @@ struct MarketView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
 
@@ -81,19 +81,23 @@ struct MarketView: View {
                     .zIndex(200)
                 }
 
-                // Programmatic Navigation (DeepLinkManager)
-                NavigationLink(
-                    destination: ArgusSanctumView(
-                        symbol: deepLinkManager.selectedStockSymbol ?? "",
-                        viewModel: viewModel
-                    ),
-                    isActive: Binding(
-                        get: { deepLinkManager.selectedStockSymbol != nil },
-                        set: { if !$0 { deepLinkManager.selectedStockSymbol = nil } }
-                    )
-                ) { EmptyView() }
             }
             .navigationBarHidden(true)
+            // Programmatic Navigation (DeepLinkManager)
+            // Modern API: navigationDestination(isPresented:) — iOS 16'da
+            // NavigationLink(isActive:) deprecated. Hidden EmptyView trick'i
+            // de gerekmiyor.
+            .navigationDestination(
+                isPresented: Binding(
+                    get: { deepLinkManager.selectedStockSymbol != nil },
+                    set: { if !$0 { deepLinkManager.selectedStockSymbol = nil } }
+                )
+            ) {
+                ArgusSanctumView(
+                    symbol: deepLinkManager.selectedStockSymbol ?? "",
+                    viewModel: viewModel
+                )
+            }
             .sheet(isPresented: $showSearch) {
                 AddSymbolSheet()
                     .preferredColorScheme(.dark)
@@ -288,7 +292,7 @@ struct MarketView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
                         deepLinkManager.navigate(to: .home)
@@ -316,7 +320,7 @@ struct MarketView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "PIYASA",
+                title: "Piyasa",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Hisse Ekle", subtitle: "Listeye sembol ekle", icon: "plus.circle") {
                         showSearch = true
@@ -355,7 +359,7 @@ struct MarketView: View {
 
     private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
         ArgusDrawerView.DrawerSection(
-            title: "ARACLAR",
+            title: "Araçlar",
             items: [
                 ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
                     openSheet(.calendar)
@@ -560,7 +564,7 @@ struct AddSymbolSheet: View {
     @State private var searchBist = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
 

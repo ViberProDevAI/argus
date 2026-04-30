@@ -41,7 +41,7 @@ struct PortfolioView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
 
@@ -299,7 +299,7 @@ struct PortfolioView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
                         deepLinkManager.navigate(to: .home); showDrawer = false
@@ -353,14 +353,14 @@ struct PortfolioView: View {
             ])
         }
 
-        sections.append(ArgusDrawerView.DrawerSection(title: "PORTFOY", items: portfolioItems))
+        sections.append(ArgusDrawerView.DrawerSection(title: "Portföy", items: portfolioItems))
         sections.append(commonToolsSection(openSheet: openSheet))
         return sections
     }
 
     private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
         ArgusDrawerView.DrawerSection(
-            title: "ARACLAR",
+            title: "Araçlar",
             items: [
                 ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
                     openSheet(.calendar)
@@ -820,7 +820,7 @@ struct NewTradeSheet: View {
     @State private var quantity: Double = 1.0
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
 

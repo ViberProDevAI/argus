@@ -214,7 +214,7 @@ struct BistPortfolioView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Alkindus Merkez", subtitle: "Yapay zeka ana sayfa", icon: "AlkindusIcon") {
                         deepLinkManager.navigate(to: .home)
@@ -238,7 +238,7 @@ struct BistPortfolioView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "BIST PORTFOY",
+                title: "BIST portföyü",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Hisse Ekle", subtitle: "BIST hissesi ekle", icon: "plus.circle") {
                         showSearch = true
@@ -250,7 +250,7 @@ struct BistPortfolioView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "ARACLAR",
+                title: "Araçlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
                         openSheet(.calendar)

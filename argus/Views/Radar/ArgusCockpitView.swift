@@ -84,7 +84,7 @@ struct ArgusCockpitView: View {
 
     var body: some View {
         ZStack {
-            NavigationView {
+            NavigationStack {
                 VStack(spacing: 0) {
                     marketTabBar
 
@@ -242,7 +242,7 @@ struct ArgusCockpitView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
                         deepLinkManager.navigate(to: .home); showDrawer = false
@@ -266,7 +266,7 @@ struct ArgusCockpitView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "TERMINAL",
+                title: "Terminal",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Pazar: Global", subtitle: "Global liste", icon: "globe.asia.australia") {
                         selectedMarket = .global; showDrawer = false
@@ -306,7 +306,7 @@ struct ArgusCockpitView: View {
 
     private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
         ArgusDrawerView.DrawerSection(
-            title: "ARACLAR",
+            title: "Araçlar",
             items: [
                 ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
                     openSheet(.calendar)

@@ -17,7 +17,7 @@ struct TransactionHistorySheet: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
                 

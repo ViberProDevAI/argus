@@ -245,7 +245,7 @@ struct ArgusSanctumView: View {
         // kalemi 2026-04-22 V5 sprintinde temizlendi.
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Alkindus Merkez",
                                                subtitle: "Yapay zeka ana sayfa",
@@ -280,7 +280,7 @@ struct ArgusSanctumView: View {
         // ağırlıklı genel görünümlerine yönlendirir.
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "MERKEZLER",
+                title: "Merkezler",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Chiron Öğrenme",
                                                subtitle: "Ağırlıklar ve performans",
@@ -307,7 +307,7 @@ struct ArgusSanctumView: View {
         // 3) HISSE İŞLEMLERI — mevcut sembole özgü aksiyonlar
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "HİSSE İŞLEMLERİ",
+                title: "Hisse işlemleri",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Alım İşlemi",
                                                subtitle: "Pozisyon aç",
@@ -398,7 +398,7 @@ struct ArgusSanctumView: View {
         }
 
         sections.append(
-            ArgusDrawerView.DrawerSection(title: "MODÜLLER", items: moduleItems)
+            ArgusDrawerView.DrawerSection(title: "Modüller", items: moduleItems)
         )
         
         sections.append(commonToolsSection(openSheet: openSheet))
@@ -408,7 +408,7 @@ struct ArgusSanctumView: View {
     
     private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
         ArgusDrawerView.DrawerSection(
-            title: "ARACLAR",
+            title: "Araçlar",
             items: [
                 ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
                     openSheet(.calendar)

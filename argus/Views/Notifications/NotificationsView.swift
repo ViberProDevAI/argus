@@ -43,7 +43,7 @@ struct NotificationsView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
 
@@ -124,7 +124,7 @@ struct NotificationsView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Alkindus Merkez", subtitle: "Yapay zeka ana sayfa", icon: "AlkindusIcon") {
                         deepLinkManager.navigate(to: .home)
@@ -148,7 +148,7 @@ struct NotificationsView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "BILDIRIMLER",
+                title: "Bildirimler",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Tumunu Oku", subtitle: "Tum bildirimleri temizle", icon: "checkmark.circle") {
                         store.markAllRead()
@@ -160,7 +160,7 @@ struct NotificationsView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "ARACLAR",
+                title: "Araçlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
                         openSheet(.calendar)

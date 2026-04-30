@@ -54,7 +54,14 @@ struct ContentView: View {
                         .environmentObject(router)
                 }
             }
-            .id(deepLinkManager.selectedTab)
+            // Tab değişiminde NavigationStack'i sıfırla (back stack temizle)
+            // Önceden .id(selectedTab) ile tüm NavigationStack yok edilip yeniden oluşturuluyordu;
+            // bu her tab geçişinde view'ların tamamen rebuild olmasına ve .onAppear/.task'ların
+            // tekrar çalışmasına neden oluyordu. popToRoot ile aynı "fresh tab" davranışı,
+            // view yıkımı olmadan sağlanır.
+            .onChange(of: deepLinkManager.selectedTab) { _, _ in
+                router.popToRoot()
+            }
 
         }
         .sheet(item: $viewModel.generatedSmartPlan) { plan in

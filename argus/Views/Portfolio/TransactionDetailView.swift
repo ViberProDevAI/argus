@@ -5,7 +5,7 @@ struct TransactionDetailView: View {
     @Environment(\.presentationMode) var presentationMode
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
                     // 1. Transaction Summary

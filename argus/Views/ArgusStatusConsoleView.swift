@@ -39,7 +39,7 @@ struct ArgusStatusConsoleView: View {
     let tradeBlockReasons: [String]
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.edgesIgnoringSafeArea(.all)
                 ScrollView {

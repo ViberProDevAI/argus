@@ -6,46 +6,16 @@ import Combine
 extension TradingViewModel {
 
     func setupStoreBindings() {
-        MarketDataStore.shared.$quotes
-            .throttle(for: .seconds(0.5), scheduler: RunLoop.main, latest: true)
-            .sink { [weak self] storeQuotes in
-                var cleanQuotes: [String: Quote] = [:]
-                for (sym, dv) in storeQuotes {
-                    if let val = dv.value {
-                        cleanQuotes[sym] = val
-                    }
-                }
-                self?.quotes = cleanQuotes
-            }
-            .store(in: &cancellables)
+        // MarketDataStore.$quotes subscription'ı MarketViewModel.setupBindings() içinde
+        // kuruluyor (1s throttle ile + diff check). Burada tekrar 0.5s throttle ile
+        // subscribe etmek aynı veriyi market.quotes'a 2 farklı zamanda yazıyordu —
+        // setter yine market.quotes'a yazıp MarketViewModel.objectWillChange'i
+        // gereksiz yere tetikliyordu. Bu yüzden kaldırıldı; tek kanal: MarketViewModel.
 
-        PortfolioStore.shared.$trades
-            .receive(on: RunLoop.main)
-            .sink { [weak self] trades in
-                self?.portfolio = trades
-            }
-            .store(in: &cancellables)
-
-        PortfolioStore.shared.$globalBalance
-            .receive(on: RunLoop.main)
-            .sink { [weak self] newBalance in
-                self?.balance = newBalance
-            }
-            .store(in: &cancellables)
-
-        PortfolioStore.shared.$bistBalance
-            .receive(on: RunLoop.main)
-            .sink { [weak self] newBalance in
-                self?.bistBalance = newBalance
-            }
-            .store(in: &cancellables)
-
-        PortfolioStore.shared.$transactions
-            .receive(on: RunLoop.main)
-            .sink { [weak self] transactions in
-                self?.transactionHistory = transactions
-            }
-            .store(in: &cancellables)
+        // PortfolioStore subscription'ları setupPortfolioStoreBridge() içinde init()'te
+        // kuruluyor. Burada tekrarlamak ikinci sink eklerdi ve her PortfolioStore
+        // güncellemesinde 2x setter çağrısına yol açardı (setter yine risk.portfolio'ya
+        // yazıyor — gereksiz ek iş). Bu yüzden kaldırıldı.
 
         ExecutionStateViewModel.shared.$planAlerts
             .receive(on: RunLoop.main)

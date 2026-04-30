@@ -102,11 +102,12 @@ struct DailyAgendaView: View {
 
     // MARK: - Body
 
+    @ViewBuilder
     var body: some View {
+        // PERFORMANCE: AnyView wrapper'ı kaldırıldı; @ViewBuilder + if ile
+        // SwiftUI yapısal kimlik takibi yapılır, body type opaque kalır.
         let items = agendaItems
-        if items.isEmpty { return AnyView(EmptyView()) }
-
-        return AnyView(
+        if !items.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 // Başlık
                 HStack(spacing: 6) {
@@ -168,7 +169,7 @@ struct DailyAgendaView: View {
                             .stroke(Color.orange.opacity(0.25), lineWidth: 1)
                     )
             )
-        )
+        }
     }
 
     // MARK: - Helpers

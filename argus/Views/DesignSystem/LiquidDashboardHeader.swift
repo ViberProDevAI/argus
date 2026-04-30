@@ -151,11 +151,15 @@ struct LiquidDashboardHeader: View {
                 .foregroundColor(selected ? .white : InstitutionalTheme.Colors.textTertiary)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 4)
-                .background(
-                    selected
-                        ? AnyView(Capsule().fill(InstitutionalTheme.Colors.holo))
-                        : AnyView(Color.clear)
-                )
+                // PERFORMANCE: AnyView ternary yerine .background { @ViewBuilder }
+                // closure formu — SwiftUI'nin tip kimliğini bozmaz.
+                .background {
+                    if selected {
+                        Capsule().fill(InstitutionalTheme.Colors.holo)
+                    } else {
+                        Color.clear
+                    }
+                }
         }
         .buttonStyle(.plain)
     }

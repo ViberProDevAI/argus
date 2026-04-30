@@ -115,7 +115,24 @@ class TradingViewModel: ObservableObject {
     // Terminal Optimized Data Source
     // MIRROR: AppStateCoordinator.shared.$terminalItems
     @Published var terminalItems: [TerminalItem] = []
-    
+
+    /// Per-symbol input signature for incremental update.
+    /// Eğer bir sembolün tüm input'ları aynıysa, o item'a `getFundamentalScore`,
+    /// `ChimeraSynergyEngine.fuse` ve TerminalItem allocation'ı yapmadan direkt
+    /// önceki item'ı kullanırız.
+    private struct TerminalInputSignature: Equatable {
+        let price: Double
+        let percentChange: Double?
+        let orionScore: Double?
+        let councilScore: Double?
+        let action: ArgusAction
+        let hermesImpact: Double?
+        let dataQuality: Int
+        let regime: MarketRegime
+        let forecastTrend: PrometheusTrend?
+    }
+    private var lastTerminalSignatures: [String: TerminalInputSignature] = [:]
+
     func refreshTerminal() {
         let regime = market.marketRegime // Use market's regime
 
@@ -129,14 +146,47 @@ class TradingViewModel: ObservableObject {
         let cachedDataHealth = dataHealthBySymbol
         let cachedForecasts = prometheusForecastBySymbol
 
+        // INCREMENTAL UPDATE: önceki TerminalItem'ları sembol→item map'ine çıkar.
+        // Watchlist'teki sembollerden input signature'ı değişmeyenler için
+        // ChimeraSynergyEngine.fuse + getFundamentalScore çağrılarını atlayıp
+        // mevcut item'ı yeniden kullanırız. Önceden 50 sembolde her quote
+        // güncellemesinde 50× chimera fuse + 50× fundamental score çağrılıyordu.
+        let existingByID: [String: TerminalItem] = Dictionary(
+            uniqueKeysWithValues: terminalItems.map { ($0.id, $0) }
+        )
+
+        var didChange = false
         let newItems = watchlist.map { symbol -> TerminalItem in
             let isBist = symbol.uppercased().hasSuffix(".IS") || SymbolResolver.shared.isBistSymbol(symbol)
             let quote = cachedQuotes[symbol]
             let decision = cachedDecisions[symbol]
-
-            // Chimera Signal Computation
             let orion = cachedOrionScores[symbol]
             let hermesImpact = cachedNewsInsights[symbol]?.first?.impactScore
+            let dataQuality = cachedDataHealth[symbol]?.qualityScore ?? 0
+            let forecast = cachedForecasts[symbol]
+
+            let signature = TerminalInputSignature(
+                price: quote?.currentPrice ?? 0,
+                percentChange: quote?.percentChange,
+                orionScore: orion?.score,
+                councilScore: decision?.confidence,
+                action: decision?.action ?? .neutral,
+                hermesImpact: hermesImpact,
+                dataQuality: dataQuality,
+                regime: regime,
+                forecastTrend: forecast?.trend
+            )
+
+            // Hızlı yol: signature aynı ve mevcut item varsa, yeniden hesaplama yapma
+            if lastTerminalSignatures[symbol] == signature,
+               let existing = existingByID[symbol] {
+                return existing
+            }
+
+            // Yavaş yol: signature değişti veya ilk kez görülüyor
+            didChange = true
+            lastTerminalSignatures[symbol] = signature
+
             let fundScore = getFundamentalScore(for: symbol)?.totalScore
 
             let chimeraResult = ChimeraSynergyEngine.shared.fuse(
@@ -156,16 +206,23 @@ class TradingViewModel: ObservableObject {
                 price: quote?.currentPrice ?? 0.0,
                 dayChangePercent: quote?.percentChange,
                 orionScore: orion?.score,
-                atlasScore: getFundamentalScore(for: symbol)?.totalScore,
+                atlasScore: fundScore,
                 councilScore: decision?.confidence,
                 action: decision?.action ?? .neutral,
-                dataQuality: cachedDataHealth[symbol]?.qualityScore ?? 0,
-                forecast: cachedForecasts[symbol],
+                dataQuality: dataQuality,
+                forecast: forecast,
                 chimeraSignal: chimeraResult.signals.first
             )
         }
-        
-        if newItems != terminalItems {
+
+        // Watchlist'ten çıkarılan sembolleri signature cache'den temizle
+        let watchlistSet = Set(watchlist)
+        if lastTerminalSignatures.count > watchlistSet.count {
+            lastTerminalSignatures = lastTerminalSignatures.filter { watchlistSet.contains($0.key) }
+        }
+
+        // Sıra/içerik gerçekten değiştiyse yayınla
+        if didChange || newItems.count != terminalItems.count {
             terminalItems = newItems
         }
     }
@@ -275,9 +332,19 @@ class TradingViewModel: ObservableObject {
     @Published var lastAction: String = ""
 
     
+    // PERFORMANCE: PortfolioStore'daki cache'lenmiş @Published alt kümelere forward et.
+    // Önceden her erişimde portfolio.filter çalışıyordu; PortfolioView, DailyAgendaView,
+    // PortfolioPlanBoard, TradeBrainStatusBand, BistMarketView gibi view'larda body
+    // içinde 6+ noktada çağrıldığı için her render'da redundant filter maliyeti vardı.
+    // Şimdi tek seviyeli forward — cache PortfolioStore.trades.didSet ile bir kez güncellenir.
+    //
+    // NOT: globalPortfolio (USD, açık+kapalı tümü) için cache yok; çoğu çağrı ya
+    // .filter { $0.isOpen } ile birleşiyor ya da kapalı işlemleri de istiyor.
+    // En sık kullanılan globalOpenTradesCache ve bistOpenTradesCache. Bunlardaki
+    // O(N) filter kazancı en yüksek.
     var globalPortfolio: [Trade] { portfolio.filter { $0.currency == .USD } }
     var bistPortfolio: [Trade] { portfolio.filter { $0.currency == .TRY } }
-    var bistOpenPortfolio: [Trade] { portfolio.filter { $0.currency == .TRY && $0.isOpen } }
+    var bistOpenPortfolio: [Trade] { PortfolioStore.shared.bistOpenTradesCache }
     var globalScoutLogs: [ScoutLog] { scoutLogs.filter { !$0.symbol.contains(".E") } }
 
     // Navigation State

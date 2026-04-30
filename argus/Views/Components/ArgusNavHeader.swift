@@ -183,15 +183,19 @@ struct ArgusNavHeader: View {
 
     // MARK: - Title
 
+    // 2026-04-30 H-44 — sade dil:
+    // Title: .black mono caps tracking 2.0 → .medium sentence case (caller
+    // responsiblity: caps başlık geçirme).
+    // Subtitle: 9pt mono micro caps tracking 1.2 → 12pt sentence case
+    // textSecondary.
     private var titleRow: some View {
         HStack(spacing: 12) {
             leadingDecoView
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 8) {
                     Text(title)
-                        .font(.system(size: titleSize, weight: .black, design: .monospaced))
-                        .tracking(titleTracking)
+                        .font(.system(size: 22, weight: .medium))
                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
                     if let pill = titlePill {
@@ -201,9 +205,8 @@ struct ArgusNavHeader: View {
 
                 if let subtitle {
                     Text(subtitle)
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .tracking(1.2)
-                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                        .font(.system(size: 12))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
             }
 
@@ -219,35 +222,21 @@ struct ArgusNavHeader: View {
         }
     }
 
-    private var titleSize: CGFloat {
-        titlePill != nil ? 18 : 22
-    }
-
-    private var titleTracking: CGFloat {
-        titlePill != nil ? 1.5 : 2.0
-    }
-
     @ViewBuilder
     private var leadingDecoView: some View {
         switch leadingDeco {
-        case .bars3(let tones):
-            HStack(spacing: 2) {
-                ForEach(Array(tones.enumerated()), id: \.offset) { _, tone in
-                    Rectangle()
-                        .fill(tone.color)
-                        .frame(width: 3, height: 20)
-                }
-            }
+        case .bars3:
+            // 2026-04-30 H-44: 3 renkli bar dekorasyonu kaldırıldı
+            // (AI-tell). Caller'lar artık sade başlığa düşüyor; backward
+            // compat için case korundu, view EmptyView döner.
+            EmptyView()
         case .back(let onTap):
             Button(action: onTap) {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    .frame(width: 36, height: 36)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(InstitutionalTheme.Colors.surface2)
-                    )
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         case .none:
@@ -258,13 +247,10 @@ struct ArgusNavHeader: View {
     private func actionButton(_ action: Action) -> some View {
         Button(action: action.action) {
             Image(systemName: action.sfSymbol)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                .frame(width: 36, height: 36)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(InstitutionalTheme.Colors.surface2)
-                )
+                .font(.system(size: 16, weight: .regular))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -293,17 +279,17 @@ struct ArgusNavHeader: View {
 
     private func statusBar(dotColor: Color, label: String, trailing: String, primary: Bool) -> some View {
         HStack(spacing: 8) {
-            ArgusDot(color: dotColor, size: 6)
+            Circle()
+                .fill(dotColor)
+                .frame(width: 6, height: 6)
             Text(label)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .tracking(1.0)
+                .font(.system(size: 12))
                 .foregroundColor(primary
                                  ? InstitutionalTheme.Colors.textPrimary
                                  : InstitutionalTheme.Colors.textSecondary)
-            ArgusHair()
+            Spacer(minLength: 8)
             Text(trailing)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .tracking(0.8)
+                .font(.system(size: 12))
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
     }

@@ -38,7 +38,7 @@ struct ArgusOrionSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Group {
                 // PRIORITY 1: Use OrionMotherboardView with reactive SanctumViewModel
                 if let analysis = sanctumVM.orionAnalysis {
@@ -74,7 +74,7 @@ struct ArgusAetherSheet: View {
         if let macro = macro {
             ArgusAetherDetailView(rating: macro)
         } else {
-            NavigationView {
+            NavigationStack {
                 VStack(spacing: 16) {
                     ProgressView()
                         .scaleEffect(1.5)
@@ -115,7 +115,7 @@ struct HermesSheetView: View {
     }
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     
