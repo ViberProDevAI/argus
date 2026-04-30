@@ -18,29 +18,26 @@ struct HoloPanelView: View {
     var body: some View {
         ZStack { // Wrap in ZStack for Info Card Overlay
             VStack(spacing: 0) {
-                // V5 HoloPanel başlığı: motor logo + mono caps pill + aksiyonlar + close
-                v5Header
+                // 2026-04-30 H-42 sade üst nav: close + sentence case başlık + opsiyonel aksiyonlar
+                topNav
 
-                ArgusHair()
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.borderSubtle)
+                    .frame(height: 0.5)
 
-                // Holo Content
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        // V5 açıklama satırı — italics yerine mono micro caps.
-                        HStack(spacing: 8) {
-                            ArgusDot(color: motorEngine.map {
-                                InstitutionalTheme.Colors.Motors.color(for: $0)
-                            } ?? module.color, size: 6)
-                            Text(module.description)
-                                .font(InstitutionalTheme.Typography.caption)
-                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                        // Sade alt başlık — modülün ne yaptığını tek cümleyle anlatır.
+                        Text(module.description)
+                            .font(.system(size: 13))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
 
                         // DYNAMIC CONTENT BASED ON MODULE
                         contentForModule(module)
                     }
-                    .padding(16)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
                     .padding(.bottom, 100) // Tab bar clearance
                 }
             }
@@ -79,9 +76,14 @@ struct HoloPanelView: View {
 
     }
 
-    // MARK: - V5 Header (Sprint V5.A — 2026-04-22)
+    // MARK: - Top nav (2026-04-30 H-42 sade)
+    //
+    // V5 mor chip + 36×36 tinted square ikon barı + caps borsacı başlık (KASA /
+    // TAHTA / SİRKİYE / KULİS / KISMET) komple gitti. Yerine sade nav: solda
+    // close, ortada tek-kelime sentence case modül adı, sağda opsiyonel grafik
+    // genişlet ve bilgi ikonları.
 
-    /// Modülün MotorEngine karşılığı (yoksa nil → SF ikon fallback).
+    /// Modülün MotorEngine karşılığı (yoksa nil → council/diğer).
     private var motorEngine: MotorEngine? {
         switch module {
         case .orion:      return .orion
@@ -96,92 +98,58 @@ struct HoloPanelView: View {
         }
     }
 
-    /// BIST sembolünde motor ismine eski borsacı jargonu uygulanır.
-    private var v5Title: String {
-        if symbol.uppercased().hasSuffix(".IS") {
-            switch module {
-            case .aether: return "SİRKİYE"
-            case .orion:  return "TAHTA"
-            case .atlas:  return "KASA"
-            case .hermes: return "KULİS"
-            case .chiron: return "KISMET"
-            default:      return module.rawValue.uppercased()
-            }
+    /// Sentence case modül adı (header için). Tek kelime, işlev karşılığı.
+    private var moduleTitle: String {
+        switch module {
+        case .atlas:      return "Bilanço"
+        case .orion:      return "Teknik"
+        case .aether:     return "Makro"
+        case .hermes:     return "Haber"
+        case .athena:     return "Faktörler"
+        case .demeter:    return "Sektör"
+        case .chiron:     return "Rejim"
+        case .prometheus: return "Tahmin"
+        case .council:    return "Konsey"
         }
-        return module.rawValue.uppercased()
     }
 
-    /// V5 HoloPanel başlık barı — motor logo + mono caps başlık + aksiyon chip'ler + close.
-    private var v5Header: some View {
-        let motorColor = motorEngine.map {
-            InstitutionalTheme.Colors.Motors.color(for: $0)
-        } ?? module.color
+    /// Sade üst nav — close + başlık + bilgi/grafik ikonları.
+    private var topNav: some View {
         let showChartExpand = !vm.candles.isEmpty &&
             (module == .orion || module == .atlas || module == .aether)
 
-        return HStack(spacing: 10) {
-            // Motor chip (logo + caps başlık)
-            HStack(spacing: 8) {
-                if let engine = motorEngine {
-                    MotorLogo(engine, size: 20)
-                } else {
-                    Image(systemName: "circle.grid.cross")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(motorColor)
-                }
-                Text(v5Title)
-                    .font(.system(size: 13, weight: .black, design: .monospaced))
-                    .tracking(1.5)
-                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(
-                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                    .fill(motorColor.opacity(0.14))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                    .stroke(motorColor.opacity(0.35), lineWidth: 1)
-            )
+        return HStack(spacing: 8) {
+            navIcon(system: "xmark", action: onClose)
 
-            // Info
-            v5IconButton(system: "info.circle", tint: motorColor) {
-                withAnimation { showInfoCard = true }
-            }
+            Text(moduleTitle)
+                .font(.system(size: 17, weight: .medium))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
-            // Expand chart (sadece teknik/makro/temel modüllerde)
+            Spacer()
+
             if showChartExpand {
-                v5IconButton(system: "arrow.up.left.and.arrow.down.right", tint: motorColor) {
+                navIcon(system: "arrow.up.left.and.arrow.down.right") {
                     showImmersiveChart = true
                 }
             }
 
-            Spacer()
-
-            // Close
-            v5IconButton(system: "xmark", tint: InstitutionalTheme.Colors.textSecondary) {
-                onClose()
+            navIcon(system: "info.circle") {
+                withAnimation { showInfoCard = true }
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(InstitutionalTheme.Colors.surface1)
+        .background(InstitutionalTheme.Colors.background)
     }
 
-    /// V5 ikon butonu — 36×36 rounded square (V5 drawer/cockpit ile aynı dil).
-    private func v5IconButton(system: String, tint: Color, action: @escaping () -> Void) -> some View {
+    /// Sade nav ikonu — sadece sembol, çerçeve/dolgu yok.
+    private func navIcon(system: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: system)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(tint)
-                .frame(width: 36, height: 36)
-                .background(InstitutionalTheme.Colors.surface2)
-                .overlay(
-                    RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                        .stroke(InstitutionalTheme.Colors.border, lineWidth: 1)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous))
+                .font(.system(size: 15, weight: .regular))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -248,14 +216,14 @@ struct HoloPanelView: View {
                     )
                 } else {
                     if vm.isLoading {
-                        VStack(spacing: 12) {
-                            ProgressView()
-                                .tint(SanctumTheme.orionColor)
-                            Text("Orion analizi yükleniyor...")
-                                .font(.caption)
+                        HStack(spacing: 10) {
+                            ProgressView().scaleEffect(0.7)
+                            Text("Teknik analiz yükleniyor…")
+                                .font(.system(size: 13))
                                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            Spacer()
                         }
-                        .frame(maxWidth: .infinity, minHeight: 200)
+                        .frame(maxWidth: .infinity, minHeight: 80)
                     } else {
                         OrionMotherboardErrorView(
                             symbol: symbol,
@@ -268,29 +236,31 @@ struct HoloPanelView: View {
                         )
                     }
                 }
-                
-                // NEW: Multi-Timeframe Strategy Button
+
+                // Sade strateji merkezi link satırı
                 Button(action: { showStrategySheet = true }) {
-                    HStack {
-                        Image(systemName: "slider.horizontal.3")
-                        Text("STRATEJİ MERKEZİ")
-                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                    HStack(spacing: 10) {
+                        Text("Strateji merkezi")
+                            .font(.system(size: 14))
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         Spacer()
-                        Text("Scalp • Swing • Position")
-                            .font(.caption2)
+                        Text("Scalp · Swing · Position")
+                            .font(.system(size: 12))
                             .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Image(systemName: "chevron.right")
+                            .font(.system(size: 12))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     }
-                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    .padding()
-                    .background(InstitutionalTheme.Colors.surface2)
-                    .cornerRadius(12)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .background(InstitutionalTheme.Colors.surface1)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(SanctumTheme.hologramBlue.opacity(0.3), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
                     )
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
-                .padding(.horizontal)
+                .buttonStyle(.plain)
 
                 // NEW: Prometheus - 5 Day Forecast (Moved to Bottom)
                 if !vm.candles.isEmpty, vm.candles.count >= 120, vm.orionAnalysis == nil {
@@ -314,116 +284,106 @@ struct HoloPanelView: View {
                 // REJİM MERKEZİ (BIST) - Piyasa Rejimi + Makro + Teknik + Sektör
                 RejimView(symbol: symbol)
             } else {
-                // V5.A-2 — Aether Global Sembol bağlamı
-                VStack(alignment: .leading, spacing: 14) {
-                    // 1) Aether Konsey Duruşu
+                // 2026-04-30 H-42 — sade Aether (global sembol)
+                VStack(alignment: .leading, spacing: 16) {
+                    // 1) Konsey duruşu — pill kalktı, sayı body'de
                     if let grandDecision = viewModel.grandDecisions[symbol] {
                         let aetherDecision = grandDecision.aetherDecision
-                        let stanceTone: ArgusChipTone = {
+                        let stanceLabel: String = {
                             switch aetherDecision.stance {
-                            case .riskOn:  return .aurora
-                            case .riskOff: return .crimson
-                            default:       return .titan
+                            case .riskOn:  return "risk-on"
+                            case .riskOff: return "risk-off"
+                            default:       return "nötr"
                             }
                         }()
-                        v5CardShell(borderTone: .motor(.aether)) {
-                            HStack {
-                                ArgusSectionCaption("AETHER KONSEY DURUŞU")
-                                Spacer()
-                                ArgusChip(aetherDecision.stance.rawValue.uppercased(),
-                                          tone: stanceTone)
+                        let stanceColor: Color = {
+                            switch aetherDecision.stance {
+                            case .riskOn:  return InstitutionalTheme.Colors.aurora
+                            case .riskOff: return InstitutionalTheme.Colors.crimson
+                            default:       return InstitutionalTheme.Colors.textSecondary
                             }
-                            HStack(spacing: 10) {
+                        }()
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionTitle("Konsey duruşu")
+                            Text("Piyasa duruşu — \(stanceLabel)")
+                                .font(.system(size: 12))
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            HStack(spacing: 16) {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("PİYASA MODU")
-                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                        .tracking(0.8)
+                                    Text("Piyasa modu")
+                                        .font(.system(size: 11))
                                         .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                                     Text(aetherDecision.marketMode.rawValue.capitalized)
-                                        .font(InstitutionalTheme.Typography.bodyStrong)
+                                        .font(.system(size: 15, weight: .medium))
                                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
-                                    Text("NET DESTEK")
-                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                        .tracking(0.8)
+                                    Text("Net destek")
+                                        .font(.system(size: 11))
                                         .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                                     Text(String(format: "%+.2f", aetherDecision.netSupport))
-                                        .font(.system(size: 15, weight: .black, design: .monospaced))
-                                        .foregroundColor(stanceTone.foreground)
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(stanceColor)
+                                        .monospacedDigit()
                                 }
                             }
                             ArgusBar(value: max(0, min(1, (aetherDecision.netSupport + 1) / 2)),
-                                     color: stanceTone.foreground,
-                                     height: 5)
+                                     color: stanceColor,
+                                     height: 4)
                         }
                     } else {
-                        v5CardShell(borderTone: .motor(.aether)) {
-                            HStack(spacing: 10) {
-                                ProgressView().scaleEffect(0.7)
-                                    .tint(InstitutionalTheme.Colors.Motors.aether)
-                                Text("Aether konseyi toplanıyor…")
-                                    .font(InstitutionalTheme.Typography.caption)
-                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                            }
+                        HStack(spacing: 10) {
+                            ProgressView().scaleEffect(0.7)
+                            Text("Konsey toplanıyor…")
+                                .font(.system(size: 13))
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                     }
 
-                    // 2) Aether Makro Dashboard (compact)
+                    Rectangle()
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
+                        .frame(height: 0.5)
+
+                    // 2) Makro dashboard
                     if let macro = viewModel.macroRating {
                         AetherDashboardCard(rating: macro, isCompact: true)
                     } else {
-                        v5CardShell(borderTone: .holo) {
-                            HStack(spacing: 10) {
-                                ProgressView().scaleEffect(0.7)
-                                    .tint(InstitutionalTheme.Colors.holo)
-                                Text("Makro veriler yükleniyor…")
-                                    .font(InstitutionalTheme.Typography.caption)
-                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                            }
+                        HStack(spacing: 10) {
+                            ProgressView().scaleEffect(0.7)
+                            Text("Makro veriler yükleniyor…")
+                                .font(.system(size: 13))
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         }
                     }
 
-                    // 3) Oracle Lens
-                    v5CardShell(borderTone: .motor(.aether)) {
-                        HStack {
-                            ArgusSectionCaption("ORACLE LENS")
-                            Spacer()
-                            Image(systemName: "sparkles")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(InstitutionalTheme.Colors.Motors.aether)
-                        }
+                    Rectangle()
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
+                        .frame(height: 0.5)
+
+                    // 3) Oracle lens
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionTitle("Oracle")
                         OracleChamberEmbeddedView()
                             .frame(height: 320)
                     }
 
-                    // 4) Global merkez kısayolu
+                    // 4) Global makro merkezi link satırı
                     Button {
                         router.navigate(to: .aetherDashboard)
                         onClose()
                     } label: {
                         HStack(spacing: 8) {
-                            MotorLogo(.aether, size: 14)
-                            Text("AETHER MAKRO MERKEZİNE GİT")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .tracking(0.8)
-                                .foregroundColor(InstitutionalTheme.Colors.Motors.aether)
+                            Text("Makro merkezine git")
+                                .font(.system(size: 14))
+                                .foregroundColor(InstitutionalTheme.Colors.holo)
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundColor(InstitutionalTheme.Colors.Motors.aether.opacity(0.7))
+                                .font(.system(size: 12))
+                                .foregroundColor(InstitutionalTheme.Colors.holo.opacity(0.6))
                         }
-                        .padding(.horizontal, 12)
                         .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                                .fill(InstitutionalTheme.Colors.Motors.aether.opacity(0.14))
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                                .stroke(InstitutionalTheme.Colors.Motors.aether.opacity(0.35), lineWidth: 1)
-                        )
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
@@ -445,159 +405,155 @@ struct HoloPanelView: View {
                     // 4. Temettü & Sermaye (eğitim notlu)
                     TemettuEgitimWrapper(symbol: symbol)
 
-                    // V5 Haberleri Tara butonu
+                    // Sade haberleri tara butonu
                     Button(action: { Task { await vm.analyzeOnDemand() } }) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             if vm.isLoadingNews {
                                 ProgressView().scaleEffect(0.7)
-                                    .tint(InstitutionalTheme.Colors.Motors.hermes)
                             } else {
-                                MotorLogo(.hermes, size: 14)
-                                    .tinted(InstitutionalTheme.Colors.Motors.hermes)
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             }
-                            Text(vm.isLoadingNews ? "ANALİZ EDİLİYOR…" : "HABERLERİ TARA")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .tracking(0.8)
-                                .foregroundColor(InstitutionalTheme.Colors.Motors.hermes)
+                            Text(vm.isLoadingNews ? "Analiz ediliyor…" : "Haberleri tara")
+                                .font(.system(size: 14))
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             Spacer()
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                                .fill(InstitutionalTheme.Colors.Motors.hermes.opacity(0.14))
-                        )
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(InstitutionalTheme.Colors.surface1)
                         .overlay(
-                            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                                .stroke(InstitutionalTheme.Colors.Motors.hermes.opacity(0.35), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
                         )
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .disabled(vm.isLoadingNews)
 
-                    HStack(spacing: 6) {
-                        ArgusDot(color: InstitutionalTheme.Colors.titan, size: 5)
-                        Text("Eğitim amaçlıdır, yatırım tavsiyesi değildir.")
-                            .font(.system(size: 10))
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    }
-                    .padding(.vertical, 6)
+                    Text("Eğitim amaçlıdır, yatırım tavsiyesi değildir.")
+                        .font(.system(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                        .padding(.top, 2)
                 }
             } else {
-                // V5.A-5 — Global Hermes
-                VStack(alignment: .leading, spacing: 14) {
+                // 2026-04-30 H-42 — sade Hermes (global)
+                VStack(alignment: .leading, spacing: 16) {
                     // 1) Duygu nabzı (child view, kendi stilinde)
                     SentimentPulseCard(symbol: symbol)
 
-                    // 2) Hermes konsey duruşu
+                    Rectangle()
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
+                        .frame(height: 0.5)
+
+                    // 2) Konsey duruşu — pill kalktı, üstte muted satır
                     if let grandDecision = viewModel.grandDecisions[symbol],
                        let hermesDecision = grandDecision.hermesDecision {
-                        let tone: ArgusChipTone = hermesDecision.isHighImpact
-                            ? (hermesDecision.netSupport >= 0 ? .aurora : .crimson)
-                            : .motor(.hermes)
+                        let toneColor: Color = hermesDecision.isHighImpact
+                            ? (hermesDecision.netSupport >= 0
+                               ? InstitutionalTheme.Colors.aurora
+                               : InstitutionalTheme.Colors.crimson)
+                            : InstitutionalTheme.Colors.textSecondary
+                        let impactLabel = hermesDecision.isHighImpact ? "yüksek etki" : "normal"
 
-                        v5CardShell(borderTone: .motor(.hermes)) {
-                            HStack {
-                                ArgusSectionCaption("HERMES DURUŞU")
-                                Spacer()
-                                ArgusChip(hermesDecision.isHighImpact ? "YÜKSEK ETKİ" : "NORMAL",
-                                          tone: tone)
-                            }
-                            HStack(spacing: 10) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionTitle("Konsey duruşu")
+                            Text("Etki — \(impactLabel)")
+                                .font(.system(size: 12))
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            HStack(spacing: 16) {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("DUYGU")
-                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                        .tracking(0.8)
+                                    Text("Duygu")
+                                        .font(.system(size: 11))
                                         .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                                     Text(hermesDecision.sentiment.displayTitle)
-                                        .font(InstitutionalTheme.Typography.bodyStrong)
+                                        .font(.system(size: 15, weight: .medium))
                                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                 }
                                 Spacer()
                                 VStack(alignment: .trailing, spacing: 2) {
-                                    Text("NET DESTEK")
-                                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                                        .tracking(0.8)
+                                    Text("Net destek")
+                                        .font(.system(size: 11))
                                         .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                                     Text(String(format: "%+.2f", hermesDecision.netSupport))
-                                        .font(.system(size: 15, weight: .black, design: .monospaced))
-                                        .foregroundColor(tone.foreground)
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(toneColor)
+                                        .monospacedDigit()
                                 }
                             }
                             ArgusBar(value: max(0, min(1, (hermesDecision.netSupport + 1) / 2)),
-                                     color: tone.foreground, height: 5)
+                                     color: toneColor, height: 4)
                         }
+
+                        Rectangle()
+                            .fill(InstitutionalTheme.Colors.borderSubtle)
+                            .frame(height: 0.5)
                     }
 
-                    // 3) Haberleri Tara V5 butonu
+                    // 3) Haberleri tara butonu — sade outline
                     Button(action: { Task { await vm.analyzeOnDemand() } }) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: 10) {
                             if vm.isLoadingNews {
                                 ProgressView().scaleEffect(0.7)
-                                    .tint(InstitutionalTheme.Colors.Motors.hermes)
                             } else {
-                                MotorLogo(.hermes, size: 14)
-                                    .tinted(InstitutionalTheme.Colors.Motors.hermes)
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.system(size: 13, weight: .regular))
+                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             }
-                            Text(vm.isLoadingNews ? "ANALİZ EDİLİYOR…" : "HABERLERİ TARA")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .tracking(0.8)
-                                .foregroundColor(InstitutionalTheme.Colors.Motors.hermes)
+                            Text(vm.isLoadingNews ? "Analiz ediliyor…" : "Haberleri tara")
+                                .font(.system(size: 14))
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             Spacer()
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(
-                            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                                .fill(InstitutionalTheme.Colors.Motors.hermes.opacity(0.14))
-                        )
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(InstitutionalTheme.Colors.surface1)
                         .overlay(
-                            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                                .stroke(InstitutionalTheme.Colors.Motors.hermes.opacity(0.35), lineWidth: 1)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
                         )
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     }
                     .buttonStyle(.plain)
                     .disabled(vm.isLoadingNews)
 
                     // 4) Hata satırı
                     if let error = vm.newsErrorMessage {
-                        HStack(spacing: 8) {
-                            ArgusDot(color: InstitutionalTheme.Colors.crimson)
-                            Text(error)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundColor(InstitutionalTheme.Colors.crimson)
-                                .lineLimit(3)
-                        }
+                        Text(error)
+                            .font(.system(size: 12))
+                            .foregroundColor(InstitutionalTheme.Colors.crimson)
+                            .lineLimit(3)
                     }
 
                     // 5) İçerik (insights / events / boş hal)
                     if !vm.newsInsights.isEmpty {
-                        v5CardShell(borderTone: .motor(.hermes)) {
-                            HStack {
-                                ArgusSectionCaption("HABER ANALİZİ")
-                                Spacer()
-                                ArgusChip("\(vm.newsInsights.count)", tone: .holo)
-                            }
-                            VStack(alignment: .leading, spacing: 10) {
-                                ForEach(Array(vm.newsInsights.prefix(5))) { insight in
+                        VStack(alignment: .leading, spacing: 10) {
+                            sectionTitle("Haber analizi", trailing: "\(vm.newsInsights.count) kayıt")
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(Array(vm.newsInsights.prefix(5).enumerated()), id: \.offset) { idx, insight in
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(insight.headline)
-                                            .font(.system(size: 12, weight: .semibold))
+                                            .font(.system(size: 13, weight: .medium))
                                             .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                             .lineLimit(2)
                                         Text(insight.impactSentenceTR)
-                                            .font(.system(size: 11))
+                                            .font(.system(size: 12))
                                             .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                                             .lineLimit(3)
                                     }
-                                    .padding(.vertical, 6)
-                                    .overlay(ArgusHair(), alignment: .bottom)
+                                    .padding(.vertical, 10)
+                                    if idx < min(vm.newsInsights.count, 5) - 1 {
+                                        Rectangle()
+                                            .fill(InstitutionalTheme.Colors.borderSubtle)
+                                            .frame(height: 0.5)
+                                    }
                                 }
                             }
                         }
                     } else if !vm.hermesEvents.isEmpty {
                         VStack(alignment: .leading, spacing: 10) {
-                            ArgusSectionCaption("HERMES ANALİZLERİ")
+                            sectionTitle("Haber analizi")
                             ForEach(Array(vm.hermesEvents.prefix(5))) { event in
                                 HermesEventTeachingCard(
                                     viewModel: viewModel,
@@ -608,121 +564,127 @@ struct HoloPanelView: View {
                             }
                         }
                     } else {
-                        v5CardShell(borderTone: .neutral) {
-                            HStack(spacing: 10) {
-                                Image(systemName: "newspaper")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                                Text("Henüz haber analizi yok")
-                                    .font(InstitutionalTheme.Typography.caption)
-                                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                            }
-                        }
+                        Text("Henüz haber analizi yok.")
+                            .font(.system(size: 13))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                            .padding(.vertical, 8)
                     }
                 }
             }
             
         case .athena:
-            // V5.A-6 — Smart Beta V5 kartı (bar listesi + toplam skor).
+            // 2026-04-30 H-42 — sade Athena (faktör skoru)
             if let athena = viewModel.athenaResults[symbol] {
-                VStack(alignment: .leading, spacing: 14) {
-                    v5CardShell(borderTone: .motor(.athena)) {
-                        HStack {
-                            ArgusSectionCaption("SMART BETA SKOR")
+                let scoreColor: Color = athena.factorScore > 50
+                    ? InstitutionalTheme.Colors.aurora
+                    : InstitutionalTheme.Colors.crimson
+
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Toplam puan — \(Int(athena.factorScore))/100")
+                            .font(.system(size: 12))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(athena.styleLabel)
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             Spacer()
                             Text("\(Int(athena.factorScore))")
-                                .font(.system(size: 28, weight: .black, design: .monospaced))
-                                .foregroundColor(athena.factorScore > 50
-                                                 ? InstitutionalTheme.Colors.aurora
-                                                 : InstitutionalTheme.Colors.crimson)
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundColor(scoreColor)
+                                .monospacedDigit()
                         }
                         ArgusBar(value: max(0, min(1, athena.factorScore / 100.0)),
-                                 color: InstitutionalTheme.Colors.Motors.athena,
-                                 height: 6)
-                        Text(athena.styleLabel)
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                                 color: scoreColor,
+                                 height: 4)
                     }
 
-                    v5CardShell(borderTone: .motor(.athena)) {
-                        ArgusSectionCaption("FAKTÖR KIRILIMI")
+                    Rectangle()
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
+                        .frame(height: 0.5)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionTitle("Faktör kırılımı")
                         VStack(spacing: 8) {
-                            v5FactorRow("MOMENTUM", value: athena.momentumFactorScore,
+                            v5FactorRow("Momentum", value: athena.momentumFactorScore,
                                         color: InstitutionalTheme.Colors.Motors.prometheus)
-                            v5FactorRow("VALUE", value: athena.valueFactorScore,
+                            v5FactorRow("Değer", value: athena.valueFactorScore,
                                         color: InstitutionalTheme.Colors.holo)
-                            v5FactorRow("QUALITY", value: athena.qualityFactorScore,
+                            v5FactorRow("Kalite", value: athena.qualityFactorScore,
                                         color: InstitutionalTheme.Colors.aurora)
                         }
                     }
                 }
             } else {
-                v5CardShell(borderTone: .neutral) {
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.7)
-                            .tint(InstitutionalTheme.Colors.Motors.athena)
-                        Text("Athena analizi yükleniyor…")
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    }
+                HStack(spacing: 10) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("Faktör analizi yükleniyor…")
+                        .font(.system(size: 13))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
             }
             
         case .demeter:
-            // V5.A-7 — Demeter sektör kartı.
+            // 2026-04-30 H-42 — sade Demeter (sektör)
             let demeterScore = viewModel.demeterScores.first(where: { $0.sector == .XLK }) ?? viewModel.demeterScores.first
 
             if let demeter = demeterScore {
-                VStack(alignment: .leading, spacing: 14) {
-                    v5CardShell(borderTone: .motor(.demeter)) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                ArgusSectionCaption("SEKTÖR PUANI")
-                                Text(demeter.sector.name)
-                                    .font(InstitutionalTheme.Typography.bodyStrong)
-                                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                            }
+                let scoreColor = v5ScoreColor(demeter.totalScore)
+
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Toplam puan — \(Int(demeter.totalScore))/100 · \(demeter.grade)")
+                            .font(.system(size: 12))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(demeter.sector.name)
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                             Spacer()
                             Text("\(Int(demeter.totalScore))")
-                                .font(.system(size: 30, weight: .black, design: .monospaced))
-                                .foregroundColor(v5ScoreColor(demeter.totalScore))
+                                .font(.system(size: 24, weight: .medium))
+                                .foregroundColor(scoreColor)
+                                .monospacedDigit()
                         }
                         ArgusBar(value: max(0, min(1, demeter.totalScore / 100.0)),
-                                 color: v5ScoreColor(demeter.totalScore),
-                                 height: 6)
-                        HStack(spacing: 6) {
-                            ArgusChip("DEĞERLENDİRME · \(demeter.grade.uppercased())",
-                                      tone: v5ScoreTone(demeter.totalScore))
-                        }
+                                 color: scoreColor,
+                                 height: 4)
                     }
 
-                    v5CardShell(borderTone: .motor(.demeter)) {
-                        ArgusSectionCaption("BİLEŞEN KIRILIMI")
+                    Rectangle()
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
+                        .frame(height: 0.5)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionTitle("Bileşen kırılımı")
                         VStack(spacing: 8) {
-                            v5FactorRow("MOMENTUM", value: demeter.momentumScore,
+                            v5FactorRow("Momentum", value: demeter.momentumScore,
                                         color: InstitutionalTheme.Colors.Motors.prometheus)
-                            v5FactorRow("ŞOK ETKİSİ", value: demeter.shockImpactScore,
+                            v5FactorRow("Şok etkisi", value: demeter.shockImpactScore,
                                         color: InstitutionalTheme.Colors.crimson)
-                            v5FactorRow("REJİM", value: demeter.regimeScore,
+                            v5FactorRow("Rejim", value: demeter.regimeScore,
                                         color: InstitutionalTheme.Colors.Motors.aether)
-                            v5FactorRow("GENİŞLİK", value: demeter.breadthScore,
+                            v5FactorRow("Genişlik", value: demeter.breadthScore,
                                         color: InstitutionalTheme.Colors.aurora)
                         }
                     }
 
                     if !demeter.activeShocks.isEmpty {
-                        v5CardShell(borderTone: .crimson) {
-                            HStack {
-                                ArgusSectionCaption("AKTİF ŞOKLAR")
-                                Spacer()
-                                ArgusChip("\(demeter.activeShocks.count) UYARI", tone: .crimson)
-                            }
-                            VStack(alignment: .leading, spacing: 6) {
+                        Rectangle()
+                            .fill(InstitutionalTheme.Colors.borderSubtle)
+                            .frame(height: 0.5)
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            sectionTitle("Aktif şoklar",
+                                         trailing: "\(demeter.activeShocks.count) uyarı")
+                            VStack(alignment: .leading, spacing: 8) {
                                 ForEach(demeter.activeShocks) { shock in
-                                    HStack(spacing: 8) {
-                                        ArgusDot(color: InstitutionalTheme.Colors.crimson)
+                                    HStack(spacing: 10) {
+                                        Circle()
+                                            .fill(InstitutionalTheme.Colors.crimson)
+                                            .frame(width: 5, height: 5)
                                         Text("\(shock.type.displayName) \(shock.direction.symbol)")
-                                            .font(.system(size: 11, weight: .semibold))
+                                            .font(.system(size: 13))
                                             .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                     }
                                 }
@@ -731,129 +693,107 @@ struct HoloPanelView: View {
                     }
                 }
             } else {
-                v5CardShell(borderTone: .neutral) {
-                    HStack(spacing: 8) {
-                        ProgressView().scaleEffect(0.7)
-                            .tint(InstitutionalTheme.Colors.Motors.demeter)
-                        Text("Sektör analizi yükleniyor…")
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    }
+                HStack(spacing: 10) {
+                    ProgressView().scaleEffect(0.7)
+                    Text("Sektör analizi yükleniyor…")
+                        .font(.system(size: 13))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
             }
             
         case .chiron:
-            // V5.A-1 — Symbol-context Chiron panel (Sprint 2026-04-22).
-            // ChironInsightsView (genel dashboard) ile aynı tasarım dilini
-            // paylaşır; burası sembol-bazlı PULSE/CORSE ağırlıklarını gösterir.
-            VStack(alignment: .leading, spacing: 14) {
-                // 1) Sembol rejimi kartı
+            // 2026-04-30 H-42 — sade Chiron (rejim + ağırlıklar).
+            // Mor pill + caps başlıklar gitti; rejim adı muted üst satırda,
+            // ağırlık tabloları sentence case + sade hairline ayrımla geliyor.
+            VStack(alignment: .leading, spacing: 18) {
+                // 1) Sembol rejimi
                 if let decision = viewModel.argusDecisions[symbol],
                    let chironResult = decision.chironResult {
-                    v5CardShell(borderTone: chironRegimeTone(chironResult.regime)) {
-                        HStack {
-                            ArgusSectionCaption("MARKET REJİMİ")
-                            Spacer()
-                            ArgusChip(chironResult.regime.descriptor.uppercased(),
-                                      tone: chironRegimeTone(chironResult.regime))
-                        }
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Şu anki rejim — \(chironResult.regime.descriptor.lowercased())")
+                            .font(.system(size: 12))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         Text(chironResult.explanationTitle)
-                            .font(InstitutionalTheme.Typography.bodyStrong)
+                            .font(.system(size: 17, weight: .medium))
                             .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         Text(chironResult.explanationBody)
-                            .font(InstitutionalTheme.Typography.caption)
+                            .font(.system(size: 13))
                             .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+
+                    Rectangle()
+                        .fill(InstitutionalTheme.Colors.borderSubtle)
+                        .frame(height: 0.5)
                 }
 
-                // 2) PULSE ağırlıkları
-                v5CardShell(borderTone: .holo) {
-                    HStack {
-                        ArgusSectionCaption("PULSE AĞIRLIKLARI · KISA VADE")
-                        Spacer()
-                        ArgusChip("HOLO", tone: .holo)
-                    }
+                // 2) Pulse ağırlıkları
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionTitle("Kısa vade ağırlıkları", trailing: "Pulse")
                     if let weights = chironPulseWeights {
                         chironWeightProgressRows(weights: weights)
                         Text(weights.reasoning)
-                            .font(.system(size: 10))
+                            .font(.system(size: 11))
                             .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                             .padding(.top, 4)
                     } else {
-                        HStack(spacing: 8) {
-                            ArgusDot(color: InstitutionalTheme.Colors.textTertiary)
-                            Text("Varsayılan ağırlıklar kullanılıyor…")
-                                .font(InstitutionalTheme.Typography.caption)
-                                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                        }
+                        Text("Varsayılan ağırlıklar kullanılıyor.")
+                            .font(.system(size: 12))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     }
                 }
 
-                // 3) CORSE ağırlıkları
-                v5CardShell(borderTone: .motor(.chiron)) {
-                    HStack {
-                        ArgusSectionCaption("CORSE AĞIRLIKLARI · UZUN VADE")
-                        Spacer()
-                        ArgusChip("CHIRON", tone: .motor(.chiron), icon: .chiron)
-                    }
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.borderSubtle)
+                    .frame(height: 0.5)
+
+                // 3) Corse ağırlıkları
+                VStack(alignment: .leading, spacing: 10) {
+                    sectionTitle("Uzun vade ağırlıkları", trailing: "Corse")
                     if let weights = chironCorseWeights {
                         chironWeightProgressRows(weights: weights)
                         Text(weights.reasoning)
-                            .font(.system(size: 10))
+                            .font(.system(size: 11))
                             .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                             .padding(.top, 4)
                     } else {
-                        HStack(spacing: 8) {
-                            ArgusDot(color: InstitutionalTheme.Colors.textTertiary)
-                            Text("Varsayılan ağırlıklar kullanılıyor…")
-                                .font(InstitutionalTheme.Typography.caption)
-                                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                        }
+                        Text("Varsayılan ağırlıklar kullanılıyor.")
+                            .font(.system(size: 12))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     }
                 }
 
-                // 4) Öğrenme açıklaması
-                v5CardShell(borderTone: .titan) {
-                    HStack(spacing: 6) {
-                        ArgusDot(color: InstitutionalTheme.Colors.titan)
-                        Text("NASIL ÖĞRENİYOR?")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .tracking(1)
-                            .foregroundColor(InstitutionalTheme.Colors.titan)
-                    }
-                    Text("Chiron, geçmiş kararlardan ve fiyat hareketlerinden öğrenerek modül ağırlıklarını dinamik ayarlar. Başarılı modüllerin ağırlığı artar.")
-                        .font(InstitutionalTheme.Typography.caption)
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.borderSubtle)
+                    .frame(height: 0.5)
+
+                // 4) Nasıl öğreniyor
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Nasıl öğreniyor?")
+                        .font(.system(size: 12))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    Text("Geçmiş kararlardan ve fiyat hareketlerinden öğrenerek modül ağırlıklarını dinamik ayarlar. Başarılı modüllerin payı zamanla artar.")
+                        .font(.system(size: 13))
                         .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
-                // 5) Global Chiron merkezi kısayolu
+                // 5) Rejim merkezi kısayolu
                 Button {
                     router.navigate(to: .chiron)
                     onClose()
                 } label: {
                     HStack(spacing: 8) {
-                        MotorLogo(.chiron, size: 14)
-                        Text("GLOBAL CHIRON MERKEZİNE GİT")
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .tracking(0.8)
-                            .foregroundColor(InstitutionalTheme.Colors.Motors.chiron)
+                        Text("Rejim merkezine git")
+                            .font(.system(size: 14))
+                            .foregroundColor(InstitutionalTheme.Colors.holo)
                         Spacer()
                         Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(InstitutionalTheme.Colors.Motors.chiron.opacity(0.7))
+                            .font(.system(size: 12))
+                            .foregroundColor(InstitutionalTheme.Colors.holo.opacity(0.6))
                     }
-                    .padding(.horizontal, 12)
                     .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                            .fill(InstitutionalTheme.Colors.Motors.chiron.opacity(0.14))
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                            .stroke(InstitutionalTheme.Colors.Motors.chiron.opacity(0.35), lineWidth: 1)
-                    )
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
@@ -952,18 +892,21 @@ struct HoloPanelView: View {
     @ViewBuilder
     func chironWeightProgressRows(weights: ChironModuleWeights) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            chironWeightRow("ORION",     engine: .orion,      weight: weights.orion)
-            chironWeightRow("ATLAS",     engine: .atlas,      weight: weights.atlas)
-            chironWeightRow("PHOENIX",   engine: nil,         weight: weights.phoenix,
+            chironWeightRow("Teknik",  engine: .orion,   weight: weights.orion)
+            chironWeightRow("Bilanço", engine: .atlas,   weight: weights.atlas)
+            chironWeightRow("Risk",    engine: nil,      weight: weights.phoenix,
                             color: InstitutionalTheme.Colors.crimson)
-            chironWeightRow("AETHER",    engine: .aether,     weight: weights.aether)
-            chironWeightRow("HERMES",    engine: .hermes,     weight: weights.hermes)
-            chironWeightRow("DEMETER",   engine: .demeter,    weight: weights.demeter)
-            chironWeightRow("ATHENA",    engine: .athena,     weight: weights.athena)
+            chironWeightRow("Makro",   engine: .aether,  weight: weights.aether)
+            chironWeightRow("Haber",   engine: .hermes,  weight: weights.hermes)
+            chironWeightRow("Sektör",  engine: .demeter, weight: weights.demeter)
+            // Athena kullanıcı UI'da gizli; ağırlığı diğer motorlarla
+            // birlikte sayılır ama satır çizilmez. (2026-04-25 H-39)
         }
     }
 
-    /// V5 Chiron ağırlık satırı — motor logolu + ArgusBar + mono yüzde.
+    /// Sade Chiron ağırlık satırı — sentence case label + bar + sade yüzde.
+    /// Bar rengi motor rengini taşımaya devam eder ki ağırlık dağılımı
+    /// görsel olarak okunabilir kalsın.
     @ViewBuilder
     func chironWeightRow(_ label: String,
                          engine: MotorEngine?,
@@ -973,36 +916,30 @@ struct HoloPanelView: View {
             ?? engine.map { InstitutionalTheme.Colors.Motors.color(for: $0) }
             ?? InstitutionalTheme.Colors.holo
 
-        HStack(spacing: 8) {
-            if let engine {
-                MotorLogo(engine, size: 14)
-            } else {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(barColor)
-                    .frame(width: 14, height: 14)
-            }
-
+        HStack(spacing: 10) {
             Text(label)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .tracking(0.6)
+                .font(.system(size: 13))
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                .frame(width: 62, alignment: .leading)
+                .frame(width: 70, alignment: .leading)
 
-            ArgusBar(value: min(1.0, weight), color: barColor, height: 5)
+            ArgusBar(value: min(1.0, weight), color: barColor, height: 4)
 
-            Text("%\(Int(weight * 100))")
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
+            Text("\(Int(weight * 100))%")
+                .font(.system(size: 12))
                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                .frame(width: 38, alignment: .trailing)
+                .monospacedDigit()
+                .frame(width: 36, alignment: .trailing)
         }
     }
 
-    // MARK: - V5 primitives (Sprint V5.A)
+    // MARK: - Sade primitives (2026-04-30 H-42)
+    //
+    // v5CardShell motor-tint border'ı + ArgusChipTone parametresi gitti.
+    // Sade kart: surface1 + 0.5px borderSubtle hairline + radius 12.
+    // borderTone parametresi backward-compat için alındı, görmezden gelinir.
 
-    /// V5 kartı — surface1 + motor-tint kenarlık.
     @ViewBuilder
-    private func v5CardShell<Content: View>(borderTone: ArgusChipTone,
+    private func v5CardShell<Content: View>(borderTone: ArgusChipTone = .neutral,
                                             @ViewBuilder _ content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             content()
@@ -1011,25 +948,42 @@ struct HoloPanelView: View {
         .padding(14)
         .background(InstitutionalTheme.Colors.surface1)
         .overlay(
-            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
-                .stroke(borderTone.foreground.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
         )
-        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    /// V5 faktör satırı — label + ArgusBar + mono puan.
+    /// Sade faktör satırı — sentence case label + bar + sade puan.
+    /// Bar rengi sayısal vurgu için motor rengini kullanmaya devam eder.
     private func v5FactorRow(_ label: String, value: Double, color: Color) -> some View {
         HStack(spacing: 10) {
             Text(label)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .tracking(0.7)
+                .font(.system(size: 13))
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .frame(width: 96, alignment: .leading)
-            ArgusBar(value: max(0, min(1, value / 100.0)), color: color, height: 5)
+            ArgusBar(value: max(0, min(1, value / 100.0)), color: color, height: 4)
             Text("\(Int(value))")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                .font(.system(size: 12))
                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .monospacedDigit()
                 .frame(width: 32, alignment: .trailing)
+        }
+    }
+
+    /// Sade bölüm başlığı — sentence case body, mono caps yerine kullanılır.
+    @ViewBuilder
+    private func sectionTitle(_ text: String, trailing: String? = nil) -> some View {
+        HStack {
+            Text(text)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+            Spacer()
+            if let trailing {
+                Text(trailing)
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            }
         }
     }
 

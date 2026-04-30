@@ -40,23 +40,26 @@ struct ArgusScoreSystem {
     }
     
     // MARK: - Module Names
-    
+    // 2026-04-30: Mitolojik başlıklar kaldırıldı; UI artık kavramsal isim kullanıyor.
+    // Title artık kullanıcıya gösterilen ana etiket (örn. "Bilanço"); subtitle ise
+    // daha detaylı alt etiket (örn. "Temel Değerleme").
+
     static func moduleTitle(_ module: ArgusModule) -> String {
         switch module {
-        case .atlas: return "Atlas"
-        case .orion: return "Orion"
-        case .aether: return "Aether"
-        case .hermes: return "Hermes"
+        case .atlas:  return "Bilanço"
+        case .orion:  return "Teknik"
+        case .aether: return "Makro"
+        case .hermes: return "Haber"
         default: return module.rawValue.capitalized
         }
     }
-    
+
     static func moduleSubtitle(_ module: ArgusModule) -> String {
         switch module {
-        case .atlas: return "Temel"
-        case .orion: return "Teknik"
-        case .aether: return "Makro"
-        case .hermes: return "Haber"
+        case .atlas:  return "Temel Değerleme"
+        case .orion:  return "Fiyat & Momentum"
+        case .aether: return "Piyasa Ortamı"
+        case .hermes: return "Haber Akışı"
         default: return ""
         }
     }

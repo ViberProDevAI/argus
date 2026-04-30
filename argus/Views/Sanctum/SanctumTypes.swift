@@ -240,15 +240,15 @@ enum SanctumModuleType: String, CaseIterable {
     
     var description: String {
         switch self {
-        case .atlas: return "Temel Analiz & Degerleme"
-        case .orion: return "Teknik Indikatorler"
-        case .aether: return "Makroekonomik Rejim"
-        case .hermes: return "Haber & Duygu Analizi"
-        case .athena: return "Akilli Varyans (Smart Beta)"
-        case .demeter: return "Sektor & Endustri Analizi"
-        case .chiron: return "Ogrenme & Risk Yonetimi"
-        case .prometheus: return "5 Gunluk Fiyat Tahmini"
-        case .council: return "Nihai Karar Mercii"
+        case .atlas:      return "Şirketin defter sağlığı ve değerleme."
+        case .orion:      return "Fiyat hareketi ve teknik göstergeler."
+        case .aether:     return "Küresel makro koşullar ve piyasa modu."
+        case .hermes:     return "Haber akışı ve piyasa duygusu."
+        case .athena:     return "Faktör skoru ve stil profili."
+        case .demeter:    return "Sektör performansı ve şok etkisi."
+        case .chiron:     return "Piyasa rejimi ve modül ağırlıkları."
+        case .prometheus: return "Önümüzdeki birkaç günün fiyat aralığı."
+        case .council:    return "Tüm motorların birleşik kararı."
         }
     }
 }

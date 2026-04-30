@@ -1,14 +1,17 @@
 import SwiftUI
 
+/// Motor öğrenme rehberi — kullanıcıya yönelik dilde, mitolojik isim olmadan.
+/// 2026-04-30: "Orion / Atlas / Hermes / Aether" gibi iç modül adları kaldırıldı,
+/// yerine kullanıcının anlayacağı kavramsal başlıklar kullanılıyor.
 struct EngineGuideSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedEngine: EngineType = .orion
+    @State private var selectedEngine: EngineType = .technical
 
     var body: some View {
         VStack(spacing: 0) {
             ArgusNavHeader(
-                title: "DERS 2 · MOTORLAR",
-                subtitle: "ORION · ATLAS · HERMES · AETHER",
+                title: "DERS 2 · ANALİZ MOTORLARI",
+                subtitle: "TEKNİK · BİLANÇO · HABER · MAKRO",
                 leadingDeco: .bars3([.holo, .text, .text]),
                 actions: [.custom(sfSymbol: "xmark", action: { dismiss() })]
             )
@@ -98,34 +101,40 @@ struct EngineGuideSheet: View {
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(InstitutionalTheme.Colors.warning)
                 .padding(.top, 2)
+
             Text(engine.caution)
                 .font(InstitutionalTheme.Typography.caption)
-                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(12)
-        .background(InstitutionalTheme.Colors.surface1)
-        .overlay(
-            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(InstitutionalTheme.Colors.surface1)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1)
+                )
         )
-        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous))
     }
 
     private func sectionTitle(_ text: String) -> some View {
         Text(text)
-            .font(InstitutionalTheme.Typography.micro)
-            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-            .tracking(0.8)
+            .font(.system(size: 11, weight: .bold, design: .monospaced))
+            .tracking(1.2)
+            .foregroundColor(InstitutionalTheme.Colors.primary)
     }
 
     private func bullet(_ text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Text("•")
-                .foregroundColor(InstitutionalTheme.Colors.primary)
+            Circle()
+                .fill(InstitutionalTheme.Colors.primary)
+                .frame(width: 4, height: 4)
+                .padding(.top, 7)
             Text(text)
                 .font(InstitutionalTheme.Typography.caption)
-                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .fixedSize(horizontal: false, vertical: true)
         }
     }
@@ -150,105 +159,105 @@ struct EngineGuideSheet: View {
 }
 
 private enum EngineType: String, CaseIterable, Identifiable {
-    case orion
-    case atlas
-    case hermes
-    case aether
+    case technical
+    case fundamental
+    case news
+    case macro
 
     var id: String { rawValue }
 
     var shortName: String {
         switch self {
-        case .orion: return "Orion"
-        case .atlas: return "Atlas"
-        case .hermes: return "Hermes"
-        case .aether: return "Aether"
+        case .technical:   return "Teknik"
+        case .fundamental: return "Bilanço"
+        case .news:        return "Haber"
+        case .macro:       return "Makro"
         }
     }
 
     var title: String {
         switch self {
-        case .orion: return "Orion · Teknik Momentum"
-        case .atlas: return "Atlas · Temel Değerleme"
-        case .hermes: return "Hermes · Haber ve Duygu"
-        case .aether: return "Aether · Makro Rejim"
+        case .technical:   return "Teknik Analiz · Momentum"
+        case .fundamental: return "Bilanço & Değerleme"
+        case .news:        return "Haber Akışı & Sentiment"
+        case .macro:       return "Makro Ortam & Rejim"
         }
     }
 
     var subtitle: String {
         switch self {
-        case .orion: return "Soru: Fiyatın ritmi güçlü mü, zayıf mı?"
-        case .atlas: return "Soru: Şirketin kalitesi fiyatla uyumlu mu?"
-        case .hermes: return "Soru: Haber akışı fiyatı taşıyor mu?"
-        case .aether: return "Soru: Piyasa risk iştahı artıyor mu azalıyor mu?"
+        case .technical:   return "Soru: Fiyatın ritmi güçlü mü, zayıf mı?"
+        case .fundamental: return "Soru: Şirketin kalitesi fiyatla uyumlu mu?"
+        case .news:        return "Soru: Haber akışı fiyatı taşıyor mu?"
+        case .macro:       return "Soru: Piyasa risk iştahı artıyor mu, azalıyor mu?"
         }
     }
 
     var summary: String {
         switch self {
-        case .orion:
-            return "Kısa ve orta vadeli yön değişimlerini yakalamaya çalışır."
-        case .atlas:
-            return "Orta ve uzun vadede bilanço gücü ile fiyat arasındaki dengeyi ölçer."
-        case .hermes:
-            return "Haberi gürültüden ayırır, etkili bilgi ile yüzeysel başlığı ayrıştırır."
-        case .aether:
-            return "Pozisyonun yönünden çok risk dozunu belirlemede kullanılır."
+        case .technical:
+            return "Kısa ve orta vadeli yön değişimlerini fiyat hareketi ve göstergeler üzerinden okur."
+        case .fundamental:
+            return "Orta ve uzun vadede bilanço gücü ile piyasa fiyatı arasındaki dengeyi ölçer."
+        case .news:
+            return "Haberi gürültüden ayırır; etkili bilgiyle yüzeysel başlığı ayrıştırır."
+        case .macro:
+            return "Pozisyonun yönünden çok risk dozunu belirlemekte kullanılır."
         }
     }
 
     var checks: [String] {
         switch self {
-        case .orion:
+        case .technical:
             return [
-                "RSI ve benzeri osilatörler ile hız değişimini ölçer.",
+                "RSI ve benzeri osilatörlerle hız değişimini ölçer.",
                 "ADX ile trendin gücünü kontrol eder.",
                 "Kırılım sonrası devam edip etmeyeceğini test eder."
             ]
-        case .atlas:
+        case .fundamental:
             return [
                 "F/K, PD/DD gibi çarpanlarla göreli pahalılık/ucuzluk okur.",
                 "Kârlılık ve borç kalitesiyle bilanço dayanıklılığına bakar.",
                 "Döngüsel sektörlerde sürdürülebilirlik sinyali arar."
             ]
-        case .hermes:
+        case .news:
             return [
-                "Haberin tonunu (pozitif/negatif/nötr) sınıflandırır.",
+                "Haberin tonunu (pozitif / negatif / nötr) sınıflandırır.",
                 "Haberi kaynağı ve bağlamıyla birlikte ağırlıklandırır.",
                 "Kısa süreli gürültü ile yön değiştirici haberi ayırır."
             ]
-        case .aether:
+        case .macro:
             return [
                 "VIX hareketini ve oynaklık rejimini izler.",
                 "Faiz, tahvil ve dolar ekseninde risk iştahını ölçer.",
-                "Motor ağırlıklarını rejime göre daha savunmacı veya agresif hale getirir."
+                "Genel risk dozunu rejime göre savunmacı ya da agresif tarafa kaydırır."
             ]
         }
     }
 
     var readingSequence: [String] {
         switch self {
-        case .orion:
+        case .technical:
             return [
-                "Önce trend var mı yok mu kontrol et.",
+                "Önce trend var mı, yok mu kontrol et.",
                 "Sonra momentum ivmesinin devam edip etmediğine bak.",
-                "En son stop/bozulma seviyesini belirle."
+                "En son stop / bozulma seviyesini belirle."
             ]
-        case .atlas:
+        case .fundamental:
             return [
                 "Önce şirketin kalite profilini oku.",
                 "Sonra fiyatın bu kaliteyi ne kadar yansıttığını karşılaştır.",
                 "En son teknik ve rejim teyidiyle giriş zamanını seç."
             ]
-        case .hermes:
+        case .news:
             return [
-                "Haberi başlıkla değil içerik ve kaynakla değerlendir.",
+                "Haberi başlıkla değil, içerik ve kaynakla değerlendir.",
                 "Piyasanın habere ilk tepkisini izle.",
-                "Etkisi kalıcı mı geçici mi karar ver."
+                "Etkisi kalıcı mı, geçici mi karar ver."
             ]
-        case .aether:
+        case .macro:
             return [
-                "Önce volatilite yönünü (risk yükselişi/düşüşü) oku.",
+                "Önce volatilite yönünü oku (risk yükselişi mi, düşüşü mü).",
                 "Sonra likidite koşullarını kontrol et.",
                 "En son pozisyon boyutunu rejime göre ayarla."
             ]
@@ -257,22 +266,22 @@ private enum EngineType: String, CaseIterable, Identifiable {
 
     var whenToUse: [String] {
         switch self {
-        case .orion:
+        case .technical:
             return [
                 "Yön belirgin ve işlem zamanlaması kritik olduğunda.",
                 "Kırılım veya dönüş teyidi almak istediğinde."
             ]
-        case .atlas:
+        case .fundamental:
             return [
-                "Orta/uzun vadeli seçim yaparken.",
+                "Orta / uzun vadeli seçim yaparken.",
                 "Kalite odaklı portföy kurarken."
             ]
-        case .hermes:
+        case .news:
             return [
                 "Ani hareketin nedenini anlamak istediğinde.",
-                "Bilanço/duyuru gibi haber yoğun günlerde."
+                "Bilanço / duyuru gibi haber yoğun günlerde."
             ]
-        case .aether:
+        case .macro:
             return [
                 "Risk boyutunu belirlerken.",
                 "Piyasa rejimi değiştiğinde pozisyonu yeniden kalibre ederken."
@@ -282,22 +291,22 @@ private enum EngineType: String, CaseIterable, Identifiable {
 
     var whenNotToTrustAlone: [String] {
         switch self {
-        case .orion:
+        case .technical:
             return [
                 "Yatay piyasada sık fake hareket varken.",
-                "Güçlü haber akışı fiyatı keskin bozuyorken."
+                "Güçlü haber akışı fiyatı keskin bozarken."
             ]
-        case .atlas:
+        case .fundamental:
             return [
                 "Dakikalık işlem kararında.",
                 "Yalnızca çarpan ucuz diye giriş yapılırken."
             ]
-        case .hermes:
+        case .news:
             return [
                 "Haber akışı çok zayıfken.",
                 "Başlık okunup fiyat tepkisi doğrulanmadan karar verilirken."
             ]
-        case .aether:
+        case .macro:
             return [
                 "Tek başına hisse seçmek için.",
                 "Mikro ölçekte 1-2 mumluk hareket yorumunda."
@@ -307,14 +316,14 @@ private enum EngineType: String, CaseIterable, Identifiable {
 
     var caution: String {
         switch self {
-        case .orion:
-            return "Orion hız verir; yönü körlemez. Rejime ters düşen hız sinyaline tek başına güvenme."
-        case .atlas:
-            return "Atlas kaliteyi ölçer; zamanlamayı değil. Teknik teyit olmadan giriş, gereksiz bekleme maliyeti yaratabilir."
-        case .hermes:
-            return "Hermes bağlam üretir; emir vermez. Haber güçlü olsa bile fiyat onayı olmadan işlem açma."
-        case .aether:
-            return "Aether risk dozunu ayarlar. Yön ve zamanlama için mutlaka diğer motorların teyidini ekle."
+        case .technical:
+            return "Teknik analiz hız verir; yönü kendi başına garanti etmez. Rejime ters düşen hız sinyaline tek başına güvenme."
+        case .fundamental:
+            return "Bilanço analizi kaliteyi ölçer; zamanlamayı değil. Teknik teyit olmadan giriş, gereksiz bekleme maliyeti yaratabilir."
+        case .news:
+            return "Haber akışı bağlam üretir; emir vermez. Haber güçlü olsa bile fiyat onayı olmadan işlem açma."
+        case .macro:
+            return "Makro analiz risk dozunu ayarlar. Yön ve zamanlama için mutlaka diğer analiz katmanlarının teyidini ekle."
         }
     }
 }

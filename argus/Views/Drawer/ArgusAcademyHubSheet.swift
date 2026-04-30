@@ -14,8 +14,8 @@ struct ArgusAcademyHubSheet: View {
         ),
         AcademyLesson(
             title: "Ders 2 · Motorları Doğru Kullanma",
-            subtitle: "Orion, Atlas, Hermes, Aether",
-            purpose: "Yanlış motora güvenme hatasını bitirmek",
+            subtitle: "Teknik · Bilanço · Haber · Makro",
+            purpose: "Yanlış katmana güvenme hatasını bitirmek",
             durationMinutes: 8,
             sheet: .engineGuide
         ),
@@ -27,7 +27,7 @@ struct ArgusAcademyHubSheet: View {
             sheet: .regimeGuide
         ),
         AcademyLesson(
-            title: "Ders 4 · Alkindus ile Pratik",
+            title: "Ders 4 · Argus Asistanı ile Pratik",
             subtitle: "Doğal dilde hızlı analiz",
             purpose: "Günlük kullanım akışını hızlandırmak",
             durationMinutes: 5,

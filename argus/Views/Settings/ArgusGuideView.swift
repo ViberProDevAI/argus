@@ -17,42 +17,42 @@ struct ArgusGuideView: View {
                     mode: .argus,
                     title: "ARGUS",
                     subtitle: "Karar Mekanizması",
-                    description: "Argus, sistemin beynidir. Atlas, Orion, Aether, Demeter ve Hermes'ten gelen sinyalleri toplar, Core (Uzun Vade) ve Pulse (Kısa Vade) olarak iki ayrı boyutta işler. Son kararı o verir: Al, Sat, Bekle."
+                    description: "Argus, sistemin beynidir. Teknik, bilanço, makro, haber ve sektör katmanlarından gelen sinyalleri toplar; uzun vadeli (Core) ve kısa vadeli (Pulse) olmak üzere iki boyutta işler. Sonuç: Al, Sat ya da Bekle."
                 )
 
                 guidePage(
                     mode: .atlas,
-                    title: "ATLAS",
+                    title: "BİLANÇO",
                     subtitle: "Temel Analiz",
-                    description: "Atlas, şirketin omurgasını inceler. Bilanço, gelir tablosu, borç yükü ve kârlılık oranlarına bakar. Bir şirketin 'gerçek' değerini hesaplar. Atlas onaylamıyorsa, temel çürüktür."
+                    description: "Şirketin omurgasını inceleyen katmandır. Bilanço, gelir tablosu, borç yükü ve kârlılık oranlarına bakar; çarpanlarla gerçek değeri hesaplar. Bilanço onayı yoksa kalite zayıf demektir."
                 )
 
                 guidePage(
                     mode: .orion,
-                    title: "ORION",
-                    subtitle: "Teknik Avcı",
-                    description: "Orion, grafikleri tarar. Trendleri, momentumu, RSI ve MACD gibi indikatörleri izler. Fiyatın 'nereye gittiğini' ve 'ne zaman' hareket edeceğini söyler. Sinyali tetikleyen tetikçidir."
+                    title: "TEKNİK",
+                    subtitle: "Fiyat & Momentum",
+                    description: "Grafiği okuyan katmandır. Trend, momentum, RSI, MACD gibi göstergelerle fiyatın yönünü ve zamanlamasını ölçer. Sinyali tetikleyen kısa vadeli tetikleyicidir."
                 )
 
                 guidePage(
                     mode: .aether,
-                    title: "AETHER",
-                    subtitle: "Piyasa Atmosferi",
-                    description: "Aether, havayı koklar. Makroekonomik verileri (Faiz, Enflasyon, VIX) ve piyasa risk iştahını ölçer. Fırtına varsa sığınağa, güneş varsa denize yönlendirir. Risk yönetimi ondan sorulur."
+                    title: "MAKRO",
+                    subtitle: "Piyasa Ortamı",
+                    description: "Genel ortamı okuyan katmandır. Faiz, enflasyon, VIX gibi makro veriler ve risk iştahı üzerinden pozisyonun büyüklüğünü ve risk dozunu belirler. Yön değil ölçek katmanıdır."
                 )
 
                 guidePage(
                     mode: .demeter,
-                    title: "DEMETER",
+                    title: "SEKTÖR",
                     subtitle: "Sektör Rotasyonu",
-                    description: "Demeter, sermayenin akış yönünü izler. Hangi sektörün (Teknoloji, Enerji, Bankacılık) güçlendiğini ve hangisinin zayıfladığını analiz eder. Paranın gittiği yerde olmanızı sağlar, ölü sektörlerden korur."
+                    description: "Sermayenin akış yönünü izleyen katmandır. Teknoloji, enerji, bankacılık gibi sektörlerden hangisinin güçlendiğini ve hangisinin zayıfladığını analiz eder; rotasyondaki kazanan tarafa yönlendirir."
                 )
 
                 guidePage(
                     mode: .hermes,
-                    title: "HERMES",
-                    subtitle: "Haberci",
-                    description: "Hermes, piyasanın kulağıdır. Binlerce haberi okur, yapay zeka ile özetler ve 'Yatırımcı Dili'ne çevirir. Duygusal analizi yapar, dedikoduyu gerçek haberden ayırır."
+                    title: "HABER",
+                    subtitle: "Haber Akışı & Sentiment",
+                    description: "Piyasanın kulağıdır. Binlerce haberi tarar, yapay zekayla özetler, tonunu (pozitif / negatif / nötr) sınıflandırır. Dedikoduyu kalıcı bilgi taşıyan haberden ayırır."
                 )
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))

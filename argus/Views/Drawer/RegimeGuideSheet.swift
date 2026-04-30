@@ -66,7 +66,7 @@ struct RegimeGuideSheet: View {
             sectionTitle("60 SANİYELİK HIZLI AKIŞ")
             stepRow(index: "1", title: "Volatiliteye bak", detail: "VIX yukarıysa risk boyutunu otomatik düşür.")
             stepRow(index: "2", title: "Trend gücünü ölç", detail: "ADX güçlü ise trend; değilse çapraz kabul et.")
-            stepRow(index: "3", title: "Motor önceliğini değiştir", detail: "Risk-off’ta Aether/Atlas önceliği artır, agresif teknik ağırlığı azalt.")
+            stepRow(index: "3", title: "Motor önceliğini değiştir", detail: "Risk-off'ta makro ve bilanço katmanlarının ağırlığını artır, agresif teknik ağırlığı azalt.")
             stepRow(index: "4", title: "Nihai kararı yeniden oku", detail: "Konsey kararı ile rejim çelişiyorsa işlem boyutunu küçült.")
         }
     }

@@ -54,7 +54,7 @@ struct SystemGuideSheet: View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("KARAR ZİNCİRİ")
             numbered("1", "Veri Toplama", "Fiyat, hacim, haber ve makro veri aynı anda çekilir.")
-            numbered("2", "Motor Skorları", "Orion/Atlas/Hermes/Aether kendi uzmanlığında puan üretir.")
+            numbered("2", "Motor Skorları", "Teknik, bilanço, haber ve makro katmanları kendi uzmanlığında puan üretir.")
             numbered("3", "Ağırlıklandırma", "Rejim bilgisine göre hangi motorun sesi daha güçlü olacağı belirlenir.")
             numbered("4", "Nihai Çıktı", "AL · SAT · BEKLE kararı ve açıklama birlikte üretilir.")
         }
@@ -72,7 +72,7 @@ struct SystemGuideSheet: View {
     private var quickPracticeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionTitle("90 SANİYELİK PRATİK")
-            numbered("A", "Rejimi Gör", "Aether ne diyor? Risk artırmalı mısın azaltmalı mısın?")
+            numbered("A", "Rejimi Gör", "Makro katmanı ne diyor? Risk artırmalı mısın, azaltmalı mısın?")
             numbered("B", "Ayrışmayı Bul", "Hangi motor uyumsuz? Ayrışma varsa nedeni anlamadan işlem yok.")
             numbered("C", "ANALİZ ile Kilitle", "Metin, senin okumanla uyumluysa karar tamam.")
         }

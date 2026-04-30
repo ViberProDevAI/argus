@@ -17,7 +17,7 @@ struct SystemInfoCard: View {
                             .font(.title)
                             .foregroundColor(color(for: entity))
                         
-                        Text(entity.rawValue.uppercased())
+                        Text(entity.displayName.uppercased())
                             .font(InstitutionalTheme.Typography.headline)
                             .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         

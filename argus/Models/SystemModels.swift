@@ -74,30 +74,48 @@ enum ArgusSystemEntity: String, CaseIterable, Identifiable {
         }
     }
     
+    /// Kullanıcıya gösterilen isim — mitolojik kod adı yerine kavramsal başlık.
+    /// 2026-04-30: rawValue'lar persistance / JSON için korunuyor; UI bu alanı okur.
+    var displayName: String {
+        switch self {
+        case .argus:    return "Argus"
+        case .aether:   return "Makro Ortam"
+        case .orion:    return "Teknik Analiz"
+        case .demeter:  return "Sektör Rotasyonu"
+        case .atlas:    return "Bilanço & Değerleme"
+        case .hermes:   return "Haber Akışı"
+        case .poseidon: return "Para Akışı"
+        case .corse:    return "Pozisyon Takibi (Swing)"
+        case .pulse:    return "Hızlı İşlem (Scalp)"
+        case .shield:   return "Risk Kalkanı"
+        case .council:  return "Karar Konseyi"
+        }
+    }
+
     var description: String {
         switch self {
         case .argus:
-            return "Sistemin beyni; Tüm verileri gören dev. Temel analiz, haber akışı ve makro verileri birleştirerek 'Ne almalı?' sorusuna yanıt arar. Asla uyumaz."
+            return "Sistemin beyni. Teknik, bilanço, makro, haber ve sektör katmanlarından gelen sinyalleri birleştirir; uzun ve kısa vadeyi ayrı ayrı değerlendirir. Nihai çıktı: AL, SAT veya BEKLE."
         case .aether:
-            return "Piyasa Atmosferi; Makroekonomik iklimi (VIX, Faizler, DXY) koklar. Fırtına yaklaşıyorsa risk iştahını kapatır. 'Ne zaman almalı?' sorusunun cevabıdır."
+            return "Makro ortamı okur. VIX, faiz, DXY ve risk iştahı verilerini izler; piyasa rejimi savunmacıya kayıyorsa pozisyon büyüklüğünü ve risk dozunu küçültür. Yön değil, ölçek katmanıdır."
         case .orion:
-            return "Avcı; Teknik analizin ustasıdır. Trendleri, formasyonları ve momentumu hesaplar. Fiyatın 'Nereden alınmalı?' olduğunu belirler. Keskin nişancıdır."
+            return "Teknik analiz katmanı. Trend, momentum, RSI ve MACD gibi göstergelerle fiyatın yönünü ve giriş zamanlamasını ölçer. Kısa-orta vadeli sinyalin tetikleyicisidir."
         case .demeter:
-            return "Doğa Ana; Sektörel döngüleri ve sermaye rotasyonunu yönetir. Paranın hangi tarlada (sektörde) yeşerdiğini, hangisinde kuruduğunu söyler. Verim odaklıdır."
+            return "Sektör rotasyonu. Sermaye akışının hangi sektöre geldiğini, hangisinden çıktığını analiz eder; rotasyondaki kazanan tarafa yönlendirir, zayıflayan sektörlerde temkinli durur."
         case .atlas:
-            return "Değerleme Uzmanı; Şirketlerin bilançolarını, nakit akışlarını ve adil değerini hesaplar. Fiyat etiketinin ötesindeki gerçek değeri bulur."
+            return "Bilanço ve değerleme katmanı. F/K, PD/DD, borç/özkaynak, kârlılık gibi metriklerle şirketin temel kalitesini ölçer; piyasa fiyatının bu kaliteyi ne kadar yansıttığını gösterir."
         case .hermes:
-            return "Haberci; Sosyal medya, kap bildirimleri ve flaş haberleri ışık hızında tarar. Fiyat hareketinden önce bilgiyi size ulaştırır."
+            return "Haber akışı katmanı. Haberlerin tonunu (pozitif / negatif / nötr) sınıflandırır, kaynak güvenilirliğini ağırlıklandırır, gürültüyü kalıcı bilgiden ayırır."
         case .poseidon:
-            return "Balina Dedektifi; Derin sulardaki büyük oyuncuların (kurumsal fonlar, balinalar) hareketlerini izler. Büyük para nereye akarsa oraya yönelir."
+            return "Para akışı katmanı. Kurumsal alıcı-satıcı dengesini ve büyük hacim hareketlerini izler; perakende kaynaklı geçici dalgalardan ayırır."
         case .corse:
-            return "Dayanıklılık Motoru (Swing); Sakin ve sabırlı. Pozisyonları günler/haftalar boyunca taşır. Trend takibi yapar. Stres seviyesi düşüktür."
+            return "Uzun vadeli (swing) işlem profili. Pozisyonları günler veya haftalar boyunca taşır; trend takibi yapar, sık giriş-çıkış yapmaz."
         case .pulse:
-            return "Nabız Motoru (Scalp); Yüksek adrenalin. Dakikalar hatta saniyeler süren işlemleri hedefler. Küçük fiyat hareketlerinden kar çıkarmaya çalışır."
+            return "Kısa vadeli (scalp) işlem profili. Dakikalar veya saatler süren küçük hareketleri hedefler; hızlı giriş-çıkış disiplinine bağlıdır."
         case .shield:
-            return "Kalkan; Portföyü koruyan savunma mekanizması. İşler ters giderse devreye girer, stop-loss çalıştırır veya hedge pozisyonu açar."
+            return "Portföy koruma katmanı. Stop-loss tetikleme, hedge önerisi ve risk limiti aşımı uyarısı yapar; sermayeyi korumak için devreye girer."
         case .council:
-            return "Konsey (Agora); Karar Merkezi. Tüm tanrıların (modüllerin) oylarını toplar, çelişkileri çözer ve nihai AL/SAT kararını verir. Demokrasi ile yönetilen yapay zeka."
+            return "Karar konseyi. Tüm analiz katmanlarının skorlarını toplar, ağırlıklandırır, çelişkileri çözer ve nihai AL / SAT / BEKLE kararını verir."
         }
     }
 }
