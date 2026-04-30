@@ -273,7 +273,7 @@ struct HoloPanelView: View {
             }
 
             .sheet(isPresented: $showStrategySheet) {
-                NavigationView {
+                NavigationStack {
                     StrategyDashboardView(viewModel: viewModel)
                         .navigationBarItems(trailing: Button("Kapat") { showStrategySheet = false })
                 }

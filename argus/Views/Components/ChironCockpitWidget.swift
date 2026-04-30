@@ -8,42 +8,47 @@ struct ChironCockpitWidget: View {
     @State private var showChironDetail = false
 
     var body: some View {
-        // Öğrenme verisi yoksa widget'ı hiç gösterme
-        if recentEventCount == 0 { return AnyView(EmptyView()) }
+        // Önceden AnyView wrapper'ı vardı; @ViewBuilder + if ile native diff,
+        // body type'ı opaque kalır, SwiftUI yapısal kimliği takip edebilir.
+        // Group dış kabuğu task modifier'ını count==0 olsa bile garanti eder
+        // (eski kodda count==0 → EmptyView → task hiç çalışmazdı, sayım
+        //  yapılamazdı; potansiyel bug. Group + task ile her zaman bir kez
+        //  yüklenir, content ise sadece sayım > 0 ise render olur).
+        Group {
+            if recentEventCount > 0 {
+                Button(action: { showChironDetail = true }) {
+                    HStack(spacing: 10) {
+                        Circle()
+                            .fill(Color.green.opacity(0.85))
+                            .frame(width: 7, height: 7)
 
-        return AnyView(
-            Button(action: { showChironDetail = true }) {
-                HStack(spacing: 10) {
-                    Circle()
-                        .fill(Color.green.opacity(0.85))
-                        .frame(width: 7, height: 7)
+                        Text("Sistem son \(recentEventCount) işlemi analiz etti")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.6))
 
-                    Text("Sistem son \(recentEventCount) işlemi analiz etti")
-                        .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.6))
+                        Spacer()
 
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10))
-                        .foregroundColor(.gray)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10))
+                            .foregroundColor(.gray)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.white.opacity(0.04))
+                    .cornerRadius(10)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(Color.white.opacity(0.04))
-                .cornerRadius(10)
-            }
-            .buttonStyle(.plain)
-            .task {
-                let events = await ChironDataLakeService.shared.loadLearningEvents()
-                recentEventCount = events.count
-            }
-            .sheet(isPresented: $showChironDetail) {
-                NavigationStack {
-                    ChironInsightsView()
+                .buttonStyle(.plain)
+                .sheet(isPresented: $showChironDetail) {
+                    NavigationStack {
+                        ChironInsightsView()
+                    }
                 }
             }
-        )
+        }
+        .task {
+            let events = await ChironDataLakeService.shared.loadLearningEvents()
+            recentEventCount = events.count
+        }
     }
 }
 

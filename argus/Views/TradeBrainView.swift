@@ -134,7 +134,7 @@ struct TradeBrainView: View {
 
                 VStack(spacing: 0) {
                     ArgusNavHeader(
-                        title: "TRADE BRAIN",
+                        title: "Trade Brain",
                         subtitle: "POZİSYON · RİSK · KARAR",
                         leadingDeco: .bars3([.holo, .text, .text]),
                         actions: [.menu({ showDrawer = true })],
@@ -847,7 +847,7 @@ struct TradeBrainView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akışı", icon: "waveform.path.ecg") {
                         deepLinkManager.navigate(to: .home)
@@ -875,7 +875,7 @@ struct TradeBrainView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "TRADE BRAIN",
+                title: "Trade Brain",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Sekme: Pozisyon", subtitle: "Plan yönetimi", icon: "waveform.path.ecg") {
                         selectedTab = .positions
@@ -911,7 +911,7 @@ struct TradeBrainView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "ARAÇLAR",
+                title: "Araçlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gerçek takvim", icon: "calendar") {
                         openSheet(.calendar)

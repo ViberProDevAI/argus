@@ -196,7 +196,7 @@ struct ArgusDetailSheet: View {
     @Environment(\.presentationMode) var presentationMode
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
                 ScrollView {

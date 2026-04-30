@@ -10,7 +10,7 @@ struct SignalsView: View {
     @State private var showJournal = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
 
@@ -63,14 +63,15 @@ struct SignalsView: View {
                     }
                 }
 
-                // SignalJournal rotası — V5 header'daki clipboard aksiyonuyla açılır.
-                NavigationLink(
-                    destination: SignalJournalView(),
-                    isActive: $showJournal
-                ) { EmptyView() }
-                .hidden()
             }
             .navigationBarHidden(true)
+            // SignalJournal rotası — V5 header'daki clipboard aksiyonuyla açılır.
+            // Modern API: NavigationLink(destination:isActive:) iOS 16'da deprecated;
+            // navigationDestination(isPresented:) ile aynı programmatic kontrol,
+            // hidden EmptyView gerekmiyor.
+            .navigationDestination(isPresented: $showJournal) {
+                SignalJournalView()
+            }
             .onAppear {
                 if viewModel.aiSignals.isEmpty { scan() }
             }

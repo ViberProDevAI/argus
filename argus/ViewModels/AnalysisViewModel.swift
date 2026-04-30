@@ -24,8 +24,10 @@ final class AnalysisViewModel: ObservableObject {
         set { SignalStateViewModel.shared.chimeraSignals = newValue }
     }
     
+    /// Cached daily scores - SignalStateViewModel'deki @Published cache'ten okur.
+    /// Önceden her erişimde mapValues çalışıyordu; artık tek seviyeli forward.
     var orionScores: [String: OrionScoreResult] {
-        return orionAnalysis.mapValues { $0.daily }
+        return SignalStateViewModel.shared.orionScores
     }
     
     // MARK: - Financial Data
@@ -57,23 +59,22 @@ final class AnalysisViewModel: ObservableObject {
     @Published var isRunningDemeter: Bool = false
     @Published var activeShocks: [ShockFlag] = []
     
-    // Cancellables
-    private var cancellables = Set<AnyCancellable>()
-    
     init() {
-        // Init logic
-        setupBindings()
-    }
-    
-    private func setupBindings() {
-        // In a full refactor, we would bind to SignalStateViewModel updates here
-        // to manually trigger objectWillChange if needed, or rely on View's observing SignalStateViewModel directly.
-        // For now, since we return computed props from Shared, Views might not update unless we publish change.
-        
-        SignalStateViewModel.shared.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
+        // Manuel objectWillChange relay'i kaldırıldı (2026-04-30).
+        //
+        // Önceki kod SignalStateViewModel'in objectWillChange yayınını sink'leyip
+        // AVM'in kendi objectWillChange'ini fire ediyordu. Bu, SignalState'teki
+        // HER property değişimini AVM'e yansıtıyordu — bu da AVM'i observe eden
+        // SignalViewModel.shared'a kademeli olarak relay ediliyordu.
+        //
+        // Sorun: ne AVM ne SignalViewModel'i doğrudan observe eden view yok.
+        // Tüm view'lar TradingViewModel üzerinden gidiyor ve TVM bu chain'in
+        // çıktısını dinlemiyor. Yani bu relay tamamen ölü iş — her
+        // SignalState güncellemesinde 2 ekstra sink çalışıyordu, sıfır görünür
+        // etkisi olan re-render tetikliyordu.
+        //
+        // Bir gün view AVM'i doğrudan observe ederse, dar (per-property)
+        // binding kullan: `SignalStateViewModel.shared.$orionAnalysis
+        //   .sink { ... }`. Tek property için tek emit, tüm chain için değil.
     }
 }

@@ -40,20 +40,27 @@ final class SignalStateViewModel: ObservableObject {
     /// Argus Explanations
     @Published var argusExplanations: [String: ArgusExplanation] = [:]
     
-    // MARK: - Legacy Support
-    
-    /// Legacy accessor for daily Orion scores
-    var orionScores: [String: OrionScoreResult] {
-        return orionAnalysis.mapValues { $0.daily }
-    }
-    
+    // MARK: - Cached Daily Scores (Performance Optimization)
+    //
+    // Önceden bu computed property'di: `orionAnalysis.mapValues { $0.daily }`.
+    // `viewModel.orionScores[symbol]` her erişimde tüm dictionary'yi yeniden
+    // mapliyor; TradeBrain, PortfolioView, MarketView, StockDetailView gibi
+    // 15+ noktada body içinde çağrıldığı için her quote/decision güncellemesinde
+    // O(N×V) mapValues maliyeti oluşuyordu.
+    //
+    // Şimdi: orionAnalysis değiştiğinde **bir kez** map'lenip @Published olarak
+    // tutulur. View'lar sözcük cache'inden okur — re-render sayısı değişmez,
+    // ama her body computation'ında full dict regeneration kalkar.
+    @Published private(set) var orionScores: [String: OrionScoreResult] = [:]
+
     // MARK: - Internal State
     private var cancellables = Set<AnyCancellable>()
-    
+
     private init() {
         setupOrionStoreBinding()
+        setupOrionScoresCache()
     }
-    
+
     // MARK: - Orion Store Binding
     private func setupOrionStoreBinding() {
         OrionStore.shared.$analysis
@@ -62,10 +69,19 @@ final class SignalStateViewModel: ObservableObject {
                 self?.orionAnalysis = analysis
             }
             .store(in: &cancellables)
-            
+
         OrionStore.shared.$isLoading
             .receive(on: DispatchQueue.main)
             .assign(to: &$isOrionLoading)
+    }
+
+    /// orionAnalysis değiştiğinde daily score'ları bir kez map'le ve cache'le.
+    /// Aynı RunLoop turunda gelen ardışık güncellemeler için latest'i alır.
+    private func setupOrionScoresCache() {
+        $orionAnalysis
+            .map { analysis in analysis.mapValues { $0.daily } }
+            .receive(on: RunLoop.main)
+            .assign(to: &$orionScores)
     }
     
     // MARK: - Orion Analysis

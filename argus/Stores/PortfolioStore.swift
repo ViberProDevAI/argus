@@ -13,10 +13,46 @@ final class PortfolioStore: ObservableObject {
     static let shared = PortfolioStore()
     
     // MARK: - Published State
-    @Published private(set) var trades: [Trade] = []
+    @Published private(set) var trades: [Trade] = [] {
+        didSet {
+            // CACHE PERFORMANCE: trades değiştiğinde filtered alt küme cache'lerini
+            // bir kez hesapla. Önceden computed property'di ve PortfolioView,
+            // DailyAgendaView, PortfolioPlanBoard, TradeBrainStatusBand gibi 6+
+            // yerde body içinde her render'da .filter çalışıyordu. Artık tek
+            // mutasyonla 4 cache güncellenir, view body'leri O(1) okuma yapar.
+            recomputeFilteredCaches()
+        }
+    }
     @Published private(set) var globalBalance: Double = -1.0 // -1 denotes "Not Loaded"
     @Published private(set) var bistBalance: Double = -1.0   // -1 denotes "Not Loaded"
     @Published private(set) var transactions: [Transaction] = []
+
+    // MARK: - Cached Filtered Subsets (Performance)
+    @Published private(set) var openTradesCache: [Trade] = []
+    @Published private(set) var closedTradesCache: [Trade] = []
+    @Published private(set) var globalOpenTradesCache: [Trade] = []
+    @Published private(set) var bistOpenTradesCache: [Trade] = []
+
+    private func recomputeFilteredCaches() {
+        var open: [Trade] = []
+        var closed: [Trade] = []
+        var globalOpen: [Trade] = []
+        var bistOpen: [Trade] = []
+        open.reserveCapacity(trades.count)
+        for trade in trades {
+            if trade.isOpen {
+                open.append(trade)
+                if trade.currency == .USD { globalOpen.append(trade) }
+                else if trade.currency == .TRY { bistOpen.append(trade) }
+            } else {
+                closed.append(trade)
+            }
+        }
+        openTradesCache = open
+        closedTradesCache = closed
+        globalOpenTradesCache = globalOpen
+        bistOpenTradesCache = bistOpen
+    }
     
     // MARK: - Persistence Keys (V6 - FileManager)
     private let portfolioFileName = "argus_portfolio_v6.json"
@@ -285,21 +321,12 @@ final class PortfolioStore: ObservableObject {
         }
     }
     
-    var openTrades: [Trade] {
-        trades.filter { $0.isOpen }
-    }
-    
-    var closedTrades: [Trade] {
-        trades.filter { !$0.isOpen }
-    }
-    
-    var globalOpenTrades: [Trade] {
-        openTrades.filter { $0.currency == .USD }
-    }
-    
-    var bistOpenTrades: [Trade] {
-        openTrades.filter { $0.currency == .TRY }
-    }
+    /// Cache'lenmiş alt kümeler — geriye dönük uyumluluk için aynı isimle korunur.
+    /// Doğrudan @Published cache'e forward eder; geri kalan kod değişiklik gerektirmez.
+    var openTrades: [Trade] { openTradesCache }
+    var closedTrades: [Trade] { closedTradesCache }
+    var globalOpenTrades: [Trade] { globalOpenTradesCache }
+    var bistOpenTrades: [Trade] { bistOpenTradesCache }
     
     // MARK: - Balance Helpers
     

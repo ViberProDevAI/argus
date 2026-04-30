@@ -1,14 +1,19 @@
 import SwiftUI
 
-/// Alt tab bar + merkez Argus Voice FAB.
+/// Alt tab bar + merkez Argus Voice butonu.
 ///
-/// 2026-04-22 Sprint 2: V5 mockup (`Argus_Mockup_V5.html` .tabbar) hizalaması.
-/// - Pill corner radius `32` (V5 `.tabbar { border-radius: 32px }`)
-/// - Yoğun V5 renk tonları (surface2→surface1 opak) + borderStrong stroke
-/// - Tab etiketleri mono + upper-case + holo accent seçili
-/// - Merkez FAB ArgusEye (PulsingFABView V5 versiyonu)
+/// 2026-04-25 H-41 — sade refactor:
+///   • Pill: glass blur + gradient + drop shadow → sade `surface1`
+///     fill, 0.5px borderSubtle stroke, radius 24.
+///   • Tab item: ALL CAPS mono tracking → sentence case (TabItem.rawValue
+///     zaten "Ana Sayfa" / "Kokpit" / "Portföy" / "Ayarlar" — uppercase
+///     dönüştürmesi kaldırıldı).
+///   • Merkez FAB: `PulsingFABView` (pulse + holo glow) → sade dairesel
+///     `ArgusAppIcon` PNG butonu. Pulse ve glow yok; tap davranışı
+///     (NotificationCenter "OpenArgusVoice" post) aynen.
 ///
-/// Davranış değişmedi: 4 tab + merkez FAB → `OpenArgusVoice` notification.
+/// `PulsingFABView` kodu projede kalmaya devam ediyor; başka bir yerden
+/// referanslanma ihtimaline karşı silinmedi.
 struct PremiumGlassmorphicTabBar: View {
     @ObservedObject private var deepLinkManager = DeepLinkManager.shared
     @EnvironmentObject var router: NavigationRouter
@@ -19,65 +24,63 @@ struct PremiumGlassmorphicTabBar: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            // Tab bar container — V5 .tabbar
-            ZStack {
-                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.tabbar, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                InstitutionalTheme.Colors.surface2.opacity(0.96),
-                                InstitutionalTheme.Colors.surface1.opacity(0.94)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+            // Tab bar pill — sade
+            HStack(spacing: 0) {
+                ForEach(Array(allTabs.prefix(2)), id: \.self) { tab in
+                    PremiumTabBarButton(
+                        tab: tab,
+                        isSelected: deepLinkManager.selectedTab == tab,
+                        action: { selectTab(tab) }
                     )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.tabbar, style: .continuous)
-                            .stroke(InstitutionalTheme.Colors.borderStrong, lineWidth: 1)
-                    )
-                    .background(
-                        // backdrop blur effect
-                        RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.tabbar, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                    )
-                    .shadow(color: .black.opacity(0.35), radius: 24, x: 0, y: 8)
-
-                // Tab row — 2 sol, center spacer, 2 sağ (V5 layout)
-                HStack(spacing: 0) {
-                    ForEach(Array(allTabs.prefix(2)), id: \.self) { tab in
-                        PremiumTabBarButton(
-                            tab: tab,
-                            isSelected: deepLinkManager.selectedTab == tab,
-                            action: { selectTab(tab) }
-                        )
-                    }
-
-                    // Merkez FAB için 76pt boşluk (FAB 64 + 6 pad her yan)
-                    Spacer().frame(width: 76)
-
-                    ForEach(Array(allTabs.suffix(2)), id: \.self) { tab in
-                        PremiumTabBarButton(
-                            tab: tab,
-                            isSelected: deepLinkManager.selectedTab == tab,
-                            action: { selectTab(tab) }
-                        )
-                    }
                 }
-                .padding(.horizontal, 12)
+
+                // Merkez FAB için boşluk
+                Spacer().frame(width: 64)
+
+                ForEach(Array(allTabs.suffix(2)), id: \.self) { tab in
+                    PremiumTabBarButton(
+                        tab: tab,
+                        isSelected: deepLinkManager.selectedTab == tab,
+                        action: { selectTab(tab) }
+                    )
+                }
             }
-            .frame(height: 74)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(InstitutionalTheme.Colors.surface1)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
+            )
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
 
-            // Merkez FAB — V5 margin-top -22 ile yarı çıkıntılı
-            PulsingFABView {
-                let haptic = UIImpactFeedbackGenerator(style: .medium)
-                haptic.impactOccurred()
-                NotificationCenter.default.post(name: NSNotification.Name("OpenArgusVoice"), object: nil)
-            }
-            .offset(y: -22)
+            // Merkez FAB — sade dairesel ArgusAppIcon, pulse/glow yok
+            argusVoiceButton
+                .offset(y: -16)
         }
+    }
+
+    private var argusVoiceButton: some View {
+        Button(action: {
+            let haptic = UIImpactFeedbackGenerator(style: .medium)
+            haptic.impactOccurred()
+            NotificationCenter.default.post(name: NSNotification.Name("OpenArgusVoice"), object: nil)
+        }) {
+            Image("ArgusAppIcon")
+                .resizable()
+                .scaledToFill()
+                .frame(width: 56, height: 56)
+                .clipShape(Circle())
+                .overlay(
+                    Circle().stroke(InstitutionalTheme.Colors.holo.opacity(0.3), lineWidth: 0.5)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Argus sesli komut")
     }
 
     private func selectTab(_ tab: TabItem) {
@@ -89,8 +92,11 @@ struct PremiumGlassmorphicTabBar: View {
 }
 
 // MARK: - TabBarButton
+//
+// 2026-04-25 H-41: Sentence case label, mono caps tracking gitti.
+// Seçili: holo (mavi), seçili olmayan: textSecondary. Scale animasyonu
+// yok — opacity hover/selected geçişi için 0.6 → 1.0.
 
-/// V5 .tabitem: dikey ikon + upper mono etiket, seçili holo accent.
 struct PremiumTabBarButton: View {
     let tab: TabItem
     let isSelected: Bool
@@ -100,21 +106,17 @@ struct PremiumTabBarButton: View {
         Button(action: action) {
             VStack(spacing: 4) {
                 Image(systemName: tab.icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 18, weight: .medium))
 
-                Text(tab.rawValue.uppercased())
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .tracking(0.8)
+                Text(tab.rawValue)
+                    .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
             }
             .frame(maxWidth: .infinity)
             .foregroundColor(isSelected
                              ? InstitutionalTheme.Colors.holo
                              : InstitutionalTheme.Colors.textSecondary)
-            .opacity(isSelected ? 1.0 : 0.72)
         }
         .buttonStyle(.plain)
-        .scaleEffect(isSelected ? 1.06 : 1.0)
-        .animation(.easeOut(duration: 0.15), value: isSelected)
     }
 }
 

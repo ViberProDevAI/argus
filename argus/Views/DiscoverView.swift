@@ -14,7 +14,7 @@ struct DiscoverView: View {
     // Grid adaptation for horizontal scroll if needed, but HStacks work better for single row carousels.
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
 
@@ -131,7 +131,7 @@ struct DiscoverView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
                         deepLinkManager.navigate(to: .home)
@@ -159,7 +159,7 @@ struct DiscoverView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "KESFET",
+                title: "Keşfet",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Yenile", subtitle: "Listeyi guncelle", icon: "arrow.clockwise") {
                         viewModel.loadDiscoverData()
@@ -171,7 +171,7 @@ struct DiscoverView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "ARACLAR",
+                title: "Araçlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
                         openSheet(.calendar)

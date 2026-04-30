@@ -87,7 +87,7 @@ struct TradeBrainAlertListView: View {
     @ObservedObject var viewModel: TradingViewModel
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()
                 

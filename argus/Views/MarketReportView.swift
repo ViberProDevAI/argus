@@ -90,7 +90,7 @@ struct MarketReportView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Alkindus Merkez", subtitle: "Yapay zeka ana sayfa", icon: "AlkindusIcon") {
                         deepLinkManager.navigate(to: .home)
@@ -114,7 +114,7 @@ struct MarketReportView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "RAPOR",
+                title: "Rapor",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Kapat", subtitle: "Raporu kapat", icon: "xmark.circle") {
                         presentationMode.wrappedValue.dismiss()
@@ -126,7 +126,7 @@ struct MarketReportView: View {
 
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "ARAÇLAR",
+                title: "Araçlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gerçek takvim", icon: "calendar") { openSheet(.calendar) },
                     ArgusDrawerView.DrawerItem(title: "Finans Sözlüğü", subtitle: "Terimler", icon: "character.book.closed") { openSheet(.dictionary) },

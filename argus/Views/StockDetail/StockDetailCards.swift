@@ -6,52 +6,59 @@ import SwiftUI
 struct AgoraTraceCard: View {
     let trace: AgoraTrace?
 
+    // PERFORMANCE: Önceden `AnyView(EmptyView())` / `AnyView(...)` pattern'i
+    // SwiftUI'nin diff'leyici tip kimliğini körleştiriyordu — body her render'da
+    // yeniden box'lanmış view yaratıyor, structural identity tracking kayboluyor.
+    // @ViewBuilder ile native conditional rendering, body type'ı statik kalır,
+    // SwiftUI yapısal diff yapabilir.
+    @ViewBuilder
     var body: some View {
-        // Veri yoksa gösterme
-        guard let t = trace else { return AnyView(EmptyView()) }
+        if let t = trace {
+            content(for: t)
+        }
+    }
 
+    private func content(for t: AgoraTrace) -> some View {
         let approved = t.riskEvaluation.isApproved
         let action   = t.finalDecision.action
 
-        return AnyView(
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: approved ? "checkmark.seal.fill" : "xmark.octagon.fill")
-                        .foregroundColor(approved ? InstitutionalTheme.Colors.aurora : InstitutionalTheme.Colors.crimson)
-                    Text(approved ? "Argus onayladı" : "Argus reddetti")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    Spacer()
-                    Text(action.rawValue.uppercased())
-                        .font(.caption)
-                        .bold()
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(action == .buy ? InstitutionalTheme.Colors.aurora.opacity(0.15) : InstitutionalTheme.Colors.holo.opacity(0.15))
-                        .foregroundColor(action == .buy ? InstitutionalTheme.Colors.aurora : InstitutionalTheme.Colors.holo)
-                        .cornerRadius(8)
-                }
-
-                // Neden reddedildi — sadece ret durumunda göster
-                if !approved, !t.riskEvaluation.reason.isEmpty {
-                    HStack(spacing: 8) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(.orange)
-                        Text(t.riskEvaluation.reason)
-                            .font(.system(size: 13))
-                            .foregroundColor(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(10)
-                    .background(Color.orange.opacity(0.08))
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: approved ? "checkmark.seal.fill" : "xmark.octagon.fill")
+                    .foregroundColor(approved ? InstitutionalTheme.Colors.aurora : InstitutionalTheme.Colors.crimson)
+                Text(approved ? "Argus onayladı" : "Argus reddetti")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Spacer()
+                Text(action.rawValue.uppercased())
+                    .font(.caption)
+                    .bold()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(action == .buy ? InstitutionalTheme.Colors.aurora.opacity(0.15) : InstitutionalTheme.Colors.holo.opacity(0.15))
+                    .foregroundColor(action == .buy ? InstitutionalTheme.Colors.aurora : InstitutionalTheme.Colors.holo)
                     .cornerRadius(8)
-                }
             }
-            .padding(16)
-            .background(InstitutionalTheme.Colors.surface1)
-            .cornerRadius(16)
-        )
+
+            // Neden reddedildi — sadece ret durumunda göster
+            if !approved, !t.riskEvaluation.reason.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.orange)
+                    Text(t.riskEvaluation.reason)
+                        .font(.system(size: 13))
+                        .foregroundColor(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(10)
+                .background(Color.orange.opacity(0.08))
+                .cornerRadius(8)
+            }
+        }
+        .padding(16)
+        .background(InstitutionalTheme.Colors.surface1)
+        .cornerRadius(16)
     }
 }
 
@@ -68,12 +75,10 @@ struct TraceLine: View { var body: some View { EmptyView() } }
 struct RiskSummaryCard: View {
     let riskReport: String?
 
+    @ViewBuilder
     var body: some View {
-        // Anlamlı içerik yoksa hiç gösterme
-        guard let report = riskReport, !report.isEmpty else { return AnyView(EmptyView()) }
-
-        let isVeto = report.contains("VETO")
-        return AnyView(
+        if let report = riskReport, !report.isEmpty {
+            let isVeto = report.contains("VETO")
             HStack(spacing: 10) {
                 Image(systemName: isVeto ? "hand.raised.fill" : "shield.lefthalf.filled")
                     .foregroundColor(isVeto ? InstitutionalTheme.Colors.crimson : InstitutionalTheme.Colors.holo)
@@ -85,7 +90,7 @@ struct RiskSummaryCard: View {
             .padding(14)
             .background(isVeto ? InstitutionalTheme.Colors.crimson.opacity(0.08) : InstitutionalTheme.Colors.surface1)
             .cornerRadius(14)
-        )
+        }
     }
 }
 
@@ -101,12 +106,9 @@ struct PhoenixChannelCard: View {
     let advice: PhoenixAdvice
     var onRunBacktest: (() -> Void)? = nil
 
+    @ViewBuilder
     var body: some View {
-        guard advice.channelUpper != nil || advice.channelLower != nil else {
-            return AnyView(EmptyView())
-        }
-
-        return AnyView(
+        if advice.channelUpper != nil || advice.channelLower != nil {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "arrow.up.and.down.circle")
@@ -171,7 +173,7 @@ struct PhoenixChannelCard: View {
             .padding(16)
             .background(InstitutionalTheme.Colors.surface1)
             .cornerRadius(16)
-        )
+        }
     }
 }
 
@@ -179,10 +181,9 @@ struct PhoenixChannelCard: View {
 struct TransactionHistoryCard: View {
     let transactions: [Transaction]
 
+    @ViewBuilder
     var body: some View {
-        guard !transactions.isEmpty else { return AnyView(EmptyView()) }
-
-        return AnyView(
+        if !transactions.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Image(systemName: "clock.arrow.circlepath")
@@ -211,7 +212,7 @@ struct TransactionHistoryCard: View {
             .padding(16)
             .background(InstitutionalTheme.Colors.surface1)
             .cornerRadius(16)
-        )
+        }
     }
 }
 

@@ -71,7 +71,7 @@ struct SettingsView: View {
     //     intelligenceSection, vs.) şimdilik kodda kaldı, sonraki cleanup
     //     turunda silinecek. Artık çağrılmıyor.
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ZStack {
                 InstitutionalTheme.Colors.background.edgesIgnoringSafeArea(.all)
 
@@ -120,7 +120,8 @@ struct SettingsView: View {
             .navigationBarHidden(true)
         }
         .preferredColorScheme(.dark)
-        .navigationViewStyle(StackNavigationViewStyle())
+        // NavigationStack zaten stack davranışı veriyor; navigationViewStyle
+        // modifier'ı NavigationView için tasarlanmıştı, NavigationStack'e gerek yok.
     }
 }
 
@@ -1206,7 +1207,7 @@ extension SettingsView {
     private func drawerSections(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> [ArgusDrawerView.DrawerSection] {
         [
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Piyasa özeti", icon: "waveform.path.ecg") {
                         deepLinkManager.navigate(to: .home)
@@ -1223,7 +1224,7 @@ extension SettingsView {
                 ]
             ),
             ArgusDrawerView.DrawerSection(
-                title: "ARAÇLAR",
+                title: "Araçlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Önemli tarihler", icon: "calendar") {
                         openSheet(.calendar)

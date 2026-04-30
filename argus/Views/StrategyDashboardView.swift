@@ -359,7 +359,7 @@ struct StrategyDashboardView: View {
 }
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         StrategyDashboardView(viewModel: TradingViewModel())
     }
 }

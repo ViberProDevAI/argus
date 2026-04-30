@@ -40,21 +40,22 @@ final class SignalViewModel: ObservableObject {
 
     // MARK: - Dependencies
     private let analysisViewModel: AnalysisViewModel
-    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Initialization
     private init(analysisViewModel: AnalysisViewModel? = nil) {
         self.analysisViewModel = analysisViewModel ?? AnalysisViewModel()
-        setupBindings()
-    }
-
-    // MARK: - Bindings
-    private func setupBindings() {
-        analysisViewModel.objectWillChange
-            .sink { [weak self] _ in
-                self?.objectWillChange.send()
-            }
-            .store(in: &cancellables)
+        // Manuel objectWillChange relay'i kaldırıldı (2026-04-30).
+        //
+        // Önceki kod AVM'in objectWillChange yayınını sink'leyip kendi
+        // objectWillChange'ini fire ediyordu. Bu, AVM'in (zaten ölü) SignalState
+        // relay zincirinin sonuna ek bir relay daha ekliyordu.
+        //
+        // Tüm chain ölü iş: ne AVM'i ne SignalViewModel'i doğrudan observe
+        // eden view var. SignalViewModel.shared sadece method/property erişimi
+        // için kullanılıyor (SignalViewModel.shared.startScoutLoop() vb.).
+        //
+        // Direct observer eklendiği gün dar binding kullan, tüm AVM zincirini
+        // değil.
     }
 
     // MARK: - Computed Accessors (Facade to AnalysisViewModel)

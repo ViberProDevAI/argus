@@ -15,7 +15,7 @@ struct AgoraDebateSheet: View {
     @State private var showInfoCard = false // NEW
     
     var body: some View {
-        NavigationView { // Note: If presented from another NavigationView, this might need adjustment, but standard sheet usually needs its own NavView or uses the parent's if not modal. Given the code, it uses its own.
+        NavigationStack { // Note: If presented from another NavigationView, this might need adjustment, but standard sheet usually needs its own NavView or uses the parent's if not modal. Given the code, it uses its own.
             ZStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
@@ -934,7 +934,7 @@ struct AgoraTermDetailSheet: View {
     @Environment(\.dismiss) var dismiss
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(alignment: .leading, spacing: 20) {
                 Text(term.term)
                     .font(.title)
