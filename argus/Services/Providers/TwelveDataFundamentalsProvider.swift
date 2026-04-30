@@ -1,5 +1,11 @@
 import Foundation
 
+// MARK: - DORMANT
+// 2026-04-30: 0 callsite. Yahoo-Only Mode'da fundamentals Yahoo quoteSummary
+// üzerinden çekiliyor; bu provider hiç çağrılmıyor. Canlandırmadan önce
+// tasks/lessons.md L13.
+
+@available(*, deprecated, message: "Yahoo-Only Mode aktif; TwelveData fundamentals çağrılmıyor (0 callsite). Lessons L13.")
 class TwelveDataFundamentalsProvider: FundamentalsProvider {
     static let shared = TwelveDataFundamentalsProvider()
     

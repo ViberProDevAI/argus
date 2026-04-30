@@ -1,8 +1,14 @@
 import Foundation
 
+// MARK: - DORMANT
+// 2026-04-30: Sadece ProviderAdapterRegistry (dormant) içinde register ediliyor.
+// Phoenix kendi local-scan fallback'ini doğrudan yapıyor; bu adapter çağrılmıyor.
+// Canlandırmadan önce: tasks/lessons.md L13.
+
 /// A self-contained adapter that acts as a Screener Provider.
 /// It uses the local Watchlist and Discovery metrics to generate "Top Lists".
 /// This ensures Phoenix never crashes even if Yahoo/EODHD are down.
+@available(*, deprecated, message: "Yahoo-Only Mode aktif; local scanner adapter çağrılmıyor. Lessons L13.")
 actor LocalScannerAdapter: HeimdallProvider {
     static let shared = LocalScannerAdapter()
     let name: String = "LocalScanner"

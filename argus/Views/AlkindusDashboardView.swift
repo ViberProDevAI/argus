@@ -20,9 +20,8 @@ struct AlkindusDashboardView: View {
     var body: some View {
         VStack(spacing: 0) {
             ArgusNavHeader(
-                title: "ALKINDUS",
-                subtitle: "ÖĞRENME · KALİBRASYON · İÇGÖRÜ",
-                leadingDeco: .bars3([.holo, .text, .text]),
+                title: "Alkindus",
+                subtitle: "Argus'un öğrenme paneli",
                 actions: [
                     .menu({ showDrawer = true }),
                     .custom(sfSymbol: "arrow.clockwise", action: refresh)
@@ -82,65 +81,76 @@ struct AlkindusDashboardView: View {
     /// bilgilendirici bir boş hal gösterilir, global dashboard altta devam eder.
     @ViewBuilder
     private func symbolInsightCard(for sym: String) -> some View {
+        // 2026-04-30 H-44 — sade. Mor border + caps başlık + sembol pill kalktı,
+        // yerine sade kart + sentence case başlık + sembol muted text.
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                MotorLogo(.alkindus, size: 14)
-                ArgusSectionCaption("BU HİSSE İÇİN OKUMAM")
+            HStack {
+                Text("Bu hisse için okumam")
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 Spacer()
-                ArgusChip(sym.uppercased(), tone: .motor(.alkindus))
+                Text(sym)
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
             if let insight = symbolInsight {
                 Text(insight.message)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     insightRow(label: "En iyi modül",
-                               value: "\(insight.bestModule.uppercased()) · %\(Int(insight.bestHitRate * 100))",
-                               tone: .aurora)
+                               value: "\(displayName(for: insight.bestModule)) · \(Int(insight.bestHitRate * 100))%",
+                               valueColor: InstitutionalTheme.Colors.aurora)
                     insightRow(label: "En zayıf modül",
-                               value: "\(insight.worstModule.uppercased()) · %\(Int(insight.worstHitRate * 100))",
-                               tone: .crimson)
+                               value: "\(displayName(for: insight.worstModule)) · \(Int(insight.worstHitRate * 100))%",
+                               valueColor: InstitutionalTheme.Colors.crimson)
                     insightRow(label: "Toplam karar",
                                value: "\(insight.totalDecisions) adet",
-                               tone: .neutral)
+                               valueColor: InstitutionalTheme.Colors.textPrimary)
                 }
             } else {
-                HStack(alignment: .top, spacing: 10) {
-                    ArgusDot(color: InstitutionalTheme.Colors.titan)
-                        .padding(.top, 5)
-                    Text("Bu hisse için henüz yeterli karar birikmedi (en az 5 karar gerekiyor). Kararlar verildikçe burası dolacak.")
-                        .font(.system(size: 11.5))
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text("Bu hisse için henüz yeterli karar birikmedi (en az 5 karar gerekiyor). Kararlar verildikçe burası dolacak.")
+                    .font(.system(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-
-            Text("↓ Global kalibrasyon panosu aşağıda")
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .tracking(0.8)
-                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                .padding(.top, 4)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(InstitutionalTheme.Colors.surface1)
-        .overlay(
-            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
-                .stroke(InstitutionalTheme.Colors.Motors.alkindus.opacity(0.35), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private func insightRow(label: String, value: String, tone: ArgusChipTone) -> some View {
-        HStack(spacing: 8) {
+    private func insightRow(label: String, value: String, valueColor: Color) -> some View {
+        HStack {
             Text(label)
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-            Spacer(minLength: 0)
-            ArgusChip(value, tone: tone)
+            Spacer()
+            Text(value)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundColor(valueColor)
+        }
+    }
+
+    /// Motor adından kullanıcıya gösterilecek işlev karşılığı.
+    /// (drawer ve sanctum'la aynı dil — Orion → Teknik, Hermes → Haber, …)
+    private func displayName(for moduleName: String) -> String {
+        switch moduleName.lowercased() {
+        case "orion":      return "Teknik"
+        case "atlas":      return "Bilanço"
+        case "aether":     return "Makro"
+        case "hermes":     return "Haber"
+        case "demeter":    return "Sektör"
+        case "chiron":     return "Rejim"
+        case "prometheus": return "Tahmin"
+        case "athena":     return "Faktör"
+        case "alkindus":   return "Alkindus"
+        case "phoenix":    return "Risk"
+        default:           return moduleName.capitalized
         }
     }
     
@@ -149,7 +159,7 @@ struct AlkindusDashboardView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "EKRANLAR",
+                title: "Ekranlar",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Ana Sayfa", subtitle: "Sinyal akisi", icon: "waveform.path.ecg") {
                         deepLinkManager.navigate(to: .home)
@@ -173,7 +183,7 @@ struct AlkindusDashboardView: View {
         
         sections.append(
             ArgusDrawerView.DrawerSection(
-                title: "ALKINDUS",
+                title: "Alkindus",
                 items: [
                     ArgusDrawerView.DrawerItem(title: "Yenile", subtitle: "Istatistikleri guncelle", icon: "arrow.clockwise") {
                         refresh()
@@ -196,7 +206,7 @@ struct AlkindusDashboardView: View {
     
     private func commonToolsSection(openSheet: @escaping (ArgusDrawerView.DrawerSheet) -> Void) -> ArgusDrawerView.DrawerSection {
         ArgusDrawerView.DrawerSection(
-            title: "ARACLAR",
+            title: "Araçlar",
             items: [
                 ArgusDrawerView.DrawerItem(title: "Ekonomi Takvimi", subtitle: "Gercek takvim", icon: "calendar") {
                     openSheet(.calendar)
@@ -218,55 +228,44 @@ struct AlkindusDashboardView: View {
     }
     
     private func headerCard(stats: AlkindusStats) -> some View {
-        // V5: Motor avatar + caption + shadow mode chip + iki mini stat
+        // 2026-04-30 H-44 — sade. ArgusOrb glow + ringColor + caps brand
+        // satırı + SHADOW MODE pill + mini stat caps + tinted yüzde badge
+        // hepsi gitti. Yerine küçük dairesel logo + "Kalibrasyon" sentence
+        // + alt satır muted, mini stat'lar sentence case + büyük metin +
+        // renkli yüzde (renk anlamı korundu).
         v5Card {
             HStack(spacing: 12) {
-                ArgusOrb(size: 48,
-                         ringColor: InstitutionalTheme.Colors.Motors.alkindus,
-                         glowColor: InstitutionalTheme.Colors.Motors.alkindus) {
-                    MotorLogo(.alkindus, size: 26)
-                }
+                MotorLogo(.alkindus, size: 24)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text("ALKINDUS")
-                            .font(InstitutionalTheme.Typography.dataMicro)
-                            .tracking(1.2)
-                            .foregroundColor(InstitutionalTheme.Colors.Motors.alkindus)
-                        Text("·")
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                        Text("META-ZEKA")
-                            .font(InstitutionalTheme.Typography.dataMicro)
-                            .tracking(1.2)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    }
-                    Text("Kalibrasyon Dashboard")
-                        .font(InstitutionalTheme.Typography.bodyStrong)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Kalibrasyon")
+                        .font(.system(size: 16, weight: .medium))
                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    Text("Shadow mode · \(stats.pendingCount) bekleyen karar")
+                        .font(.system(size: 12))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 }
 
                 Spacer()
-
-                VStack(alignment: .trailing, spacing: 4) {
-                    ArgusPill("SHADOW MODE", tone: .motor(.alkindus))
-                    Text("\(stats.pendingCount) bekleyen")
-                        .font(.system(size: 9, weight: .bold, design: .monospaced))
-                        .tracking(0.6)
-                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                }
             }
 
-            ArgusHair()
+            Rectangle()
+                .fill(InstitutionalTheme.Colors.borderSubtle)
+                .frame(height: 0.5)
 
             HStack(spacing: 14) {
                 if let top = stats.topModule {
-                    miniStat(title: "EN İYİ MODÜL", value: top.name.capitalized,
-                             rate: top.hitRate, color: InstitutionalTheme.Colors.aurora)
+                    miniStat(title: "En iyi modül",
+                             value: displayName(for: top.name),
+                             rate: top.hitRate,
+                             color: InstitutionalTheme.Colors.aurora)
                 }
 
                 if let weak = stats.weakestModule {
-                    miniStat(title: "EN ZAYIF", value: weak.name.capitalized,
-                             rate: weak.hitRate, color: InstitutionalTheme.Colors.crimson)
+                    miniStat(title: "En zayıf",
+                             value: displayName(for: weak.name),
+                             rate: weak.hitRate,
+                             color: InstitutionalTheme.Colors.crimson)
                 }
             }
         }
@@ -282,55 +281,56 @@ struct AlkindusDashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(14)
         .background(InstitutionalTheme.Colors.surface1)
-        .overlay(
-            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
-                .stroke(InstitutionalTheme.Colors.border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
-    
+
     private func miniStat(title: String, value: String, rate: Double, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(title)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .tracking(1)
-                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-            HStack(spacing: 8) {
+                .font(.system(size: 11))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(value)
-                    .font(InstitutionalTheme.Typography.bodyStrong)
+                    .font(.system(size: 15, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     .lineLimit(1)
-                Text(String(format: "%%%.0f", rate * 100))
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
+                Text("\(Int(rate * 100))%")
+                    .font(.system(size: 13, weight: .medium))
                     .foregroundColor(color)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(color.opacity(0.18))
-                    )
+                    .monospacedDigit()
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    /// Sade bölüm başlığı — sentence case + sağda muted trailing.
+    @ViewBuilder
+    private func sectionTitle(_ text: String, trailing: String? = nil) -> some View {
+        HStack {
+            Text(text)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+            Spacer()
+            if let trailing {
+                Text(trailing)
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            }
+        }
+    }
     
     private func moduleCalibrationSection(stats: AlkindusStats) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                ArgusSectionCaption("MODÜL KALİBRASYONU")
-                Spacer()
-                ArgusChip("\(stats.calibration.modules.count) MODÜL", tone: .motor(.alkindus))
-            }
+            sectionTitle("Modül kalibrasyonu",
+                         trailing: stats.calibration.modules.isEmpty
+                            ? nil
+                            : "\(stats.calibration.modules.count) modül")
 
             if stats.calibration.modules.isEmpty {
-                v5Card {
-                    HStack(spacing: 8) {
-                        ArgusDot(color: InstitutionalTheme.Colors.textTertiary)
-                        Text("Henüz veri yok. Kararlar verildikçe burası dolacak.")
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    }
-                }
+                Text("Henüz veri yok. Kararlar verildikçe burası dolacak.")
+                    .font(.system(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .padding(.vertical, 8)
             } else {
                 VStack(spacing: 10) {
                     ForEach(stats.calibration.modules.sorted(by: { $0.key < $1.key }), id: \.key) { module, cal in
@@ -342,44 +342,40 @@ struct AlkindusDashboardView: View {
     }
 
     private func moduleCard(name: String, calibration: ModuleCalibration) -> some View {
-        let engine = motorFromName(name)
-        return v5Card {
+        v5Card {
             HStack(spacing: 10) {
-                if let engine {
-                    MotorLogo(engine, size: 18)
-                }
-                Text(name.uppercased())
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .tracking(1)
+                Text(displayName(for: name))
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 Spacer()
                 let totalAttempts = calibration.brackets.values.reduce(0) { $0 + $1.attempts }
                 Text("\(totalAttempts) deneme")
-                    .font(.system(size: 9, weight: .medium, design: .monospaced))
-                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 ForEach(calibration.brackets.sorted(by: { $0.key > $1.key }), id: \.key) { bracket, bstats in
                     HStack(spacing: 10) {
                         Text(bracket)
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .tracking(0.5)
+                            .font(.system(size: 12))
                             .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             .frame(width: 56, alignment: .leading)
 
                         ArgusBar(value: bstats.hitRate,
                                  color: colorForHitRate(bstats.hitRate),
-                                 height: 5)
+                                 height: 4)
 
-                        Text(String(format: "%%%.0f", bstats.hitRate * 100))
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        Text("\(Int(bstats.hitRate * 100))%")
+                            .font(.system(size: 12))
                             .foregroundColor(colorForHitRate(bstats.hitRate))
-                            .frame(width: 36, alignment: .trailing)
+                            .monospacedDigit()
+                            .frame(width: 40, alignment: .trailing)
 
                         Text("\(bstats.attempts)")
-                            .font(.system(size: 9, weight: .medium, design: .monospaced))
+                            .font(.system(size: 11))
                             .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                            .monospacedDigit()
                             .frame(width: 28, alignment: .trailing)
                     }
                 }
@@ -410,23 +406,16 @@ struct AlkindusDashboardView: View {
     
     private func regimeInsightsSection(stats: AlkindusStats) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                ArgusSectionCaption("REJİM BAZLI PERFORMANS")
-                Spacer()
-                if !stats.calibration.regimes.isEmpty {
-                    ArgusChip("\(stats.calibration.regimes.count) REJİM", tone: .motor(.aether))
-                }
-            }
+            sectionTitle("Rejim bazlı performans",
+                         trailing: stats.calibration.regimes.isEmpty
+                            ? nil
+                            : "\(stats.calibration.regimes.count) rejim")
 
             if stats.calibration.regimes.isEmpty {
-                v5Card {
-                    HStack(spacing: 8) {
-                        ArgusDot(color: InstitutionalTheme.Colors.textTertiary)
-                        Text("Rejim verisi henüz yok.")
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    }
-                }
+                Text("Rejim verisi henüz yok.")
+                    .font(.system(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .padding(.vertical, 8)
             } else {
                 VStack(spacing: 10) {
                     ForEach(stats.calibration.regimes.sorted(by: { $0.key < $1.key }), id: \.key) { regime, insight in
@@ -440,70 +429,66 @@ struct AlkindusDashboardView: View {
     private func regimeCard(regime: String, insight: RegimeInsight) -> some View {
         v5Card {
             HStack {
-                ArgusDot(color: regimeTone(regime).foreground)
-                Text(regime.uppercased())
-                    .font(.system(size: 12, weight: .bold, design: .monospaced))
-                    .tracking(1)
+                Circle()
+                    .fill(regimeColor(regime))
+                    .frame(width: 6, height: 6)
+                Text(regime.capitalized)
+                    .font(.system(size: 14, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 Spacer()
-                ArgusChip("\(insight.moduleAttempts.count) MODÜL", tone: regimeTone(regime))
+                Text("\(insight.moduleAttempts.count) modül")
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
-            VStack(spacing: 6) {
+            VStack(spacing: 8) {
                 ForEach(insight.moduleAttempts.sorted(by: { $0.key < $1.key }), id: \.key) { module, _ in
                     let rate = insight.hitRate(for: module)
                     HStack(spacing: 10) {
-                        if let engine = motorFromName(module) {
-                            MotorLogo(engine, size: 14)
-                        } else {
-                            Spacer().frame(width: 14, height: 14)
-                        }
-                        Text(module.uppercased())
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
-                            .tracking(0.6)
+                        Text(displayName(for: module))
+                            .font(.system(size: 13))
                             .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             .frame(width: 80, alignment: .leading)
                         ArgusBar(value: rate, color: colorForHitRate(rate), height: 4)
-                        Text(String(format: "%%%.0f", rate * 100))
-                            .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        Text("\(Int(rate * 100))%")
+                            .font(.system(size: 12))
                             .foregroundColor(colorForHitRate(rate))
-                            .frame(width: 36, alignment: .trailing)
+                            .monospacedDigit()
+                            .frame(width: 40, alignment: .trailing)
                     }
                 }
             }
         }
     }
 
-    /// Rejim adına göre V5 tonu — bilinen rejimleri aether/aurora/titan/crimson'a eşler.
-    private func regimeTone(_ regime: String) -> ArgusChipTone {
+    /// Rejim adına göre nokta rengi (sade — pill tone değil).
+    private func regimeColor(_ regime: String) -> Color {
         let r = regime.lowercased()
-        if r.contains("bull") || r.contains("trend") || r.contains("yüksel") { return .aurora }
-        if r.contains("bear") || r.contains("düş") || r.contains("risk") || r.contains("crash") { return .crimson }
-        if r.contains("chop") || r.contains("yatay") || r.contains("neutral") { return .titan }
-        return .motor(.aether)
+        if r.contains("bull") || r.contains("trend") || r.contains("yüksel") {
+            return InstitutionalTheme.Colors.aurora
+        }
+        if r.contains("bear") || r.contains("düş") || r.contains("risk") || r.contains("crash") {
+            return InstitutionalTheme.Colors.crimson
+        }
+        return InstitutionalTheme.Colors.textSecondary
     }
 
     private func pendingSection(stats: AlkindusStats) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            ArgusSectionCaption("BEKLEYEN GÖZLEMLER")
+            sectionTitle("Bekleyen gözlemler")
             v5Card {
                 HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(InstitutionalTheme.Colors.Motors.alkindus.opacity(0.18))
-                            .frame(width: 36, height: 36)
-                        Image(systemName: "hourglass")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(InstitutionalTheme.Colors.Motors.alkindus)
-                    }
+                    Image(systemName: "hourglass")
+                        .font(.system(size: 16))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .frame(width: 28, height: 28)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("\(stats.pendingCount)")
-                            .font(.system(size: 22, weight: .black, design: .monospaced))
+                        Text("\(stats.pendingCount) karar")
+                            .font(.system(size: 18, weight: .medium))
                             .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                        Text("KARAR OLGUNLAŞMA BEKLİYOR")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .tracking(0.8)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                        Text("Olgunlaşma bekleniyor")
+                            .font(.system(size: 12))
+                            .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     }
                     Spacer()
                 }
@@ -516,35 +501,23 @@ struct AlkindusDashboardView: View {
     private var insightsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                ArgusSectionCaption("BUGÜN ÖĞRENDİKLERİM")
+                Text("Bugün öğrendiklerim")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 Spacer()
                 Button(action: refreshInsights) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 10, weight: .bold))
-                        Text("YENİLE")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .tracking(0.6)
-                    }
-                    .foregroundColor(InstitutionalTheme.Colors.titan)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule().fill(InstitutionalTheme.Colors.titan.opacity(0.14))
-                    )
+                    Text("Yenile")
+                        .font(.system(size: 13))
+                        .foregroundColor(InstitutionalTheme.Colors.holo)
                 }
                 .buttonStyle(.plain)
             }
 
             if insights.isEmpty {
-                v5Card {
-                    HStack(spacing: 8) {
-                        ArgusDot(color: InstitutionalTheme.Colors.textTertiary)
-                        Text("Henüz günlük insight yok. 'Eventlerden Öğren' butonuna bas.")
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    }
-                }
+                Text("Henüz günlük içgörü yok. 'Eventlerden öğren' butonuna bas.")
+                    .font(.system(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .padding(.vertical, 8)
             } else {
                 VStack(spacing: 8) {
                     ForEach(insights.prefix(5)) { insight in
@@ -556,38 +529,35 @@ struct AlkindusDashboardView: View {
     }
 
     private func insightCard(insight: AlkindusInsightGenerator.Insight) -> some View {
-        let tone = importanceTone(insight.importance)
+        let accent = importanceColor(insight.importance)
         return HStack(alignment: .top, spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(tone.foreground.opacity(0.16))
-                    .frame(width: 30, height: 30)
-                Image(systemName: iconForCategory(insight.category))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(tone.foreground)
-            }
+            Image(systemName: iconForCategory(insight.category))
+                .font(.system(size: 14))
+                .foregroundColor(accent)
+                .frame(width: 24, height: 24)
+                .padding(.top, 2)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(insight.title)
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    .lineLimit(2)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(insight.title)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        .lineLimit(2)
+                    Spacer()
+                    Text(categoryLabel(insight.category))
+                        .font(.system(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                }
                 Text(insight.detail)
-                    .font(.system(size: 10))
+                    .font(.system(size: 12))
                     .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     .lineLimit(3)
             }
-            Spacer(minLength: 8)
-            ArgusChip(categoryLabel(insight.category), tone: tone)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(InstitutionalTheme.Colors.surface1)
-        .overlay(
-            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous)
-                .stroke(tone.foreground.opacity(0.22), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func iconForCategory(_ category: AlkindusInsightGenerator.InsightCategory) -> String {
@@ -604,22 +574,22 @@ struct AlkindusDashboardView: View {
 
     private func categoryLabel(_ category: AlkindusInsightGenerator.InsightCategory) -> String {
         switch category {
-        case .correlation: return "KORELASYON"
-        case .anomaly:     return "ANOMALİ"
-        case .trend:       return "TREND"
-        case .performance: return "PERFORMANS"
-        case .regime:      return "REJİM"
-        case .warning:     return "UYARI"
-        case .discovery:   return "KEŞİF"
+        case .correlation: return "Korelasyon"
+        case .anomaly:     return "Anomali"
+        case .trend:       return "Trend"
+        case .performance: return "Performans"
+        case .regime:      return "Rejim"
+        case .warning:     return "Uyarı"
+        case .discovery:   return "Keşif"
         }
     }
 
-    private func importanceTone(_ importance: AlkindusInsightGenerator.InsightImportance) -> ArgusChipTone {
+    private func importanceColor(_ importance: AlkindusInsightGenerator.InsightImportance) -> Color {
         switch importance {
-        case .critical: return .crimson
-        case .high:     return .titan
-        case .medium:   return .holo
-        case .low:      return .neutral
+        case .critical: return InstitutionalTheme.Colors.crimson
+        case .high:     return InstitutionalTheme.Colors.titan
+        case .medium:   return InstitutionalTheme.Colors.holo
+        case .low:      return InstitutionalTheme.Colors.textSecondary
         }
     }
     
@@ -627,54 +597,52 @@ struct AlkindusDashboardView: View {
     
     private var correlationsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                ArgusSectionCaption("EN BAŞARILI KOMBİNASYONLAR")
-                Spacer()
-                if !topCorrelations.isEmpty {
-                    ArgusChip("TOP \(topCorrelations.count)", tone: .motor(.alkindus))
-                }
-            }
+            sectionTitle("En başarılı kombinasyonlar",
+                         trailing: topCorrelations.isEmpty
+                            ? nil
+                            : "İlk \(topCorrelations.count)")
 
             if topCorrelations.isEmpty {
-                v5Card {
-                    HStack(spacing: 8) {
-                        ArgusDot(color: InstitutionalTheme.Colors.textTertiary)
-                        Text("Henüz korelasyon verisi yok.")
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    }
-                }
+                Text("Henüz korelasyon verisi yok.")
+                    .font(.system(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .padding(.vertical, 8)
             } else {
-                VStack(spacing: 6) {
+                VStack(spacing: 0) {
                     ForEach(Array(topCorrelations.enumerated()), id: \.offset) { idx, corr in
                         HStack(spacing: 12) {
-                            Text("#\(idx + 1)")
-                                .font(.system(size: 11, weight: .black, design: .monospaced))
-                                .foregroundColor(InstitutionalTheme.Colors.Motors.alkindus)
-                                .frame(width: 28, alignment: .leading)
+                            Text("\(idx + 1)")
+                                .font(.system(size: 13))
+                                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                                .monospacedDigit()
+                                .frame(width: 20, alignment: .leading)
                             Text(formatCorrelationKey(corr.key))
-                                .font(.system(size: 11, weight: .semibold))
+                                .font(.system(size: 13))
                                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                 .lineLimit(1)
                             Spacer()
-                            Text("%\(Int(corr.hitRate * 100))")
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
+                            Text("\(Int(corr.hitRate * 100))%")
+                                .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(colorForHitRate(corr.hitRate))
+                                .monospacedDigit()
                             Text("\(corr.attempts)")
-                                .font(.system(size: 9, weight: .medium, design: .monospaced))
+                                .font(.system(size: 11))
                                 .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                                .monospacedDigit()
                                 .frame(width: 28, alignment: .trailing)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(InstitutionalTheme.Colors.surface1)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                                .stroke(InstitutionalTheme.Colors.border, lineWidth: 1)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                        if idx < topCorrelations.count - 1 {
+                            Rectangle()
+                                .fill(InstitutionalTheme.Colors.borderSubtle)
+                                .frame(height: 0.5)
+                                .padding(.leading, 14)
+                        }
                     }
                 }
+                .background(InstitutionalTheme.Colors.surface1)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
         }
     }
@@ -690,27 +658,23 @@ struct AlkindusDashboardView: View {
     
     private var marketComparisonSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ArgusSectionCaption("MARKET KARŞILAŞTIRMASI")
+            sectionTitle("Pazar karşılaştırması")
 
             if let comparison = marketComparison {
                 v5Card {
                     HStack(spacing: 14) {
-                        marketOrb(title: "BIST", rate: comparison.bist, flag: "🇹🇷")
+                        marketOrb(title: "BIST", rate: comparison.bist)
                         Rectangle()
-                            .fill(InstitutionalTheme.Colors.border)
-                            .frame(width: 1, height: 48)
-                        marketOrb(title: "GLOBAL", rate: comparison.global, flag: "🌐")
+                            .fill(InstitutionalTheme.Colors.borderSubtle)
+                            .frame(width: 0.5, height: 48)
+                        marketOrb(title: "Global", rate: comparison.global)
                     }
                 }
             } else {
-                v5Card {
-                    HStack(spacing: 8) {
-                        ArgusDot(color: InstitutionalTheme.Colors.textTertiary)
-                        Text("Henüz BIST/Global karşılaştırma verisi yok")
-                            .font(InstitutionalTheme.Typography.caption)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    }
-                }
+                Text("Henüz BIST / Global karşılaştırma verisi yok.")
+                    .font(.system(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .padding(.vertical, 8)
             }
         }
         .task {
@@ -718,93 +682,86 @@ struct AlkindusDashboardView: View {
         }
     }
 
-    private func marketOrb(title: String, rate: Double, flag: String) -> some View {
-        VStack(spacing: 6) {
-            HStack(spacing: 4) {
-                Text(flag).font(.system(size: 12))
-                Text(title)
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .tracking(1)
-                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-            }
-            Text("%\(Int(rate * 100))")
-                .font(.system(size: 28, weight: .black, design: .monospaced))
+    private func marketOrb(title: String, rate: Double) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 12))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+            Text("\(Int(rate * 100))%")
+                .font(.system(size: 24, weight: .medium))
                 .foregroundColor(colorForHitRate(rate))
+                .monospacedDigit()
             ArgusBar(value: rate, color: colorForHitRate(rate), height: 4)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
     
     private var dataToolsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ArgusSectionCaption("VERİ ARAÇLARI")
+            sectionTitle("Veri araçları")
 
             v5Card {
-                // DB boyutu satırı
                 HStack(spacing: 10) {
                     Image(systemName: "internaldrive")
-                        .font(.system(size: 12, weight: .semibold))
+                        .font(.system(size: 14))
                         .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    Text("VERİTABANI BOYUTU")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .tracking(0.6)
+                    Text("Veritabanı boyutu")
+                        .font(.system(size: 13))
                         .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                     Spacer()
                     Text(String(format: "%.1f MB", dbSizeMB))
-                        .font(.system(size: 12, weight: .bold, design: .monospaced))
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(dbSizeMB > 100
                                          ? InstitutionalTheme.Colors.crimson
                                          : InstitutionalTheme.Colors.textPrimary)
+                        .monospacedDigit()
                 }
 
                 if isProcessing {
                     VStack(alignment: .leading, spacing: 8) {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .scaleEffect(0.75)
-                                .tint(InstitutionalTheme.Colors.holo)
-                            Text("İŞLENİYOR · \(processedCount)/\(totalToProcess)")
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .tracking(0.6)
-                                .foregroundColor(InstitutionalTheme.Colors.holo)
+                        HStack(spacing: 10) {
+                            ProgressView().scaleEffect(0.7)
+                            Text("İşleniyor · \(processedCount)/\(totalToProcess)")
+                                .font(.system(size: 12))
+                                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                                .monospacedDigit()
                         }
                         let progress = totalToProcess > 0
                             ? Double(processedCount) / Double(totalToProcess)
                             : 0
                         ArgusBar(value: min(max(progress, 0), 1),
                                  color: InstitutionalTheme.Colors.holo,
-                                 height: 5)
+                                 height: 4)
                     }
                 }
 
                 if let result = processingResult {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(spacing: 8) {
-                            ArgusDot(color: InstitutionalTheme.Colors.aurora)
-                            Text("\(result.eventsProcessed) event · \(result.patternsExtracted) pattern")
-                                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                                .foregroundColor(InstitutionalTheme.Colors.aurora)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(result.eventsProcessed) olay · \(result.patternsExtracted) örüntü")
+                            .font(.system(size: 13))
+                            .foregroundColor(InstitutionalTheme.Colors.aurora)
+                        if !result.modulesLearned.isEmpty {
+                            Text("Öğrenilen: \(result.modulesLearned.map { displayName(for: $0) }.joined(separator: ", "))")
+                                .font(.system(size: 12))
+                                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         }
-                        Text("ÖĞRENİLEN: \(result.modulesLearned.joined(separator: " · ").uppercased())")
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .tracking(0.5)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                     }
                 }
 
-                ArgusHair()
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.borderSubtle)
+                    .frame(height: 0.5)
 
                 HStack(spacing: 8) {
-                    v5ActionButton(label: "EVENTLERDEN ÖĞREN",
-                                   icon: .alkindus,
-                                   tone: .motor(.alkindus),
+                    v5ActionButton(label: "Eventlerden öğren",
+                                   sfSymbol: "sparkles",
+                                   accent: InstitutionalTheme.Colors.holo,
                                    disabled: isProcessing,
                                    action: processEvents)
 
-                    v5ActionButton(label: "BLOB TEMİZLE",
-                                   icon: nil,
+                    v5ActionButton(label: "Blob temizle",
                                    sfSymbol: "trash",
-                                   tone: .crimson,
+                                   accent: InstitutionalTheme.Colors.crimson,
                                    disabled: isProcessing,
                                    action: cleanupBlobs)
                 }
@@ -812,38 +769,30 @@ struct AlkindusDashboardView: View {
         }
     }
 
-    /// V5 aksiyon butonu — pill + mono label.
+    /// Sade aksiyon butonu — outline + sentence case label + ikon.
     private func v5ActionButton(label: String,
-                                icon: MotorEngine? = nil,
-                                sfSymbol: String? = nil,
-                                tone: ArgusChipTone,
+                                sfSymbol: String,
+                                accent: Color,
                                 disabled: Bool,
                                 action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                if let icon {
-                    MotorLogo(icon, size: 12).tinted(tone.foreground)
-                } else if let sfSymbol {
-                    Image(systemName: sfSymbol)
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(tone.foreground)
-                }
+            HStack(spacing: 8) {
+                Image(systemName: sfSymbol)
+                    .font(.system(size: 13, weight: .regular))
+                    .foregroundColor(accent)
                 Text(label)
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .tracking(0.6)
-                    .foregroundColor(tone.foreground)
+                    .font(.system(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .frame(maxWidth: .infinity)
-            .background(
-                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                    .fill(tone.background)
-            )
+            .background(InstitutionalTheme.Colors.surface2)
             .overlay(
-                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                    .stroke(tone.foreground.opacity(0.35), lineWidth: 1)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
             )
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .opacity(disabled ? 0.45 : 1)
         }
         .buttonStyle(.plain)

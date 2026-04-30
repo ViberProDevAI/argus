@@ -1,7 +1,14 @@
 import Foundation
 
+// MARK: - DORMANT
+// 2026-04-30: Yahoo-Only Mode aktif olduğundan registry çağrılmıyor.
+// İçinde register edilen TwelveDataService, EODHDProvider, LocalScannerAdapter,
+// MassiveProvider zinciri de bu nedenle ölü.
+// Canlandırmadan önce: tasks/lessons.md L13.
+
 /// Registry for mapping Canonical Providers to their runtime Adapters.
 /// Solves the "Candidate Yahoo has no adapter" bug by strictly verifying capabilities.
+@available(*, deprecated, message: "Yahoo-Only Mode aktif; registry çağrılmıyor. Lessons L13.")
 actor ProviderAdapterRegistry {
     static let shared = ProviderAdapterRegistry()
     

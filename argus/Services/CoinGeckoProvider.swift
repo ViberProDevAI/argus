@@ -1,5 +1,11 @@
 import Foundation
 
+// MARK: - DORMANT
+// 2026-04-30: Sadece FieldBasedFallbackManager (dormant) içinde init ediliyor.
+// Crypto verisi şu an Yahoo (BTC-USD, ETH-USD vb.) üzerinden çekiliyor; CoinGecko
+// fallback yolu çağrılmıyor. Canlandırmadan önce: tasks/lessons.md L13.
+
+@available(*, deprecated, message: "Yahoo-Only Mode aktif; CoinGecko fallback çağrılmıyor. Lessons L13.")
 final class CoinGeckoProvider: FallbackDataProvider {
     let name = "CoinGecko"
     

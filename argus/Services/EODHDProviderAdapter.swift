@@ -1,6 +1,11 @@
 import Foundation
 
+// MARK: - DORMANT
+// 2026-04-30: FieldBasedFallbackManager (dormant) içinde register satırı bile
+// commented-out. Hiçbir runtime caller yok. Canlandırmadan önce: tasks/lessons.md L13.
+
 /// Adapter to allow existing MarketDataProvider/EODHD logic to function as a Priority Provider within the Fallback System.
+@available(*, deprecated, message: "Yahoo-Only Mode aktif; EODHD adapter çağrılmıyor. Lessons L13.")
 final class EODHDProviderAdapter: FallbackDataProvider {
     let name = "EODHD (Primary)"
     

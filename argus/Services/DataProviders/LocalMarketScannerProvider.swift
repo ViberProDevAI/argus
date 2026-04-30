@@ -1,8 +1,14 @@
 import Foundation
 
+// MARK: - DORMANT
+// 2026-04-30: 0 callsite. Phoenix kendi yerel-tarama fallback'ini doğrudan
+// yapıyor; bu provider hiç register edilmemiş. Canlandırmadan önce
+// tasks/lessons.md L13.
+
 /// "The Backup Generator"
 /// Provides "Screener" capabilities by scanning a local static universe
 /// using standard Quote endpoints (which are more reliable than Screener endpoints).
+@available(*, deprecated, message: "Yahoo-Only Mode aktif; local scanner provider register edilmemiş (0 callsite). Lessons L13.")
 actor LocalMarketScannerProvider: HeimdallProvider {
     static let shared = LocalMarketScannerProvider()
     

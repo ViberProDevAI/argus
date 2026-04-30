@@ -1,6 +1,11 @@
 import Foundation
 
+// MARK: - DORMANT
+// 2026-04-30: Sadece ProviderAdapterRegistry (dormant) içinde register ediliyor.
+// Options endpoint'i runtime'da hiç çağrılmıyor. Canlandırmadan önce: tasks/lessons.md L13.
+
 /// Provider for Options Data via Massive API
+@available(*, deprecated, message: "Yahoo-Only Mode aktif; Massive options provider çağrılmıyor. Lessons L13.")
 actor MassiveProvider: HeimdallProvider {
     static let shared = MassiveProvider()
     

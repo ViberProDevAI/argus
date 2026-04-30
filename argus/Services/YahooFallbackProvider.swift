@@ -1,7 +1,13 @@
 import Foundation
 
+// MARK: - DORMANT
+// 2026-04-30: Sadece FieldBasedFallbackManager (dormant) tarafından init ediliyor.
+// Yahoo birincil yol artık YahooFinanceProvider üzerinden gidiyor; bu eski
+// "fallback" katmanı çağrılmıyor. Canlandırmadan önce: tasks/lessons.md L13.
+
 /// A "Last Resort" data provider using unofficial Yahoo Finance endpoints.
 /// Used only when primary official APIs fail or for specific missing data (e.g. Crypto fallback).
+@available(*, deprecated, message: "Yahoo-Only Mode (YahooFinanceProvider) primary; bu fallback dormant. Lessons L13.")
 final class YahooFallbackProvider: FallbackDataProvider {
     static let shared = YahooFallbackProvider()
     let name = "YahooFallback"

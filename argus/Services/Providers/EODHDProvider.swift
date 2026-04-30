@@ -1,5 +1,11 @@
 import Foundation
 
+// MARK: - DORMANT
+// 2026-04-30: Sadece ProviderAdapterRegistry (dormant) ve EODHDProviderAdapter
+// (dormant) tarafından register ediliyor; runtime'da hiç çağrılmıyor.
+// Canlandırmadan önce: tasks/lessons.md L13.
+
+@available(*, deprecated, message: "Yahoo-Only Mode aktif; EODHD provider çağrılmıyor. Lessons L13.")
 final class EODHDProvider: HeimdallProvider {
     static let shared = EODHDProvider()
     nonisolated var name: String { "EODHD" }
