@@ -7,7 +7,7 @@ import SwiftUI
 ///   1. Navbar: back + sembol + aksiyon pill + bell + plus
 ///   2. Fiyat + değişim + son tarih
 ///   3. Chart + timeframe chipleri
-///   4. Konsey kartı (aurora border + güven + kısa yorum)
+///   4. Konsey kartı (aurora border + kısa yorum)
 ///   5. Motor chip grid (Orion/Atlas/Aether/Hermes/Prometheus/Alkindus/Chiron/Demeter)
 ///   6. Temel veriler (P/E, EPS, MKT CAP, DIV, ROE, BETA)
 ///   7. Hermes mini feed (ilk 3 haber)
@@ -218,10 +218,6 @@ struct StockDetailV5Body: View {
                     .tracking(1.4)
                     .foregroundColor(councilTintColor)
                 Spacer()
-                if let d = decision {
-                    ArgusChip("GÜVEN \(Int(d.confidence * 100))",
-                              tone: tone(for: d.action))
-                }
             }
 
             Text(councilSummary)

@@ -25,12 +25,11 @@ actor YahooAuthenticationService {
     // onu bekler — Yahoo'ya 1 auth isteği yeter.
     private var refreshTask: Task<(String, String), Error>?
 
-    // Phase 7 PR-2: Crumb TTL 3600 → 600.
-    // Yahoo crumb gerçek ömrü 5-15 dk arası — 1 saat TTL'de çoğu istek
-    // stale crumb ile gidip 401 yiyor → invalidate → refresh → retry cycle.
-    // 10 dk TTL + proactive warm-renewal (TTL'in %75'i ≈ 7.5 dk) ile çoğu
-    // istek fresh crumb'a denk gelir.
-    private let crumbTTL: TimeInterval = 600
+    // 2026-05-02: TTL 600 → 300. Pratikte Yahoo crumb 5dk'da eskiyebiliyor;
+    // 10dk TTL'de sayısız istek 401 yiyip SymbolBlocklist sayacını şişiriyor
+    // (2 strike → 24h block). 5dk TTL + warm-renewal (TTL'in %75'i ≈ 3.75dk)
+    // ile çoğu istek fresh crumb'a denk gelir, blocklist tetiklenmez.
+    private let crumbTTL: TimeInterval = 300
     private var crumbRefreshThreshold: TimeInterval { crumbTTL * 0.75 }
     
     // Session with cookie storage
@@ -100,7 +99,11 @@ actor YahooAuthenticationService {
         print("⚠️ YahooAuth: Refresh attempt failed (\(consecutiveFailures)/5)")
 
         if consecutiveFailures >= 5 {
-            let backoffSeconds = 300.0 // 5 Minutes
+            // 2026-05-02: 300s → 120s. 5dk komple sessizlik kullanıcı UX'ini
+            // bozuyor — 2dk yeterli (Yahoo'nun rate-limit kuralları çoğunlukla
+            // 60-90s'de toparlanıyor). Cooldown sonrası başarılı olursa zaten
+            // sayaç sıfırlanır.
+            let backoffSeconds = 120.0
             circuitBreakUntil = Date().addingTimeInterval(backoffSeconds)
             print("⛔️ YahooAuth: Too many failures. Circuit Breaker ACTIVATED for \(Int(backoffSeconds))s")
         } else {

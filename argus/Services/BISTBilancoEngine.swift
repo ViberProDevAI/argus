@@ -76,13 +76,38 @@ actor BISTBilancoEngine {
         let sektorBenchmark = benchmarks.getBenchmark(sektor: nil) // TODO: Sektör bilgisi ekle
         
         // 4. Her bölümü analiz et ve skorla
-        let degerlemeVerisi = analizDegerleme(finansallar: finansallar, quote: quote, benchmark: sektorBenchmark)
-        let karlilikVerisi = analizKarlilik(finansallar: finansallar, benchmark: sektorBenchmark)
-        let buyumeVerisi = analizBuyume(finansallar: finansallar)
-        let saglikVerisi = analizSaglik(finansallar: finansallar)
-        let nakitVerisi = analizNakit(finansallar: finansallar)
-        let temettuVerisi = analizTemettu(finansallar: finansallar)
-        let riskVerisi = analizRisk(finansallar: finansallar, quote: quote)
+        // 2026-05-02 perf: 7 CPU-bound analiz fonksiyonu paralel detached task'lara
+        // dağıtılıyor. Her fonksiyon nonisolated + saf hesaplama → actor serializa-
+        // syonu olmadan modern iPhone'larda çoklu çekirdek kullanır.
+        async let degerlemeTask = Task.detached(priority: .userInitiated) {
+            self.analizDegerleme(finansallar: finansallar, quote: quote, benchmark: sektorBenchmark)
+        }.value
+        async let karlilikTask = Task.detached(priority: .userInitiated) {
+            self.analizKarlilik(finansallar: finansallar, benchmark: sektorBenchmark)
+        }.value
+        async let buyumeTask = Task.detached(priority: .userInitiated) {
+            self.analizBuyume(finansallar: finansallar)
+        }.value
+        async let saglikTask = Task.detached(priority: .userInitiated) {
+            self.analizSaglik(finansallar: finansallar)
+        }.value
+        async let nakitTask = Task.detached(priority: .userInitiated) {
+            self.analizNakit(finansallar: finansallar)
+        }.value
+        async let temettuTask = Task.detached(priority: .userInitiated) {
+            self.analizTemettu(finansallar: finansallar)
+        }.value
+        async let riskTask = Task.detached(priority: .userInitiated) {
+            self.analizRisk(finansallar: finansallar, quote: quote)
+        }.value
+
+        let degerlemeVerisi = await degerlemeTask
+        let karlilikVerisi = await karlilikTask
+        let buyumeVerisi = await buyumeTask
+        let saglikVerisi = await saglikTask
+        let nakitVerisi = await nakitTask
+        let temettuVerisi = await temettuTask
+        let riskVerisi = await riskTask
         
         // 5. Bölüm skorlarını hesapla (SADECE VERİ MEVCUT OLANLAR)
         // 5. Bölüm skorlarını hesapla (SADECE VERİ MEVCUT OLANLAR)
@@ -181,7 +206,7 @@ actor BISTBilancoEngine {
     
     // MARK: - Değerleme Analizi
     
-    private func analizDegerleme(finansallar: FinancialsData, quote: Quote?, benchmark: BISTSektorBenchmark) -> BISTDegerlemeVerisi {
+    nonisolated private func analizDegerleme(finansallar: FinancialsData, quote: Quote?, benchmark: BISTSektorBenchmark) -> BISTDegerlemeVerisi {
         let fk = olusturMetrik(
             id: "fk",
             isim: "F/K (Fiyat/Kazanç)",
@@ -256,7 +281,7 @@ actor BISTBilancoEngine {
     
     // MARK: - Karlılık Analizi
     
-    private func analizKarlilik(finansallar: FinancialsData, benchmark: BISTSektorBenchmark) -> BISTKarlilikVerisi {
+    nonisolated private func analizKarlilik(finansallar: FinancialsData, benchmark: BISTSektorBenchmark) -> BISTKarlilikVerisi {
         let roe = olusturMetrik(
             id: "roe",
             isim: "Özsermaye Kârlılığı (ROE)",
@@ -318,7 +343,7 @@ actor BISTBilancoEngine {
     
     // MARK: - Büyüme Analizi
     
-    private func analizBuyume(finansallar: FinancialsData) -> BISTBuyumeVerisi {
+    nonisolated private func analizBuyume(finansallar: FinancialsData) -> BISTBuyumeVerisi {
         let gelirB = olusturMetrik(
             id: "gelirBuyume",
             isim: "Gelir Büyümesi (YoY)",
@@ -357,7 +382,7 @@ actor BISTBilancoEngine {
     
     // MARK: - Sağlık Analizi
     
-    private func analizSaglik(finansallar: FinancialsData) -> BISTSaglikVerisi {
+    nonisolated private func analizSaglik(finansallar: FinancialsData) -> BISTSaglikVerisi {
         let borcOz = olusturMetrik(
             id: "borcOz",
             isim: "Borç/Özsermaye",
@@ -396,7 +421,7 @@ actor BISTBilancoEngine {
     
     // MARK: - Nakit Analizi
     
-    private func analizNakit(finansallar: FinancialsData) -> BISTNakitVerisi {
+    nonisolated private func analizNakit(finansallar: FinancialsData) -> BISTNakitVerisi {
         let fcf = olusturMetrik(
             id: "fcf",
             isim: "Serbest Nakit Akışı",
@@ -417,7 +442,7 @@ actor BISTBilancoEngine {
     
     // MARK: - Temettü Analizi
     
-    private func analizTemettu(finansallar: FinancialsData) -> BISTTemettuVerisi {
+    nonisolated private func analizTemettu(finansallar: FinancialsData) -> BISTTemettuVerisi {
         let verim = olusturMetrik(
             id: "temettuVerim",
             isim: "Temettü Verimi",
@@ -441,7 +466,7 @@ actor BISTBilancoEngine {
     
     // MARK: - Risk Analizi
     
-    private func analizRisk(finansallar: FinancialsData, quote: Quote?) -> BISTRiskVerisi {
+    nonisolated private func analizRisk(finansallar: FinancialsData, quote: Quote?) -> BISTRiskVerisi {
         // NOT: FinancialsData'da beta yok, varsayılan değer kullanılıyor
         let betaDeger: Double? = nil // Yahoo'dan ayrıca çekilebilir
         
@@ -468,7 +493,7 @@ actor BISTBilancoEngine {
     
     // MARK: - Yardımcı Fonksiyonlar
     
-    private func olusturMetrik(
+    nonisolated private func olusturMetrik(
         id: String,
         isim: String,
         deger: Double?,

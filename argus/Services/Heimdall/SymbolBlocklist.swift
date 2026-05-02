@@ -35,8 +35,15 @@ actor SymbolBlocklist {
     /// Sembol başına ardışık başarısızlık sayacı. 2 → block.
     private var consecutiveFailures: [String: Int] = [:]
 
-    private let blockDuration: TimeInterval = 24 * 60 * 60 // 24 saat
-    private let blockThreshold: Int = 2
+    // 2026-05-02: 2-strike + 24h çok agresifti — Yahoo crumb geçici hatalarında
+    // (5-15 dk'lık eski crumb pencerelerinde) iki ardışık 401 yiyen sembol
+    // 24 saat boyunca komple ölüyordu. Kullanıcı global hisse açtığında veri
+    // gelmemesinin baş sebebi buydu.
+    // Yeni: 5 ardışık hata + 6 saat block. Gerçek Yahoo paywall'larını yine
+    // engeller (her seferinde 401 yer), ama transient hata penceresinde
+    // sembolleri ölü duruma düşürmez.
+    private let blockDuration: TimeInterval = 6 * 60 * 60 // 6 saat
+    private let blockThreshold: Int = 5
 
     private static let storageKey = "ArgusSymbolBlocklist.v1"
 
