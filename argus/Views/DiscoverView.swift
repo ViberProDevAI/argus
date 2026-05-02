@@ -20,9 +20,8 @@ struct DiscoverView: View {
 
                 VStack(spacing: 0) {
                     ArgusNavHeader(
-                        title: "KEŞFET",
-                        subtitle: "MOMENTUM · DİBE VURAN · HACİM",
-                        leadingDeco: .bars3([.holo, .text, .text]),
+                        title: "Keşfet",
+                        subtitle: "Momentum, dibe vuranlar ve hacim",
                         actions: [
                             .menu({ showDrawer = true }),
                             .custom(sfSymbol: "arrow.clockwise",
@@ -32,6 +31,11 @@ struct DiscoverView: View {
 
                     ScrollView {
                         VStack(alignment: .leading, spacing: 32) {
+
+                        // 2026-04-30 H-50: ScoutStoriesBar Cockpit'ten taşındı.
+                        // Argus'un keşfettikleri Discover'ın doğal bağlamı.
+                        ScoutStoriesBar()
+                            .padding(.bottom, 8)
 
                         // MARK: - 1. Top Gainers (Momentum)
                         VStack(alignment: .leading, spacing: 16) {

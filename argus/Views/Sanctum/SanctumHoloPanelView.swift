@@ -83,21 +83,6 @@ struct HoloPanelView: View {
     // close, ortada tek-kelime sentence case modül adı, sağda opsiyonel grafik
     // genişlet ve bilgi ikonları.
 
-    /// Modülün MotorEngine karşılığı (yoksa nil → council/diğer).
-    private var motorEngine: MotorEngine? {
-        switch module {
-        case .orion:      return .orion
-        case .atlas:      return .atlas
-        case .aether:     return .aether
-        case .hermes:     return .hermes
-        case .athena:     return .athena
-        case .demeter:    return .demeter
-        case .chiron:     return .chiron
-        case .prometheus: return .prometheus
-        case .council:    return .council
-        }
-    }
-
     /// Sentence case modül adı (header için). Tek kelime, işlev karşılığı.
     private var moduleTitle: String {
         switch module {
@@ -932,28 +917,6 @@ struct HoloPanelView: View {
         }
     }
 
-    // MARK: - Sade primitives (2026-04-30 H-42)
-    //
-    // v5CardShell motor-tint border'ı + ArgusChipTone parametresi gitti.
-    // Sade kart: surface1 + 0.5px borderSubtle hairline + radius 12.
-    // borderTone parametresi backward-compat için alındı, görmezden gelinir.
-
-    @ViewBuilder
-    private func v5CardShell<Content: View>(borderTone: ArgusChipTone = .neutral,
-                                            @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .background(InstitutionalTheme.Colors.surface1)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-
     /// Sade faktör satırı — sentence case label + bar + sade puan.
     /// Bar rengi sayısal vurgu için motor rengini kullanmaya devam eder.
     private func v5FactorRow(_ label: String, value: Double, color: Color) -> some View {
@@ -993,18 +956,4 @@ struct HoloPanelView: View {
         return InstitutionalTheme.Colors.crimson
     }
 
-    private func v5ScoreTone(_ value: Double) -> ArgusChipTone {
-        if value >= 60 { return .aurora }
-        if value >= 40 { return .titan }
-        return .crimson
-    }
-
-    /// Chiron regime → V5 tone (trend=aurora, riskOff=crimson, chop=titan vb.)
-    private func chironRegimeTone(_ regime: MarketRegime) -> ArgusChipTone {
-        switch regime {
-        case .trend:   return .aurora
-        case .riskOff: return .crimson
-        default:       return .titan
-        }
-    }
 }

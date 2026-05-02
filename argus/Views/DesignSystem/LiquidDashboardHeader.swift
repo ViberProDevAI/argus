@@ -44,167 +44,166 @@ struct LiquidDashboardHeader: View {
         return (unrealized / positionValue) * 100
     }
 
+    // 2026-04-30 H-45 — sade. Hero gradient + 34pt black mono equity +
+    // ortalı caps başlık + per-card stat tile'lar gitti. Sol-aligned
+    // sentence case + 28pt medium equity + inline delta + 3 sütunlu
+    // dikey-ayraçlı stat satırı. Toggle: caps pill → underline tab.
     var body: some View {
-        VStack(spacing: 14) {
-            // 1. Üst control bar
+        VStack(alignment: .leading, spacing: 14) {
             controlBar
 
-            // 2. Ortalı TOPLAM VARLIK
-            VStack(spacing: 4) {
-                Text(isBist ? "BIST DEĞERİ" : "TOPLAM VARLIK")
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            marketTabs
 
-                Text("\(currencySymbol)\(formatLarge(equity))")
-                    .font(.system(size: 34, weight: .black, design: .monospaced))
-                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-            }
-
-            // 3. Aurora delta capsule
-            if netPnL != 0 {
-                instantChangeCapsule
-            }
-
-            // 4. 3 tile
-            HStack(spacing: 8) {
-                statTile(title: "NAKİT",
-                         value: "\(currencySymbol)\(formatLarge(balance))",
-                         tone: InstitutionalTheme.Colors.textPrimary)
-                statTile(title: "NET K/Z",
-                         value: "\(netPnL >= 0 ? "+" : "")\(currencySymbol)\(formatLarge(netPnL))",
-                         tone: netPnL >= 0 ? InstitutionalTheme.Colors.aurora
-                                           : InstitutionalTheme.Colors.crimson)
-                statTile(title: "ANLIK",
-                         value: "\(unrealized >= 0 ? "+" : "")\(currencySymbol)\(formatLarge(unrealized))",
-                         tone: unrealized >= 0 ? InstitutionalTheme.Colors.aurora
-                                               : InstitutionalTheme.Colors.crimson)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(hex: "0B1426"),
-                    Color(hex: "060C18")
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-    }
-
-    // MARK: - Control bar (menu + toggle + refresh/bell)
-
-    private var controlBar: some View {
-        HStack {
-            iconButton(icon: "line.3.horizontal", action: onDrawerTap)
-
-            Spacer()
-
-            // V5 pill capsule toggle
-            HStack(spacing: 4) {
-                toggleChip("GLOBAL", selected: selectedMarket == .global) {
-                    withAnimation(.spring(response: 0.3)) { selectedMarket = .global }
-                }
-                toggleChip("BIST", selected: selectedMarket == .bist) {
-                    withAnimation(.spring(response: 0.3)) { selectedMarket = .bist }
-                }
-            }
-            .padding(4)
-            .background(
-                Capsule()
-                    .fill(InstitutionalTheme.Colors.surface2)
-                    .overlay(Capsule().stroke(InstitutionalTheme.Colors.border, lineWidth: 1))
-            )
-
-            Spacer()
-
-            HStack(spacing: 4) {
-                iconButton(icon: "arrow.clockwise", action: onHistoryTap)
-                iconButton(icon: "brain.head.profile", action: onBrainTap)
-            }
-        }
-    }
-
-    private func iconButton(icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                .frame(width: 36, height: 36)
-                .background(InstitutionalTheme.Colors.surface2)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func toggleChip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                .tracking(0.5)
-                .foregroundColor(selected ? .white : InstitutionalTheme.Colors.textTertiary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                // PERFORMANCE: AnyView ternary yerine .background { @ViewBuilder }
-                // closure formu — SwiftUI'nin tip kimliğini bozmaz.
-                .background {
-                    if selected {
-                        Capsule().fill(InstitutionalTheme.Colors.holo)
-                    } else {
-                        Color.clear
+            VStack(alignment: .leading, spacing: 2) {
+                Text(isBist ? "BIST değeri" : "Toplam varlık")
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(currencySymbol)\(formatLarge(equity))")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .monospacedDigit()
+                    if netPnL != 0 {
+                        let positive = netPnL >= 0
+                        let color = positive ? InstitutionalTheme.Colors.aurora
+                                             : InstitutionalTheme.Colors.crimson
+                        let sign = positive ? "+" : ""
+                        Text("\(sign)\(currencySymbol)\(formatLarge(netPnL))")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(color)
+                            .monospacedDigit()
+                        Text("\(sign)\(String(format: "%.2f", instantPct))%")
+                            .font(.system(size: 13))
+                            .foregroundColor(color)
+                            .monospacedDigit()
                     }
                 }
+                Text("Bugünkü değişim")
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            }
+
+            HStack(spacing: 0) {
+                statColumn(title: "Nakit",
+                           value: "\(currencySymbol)\(formatLarge(balance))",
+                           tone: InstitutionalTheme.Colors.textPrimary,
+                           leadingDivider: false)
+                statColumn(title: "Pozisyon",
+                           value: "\(currencySymbol)\(formatLarge(equity - balance))",
+                           tone: InstitutionalTheme.Colors.textPrimary,
+                           leadingDivider: true)
+                statColumn(title: "Toplam K/Z",
+                           value: "\(netPnL >= 0 ? "+" : "")\(currencySymbol)\(formatLarge(netPnL))",
+                           tone: netPnL >= 0 ? InstitutionalTheme.Colors.aurora
+                                             : InstitutionalTheme.Colors.crimson,
+                           leadingDivider: true)
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 8)
+    }
+
+    // MARK: - Control bar (sade — sol drawer + başlık + sağ ikonlar)
+
+    private var controlBar: some View {
+        HStack(spacing: 8) {
+            navIcon(icon: "line.3.horizontal", action: onDrawerTap)
+
+            Text("Portföy")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+
+            Spacer()
+
+            navIcon(icon: "arrow.clockwise", action: onHistoryTap)
+
+            // Trade Brain — özel asset (TB beyin logosu, template mode)
+            Button(action: onBrainTap) {
+                Image("TradeBrainIcon")
+                    .resizable()
+                    .renderingMode(.template)
+                    .aspectRatio(contentMode: .fit)
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .frame(width: 22, height: 22)
+                    .frame(width: 32, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// Sade nav ikonu — kart/dolgu yok.
+    private func navIcon(icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Instant change capsule
+    // MARK: - Market tabs — caps capsule pill yerine underline tab
 
-    private var instantChangeCapsule: some View {
-        let positive = netPnL >= 0
-        let color = positive ? InstitutionalTheme.Colors.aurora : InstitutionalTheme.Colors.crimson
-        let sign = positive ? "+" : ""
-        return HStack(spacing: 6) {
-            Image(systemName: positive ? "arrow.up" : "arrow.down")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(color)
-            Text("\(sign)\(currencySymbol)\(formatLarge(netPnL)) · \(sign)\(String(format: "%.2f", instantPct))%")
-                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                .foregroundColor(color)
+    private var marketTabs: some View {
+        HStack(spacing: 4) {
+            marketTab("Global", selected: selectedMarket == .global) {
+                withAnimation(.easeInOut(duration: 0.2)) { selectedMarket = .global }
+            }
+            marketTab("BIST", selected: selectedMarket == .bist) {
+                withAnimation(.easeInOut(duration: 0.2)) { selectedMarket = .bist }
+            }
+            Spacer()
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
-        .background(Capsule().fill(color.opacity(0.15)))
     }
 
-    // MARK: - Stat tile
-
-    private func statTile(title: String, value: String, tone: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(title)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .tracking(1)
-                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-            Text(value)
-                .font(.system(size: 13, weight: .bold, design: .monospaced))
-                .foregroundColor(tone)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+    private func marketTab(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Text(label)
+                    .font(.system(size: 13, weight: selected ? .medium : .regular))
+                    .foregroundColor(selected
+                                     ? InstitutionalTheme.Colors.textPrimary
+                                     : InstitutionalTheme.Colors.textSecondary)
+                Rectangle()
+                    .fill(selected
+                          ? InstitutionalTheme.Colors.textPrimary
+                          : Color.clear)
+                    .frame(height: 1.5)
+            }
+            .padding(.horizontal, 8)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(InstitutionalTheme.Colors.surface1)
-        .overlay(
-            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
-                .stroke(InstitutionalTheme.Colors.border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Stat column — kart yerine dikey-ayraçlı sütun
+
+    private func statColumn(title: String, value: String, tone: Color, leadingDivider: Bool) -> some View {
+        HStack(spacing: 0) {
+            if leadingDivider {
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.borderSubtle)
+                    .frame(width: 0.5)
+                    .padding(.vertical, 2)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                Text(value)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(tone)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 
     // MARK: - Format helpers

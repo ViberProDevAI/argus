@@ -4,17 +4,19 @@ private enum ReportPeriod {
     case daily
     case weekly
 
+    /// Sentence case başlık (2026-04-30 H-47 sade dil).
     var title: String {
         switch self {
-        case .daily: return "GÜN SONU"
-        case .weekly: return "HAFTALIK"
+        case .daily:  return "Gün sonu"
+        case .weekly: return "Haftalık"
         }
     }
 
+    /// SF Symbol — sade kullanım için saklı, button'da kullanılmıyor artık.
     var icon: String {
         switch self {
-        case .daily: return "sun.max.fill"
-        case .weekly: return "calendar.badge.clock"
+        case .daily:  return "sun.max"
+        case .weekly: return "calendar"
         }
     }
 }
@@ -141,7 +143,12 @@ struct PortfolioReportsView: View {
     }
 }
 
-// MARK: - Report Button (Minimal)
+// MARK: - Report Button (2026-04-30 H-47 sade)
+//
+// Tinted icon circle + caps mono ".black" başlık + mono semibold subtitle +
+// tinted dot + arrow + per-button color border kalktı. Yerine sade kart:
+// sentence case başlık + alt satır "tarih · durum" muted. Renkli border yok,
+// hazır/yükleniyor durumu satır metnine entegre.
 private struct ReportButton: View {
     let period: ReportPeriod
     let subtitle: String
@@ -154,57 +161,42 @@ private struct ReportButton: View {
         return !text.isEmpty
     }
 
+    private var statusText: String {
+        isReady ? "hazır" : "hazırlanıyor…"
+    }
+
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.18))
-                        .frame(width: 34, height: 34)
-                    Image(systemName: period.icon)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(color)
-                }
-
+            HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(period.title)
-                        .font(.system(size: 11, weight: .black, design: .monospaced))
-                        .tracking(1.1)
+                        .font(.system(size: 13, weight: .medium))
                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    Text(subtitle)
-                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
-                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    Text("\(subtitle) · \(statusText)")
+                        .font(.system(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .lineLimit(1)
                 }
-
-                Spacer()
-
+                Spacer(minLength: 6)
                 if isReady {
-                    HStack(spacing: 5) {
-                        ArgusDot(color: color, size: 5)
-                        Image(systemName: "arrow.up.right")
-                            .font(.system(size: 11, weight: .bold))
-                            .foregroundColor(color)
-                    }
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 } else {
                     ProgressView()
-                        .scaleEffect(0.7)
-                        .tint(color)
+                        .scaleEffect(0.6)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 11)
-            .background(
-                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                    .fill(InstitutionalTheme.Colors.surface1)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                    .stroke(color.opacity(isReady ? 0.3 : 0.15), lineWidth: 1)
-            )
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(InstitutionalTheme.Colors.surface1)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .contentShape(Rectangle())
+            .opacity(isReady ? 1 : 0.7)
         }
         .buttonStyle(.plain)
         .disabled(!isReady)
-        .opacity(isReady ? 1 : 0.6)
     }
 }
 
@@ -242,13 +234,9 @@ private struct ReportDetailSheetV2: View {
 
                         if parsedSections.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                HStack(spacing: 6) {
-                                    ArgusDot(color: InstitutionalTheme.Colors.textTertiary, size: 5)
-                                    Text("HAM METİN")
-                                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                        .tracking(1)
-                                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                                }
+                                Text("Ham metin")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                                 Text(text)
                                     .font(.system(size: 13))
                                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
@@ -258,11 +246,7 @@ private struct ReportDetailSheetV2: View {
                             .padding(14)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(InstitutionalTheme.Colors.surface1)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
-                                    .stroke(InstitutionalTheme.Colors.border, lineWidth: 1)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                         } else {
                             ForEach(parsedSections) { section in
                                 SectionCard(section: section, accentColor: color)
@@ -302,55 +286,57 @@ private struct ReportHeroHeader: View {
     let color: Color
     let metrics: [ReportMetric]
 
+    // 2026-04-30 H-47 — sade. ArgusDot + caps black mono başlık + tinted
+    // metric kartları + tinted color border kalktı. Sentence "Gün sonu"
+    // 17pt medium + alt satır subtitle + dikey-ayraçlı 3 sütun stat
+    // (LiquidDashboardHeader / tradeBrainBand ile aynı dil).
     var body: some View {
-        // V5 hero: mono caps başlık, alt subtitle, ayraç, 3-column mini stat.
         VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    ArgusDot(color: color, size: 6)
-                    Text(title.uppercased())
-                        .font(.system(size: 12, weight: .black, design: .monospaced))
-                        .tracking(1.5)
-                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 Text(subtitle)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
             }
 
-            ArgusHair()
-
-            HStack(spacing: 8) {
-                ForEach(metrics) { metric in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(metric.label.uppercased())
-                            .font(.system(size: 9, weight: .bold, design: .monospaced))
-                            .tracking(0.7)
-                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                        Text(metric.value)
-                            .font(.system(size: 16, weight: .black, design: .monospaced))
-                            .foregroundColor(metric.color)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                            .fill(InstitutionalTheme.Colors.surface2)
-                    )
+            HStack(spacing: 0) {
+                ForEach(Array(metrics.enumerated()), id: \.element.id) { idx, metric in
+                    statColumn(metric: metric, leadingDivider: idx > 0)
                 }
             }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(InstitutionalTheme.Colors.surface1)
-        .overlay(
-            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
-                .stroke(color.opacity(0.35), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    /// Sade metric sütunu — kart yerine dikey ayraç.
+    @ViewBuilder
+    private func statColumn(metric: ReportMetric, leadingDivider: Bool) -> some View {
+        HStack(spacing: 0) {
+            if leadingDivider {
+                Rectangle()
+                    .fill(InstitutionalTheme.Colors.borderSubtle)
+                    .frame(width: 0.5)
+                    .padding(.vertical, 2)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(metric.label)
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                Text(metric.value)
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(metric.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
 
@@ -380,44 +366,35 @@ private struct SectionCard: View {
     let section: ParsedSection
     let accentColor: Color
 
+    // 2026-04-30 H-47 — sade. Tinted icon circle + caps mono başlık +
+    // per-card border + per-metric tinted card kalktı. Yerine sade kart:
+    // sentence case başlık + grouped item list + hairline ayrım.
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(accentColor.opacity(0.18))
-                        .frame(width: 28, height: 28)
-                    Image(systemName: iconForSection(section.title))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(accentColor)
-                }
-                Text(section.title.uppercased())
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                Spacer()
-            }
+            Text(section.title)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
 
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(section.items) { item in
                     switch item {
                     case .emphasis(let value):
-                        HStack(spacing: 8) {
-                            Rectangle()
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle()
                                 .fill(accentColor)
-                                .frame(width: 2)
+                                .frame(width: 6, height: 6)
+                                .padding(.top, 6)
                             Text(value)
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(accentColor)
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                         }
                         .fixedSize(horizontal: false, vertical: true)
 
                     case .bullet(let value):
                         HStack(alignment: .top, spacing: 10) {
-                            Circle()
-                                .fill(accentColor.opacity(0.85))
-                                .frame(width: 5, height: 5)
-                                .padding(.top, 6)
+                            Text("•")
+                                .font(.system(size: 13))
+                                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                             Text(value)
                                 .font(.system(size: 13))
                                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
@@ -425,25 +402,22 @@ private struct SectionCard: View {
                         }
 
                     case .metric(let label, let value):
-                        HStack(spacing: 10) {
-                            Text(label.uppercased())
-                                .font(.system(size: 10, weight: .bold, design: .monospaced))
-                                .tracking(0.7)
+                        HStack {
+                            Text(label)
+                                .font(.system(size: 13))
                                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                             Spacer()
                             Text(value)
-                                .font(.system(size: 13, weight: .black, design: .monospaced))
+                                .font(.system(size: 13, weight: .medium))
                                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                                .monospacedDigit()
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
-                        .background(
-                            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                                .fill(InstitutionalTheme.Colors.surface2)
-                        )
+                        .padding(.vertical, 6)
                         .overlay(
-                            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.sm, style: .continuous)
-                                .stroke(InstitutionalTheme.Colors.border, lineWidth: 0.5)
+                            Rectangle()
+                                .fill(InstitutionalTheme.Colors.borderSubtle)
+                                .frame(height: 0.5),
+                            alignment: .bottom
                         )
 
                     case .paragraph(let value):
@@ -459,21 +433,7 @@ private struct SectionCard: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(InstitutionalTheme.Colors.surface1)
-        .overlay(
-            RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous)
-                .stroke(InstitutionalTheme.Colors.border, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: InstitutionalTheme.Radius.lg, style: .continuous))
-    }
-
-    private func iconForSection(_ title: String) -> String {
-        let normalized = title.lowercased()
-        if normalized.contains("öğren") { return "brain.head.profile" }
-        if normalized.contains("makro") || normalized.contains("ortam") { return "globe.europe.africa.fill" }
-        if normalized.contains("işlem") || normalized.contains("performans") { return "chart.line.uptrend.xyaxis" }
-        if normalized.contains("karar") || normalized.contains("veto") { return "shield.lefthalf.filled.badge.checkmark" }
-        if normalized.contains("ders") { return "book.closed.fill" }
-        return "doc.text.fill"
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 

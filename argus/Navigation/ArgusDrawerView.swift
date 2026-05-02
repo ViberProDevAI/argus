@@ -197,11 +197,27 @@ struct ArgusDrawerView: View {
     private func iconView(for icon: String) -> some View {
         if let motor = motorFromIconName(icon) {
             MotorLogo(motor, size: 20)
+        } else if isCustomAsset(icon) {
+            // Motor olmayan özel asset'ler (örn. TradeBrainIcon).
+            // Template rendering — proje tonu uygulanır, transparent
+            // PNG ile silüet olarak gösterilir.
+            Image(icon)
+                .resizable()
+                .renderingMode(.template)
+                .aspectRatio(contentMode: .fit)
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .frame(width: 20, height: 20)
         } else {
             Image(systemName: icon)
                 .font(.system(size: 16, weight: .regular))
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
+    }
+
+    /// "Icon" suffix'li ve büyük harfle başlayan string'ler asset varsayılır.
+    private func isCustomAsset(_ name: String) -> Bool {
+        guard name.hasSuffix("Icon"), let first = name.first else { return false }
+        return first.isUppercase
     }
 
     /// Icon adından MotorEngine türet (varsa).

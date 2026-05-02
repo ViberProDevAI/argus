@@ -33,11 +33,11 @@ struct SirkiyeDashboardView: View {
 
     private var statusIndicator: (color: Color, text: String) {
         if viewModel.bistAtmosphere != nil {
-            return (InstitutionalTheme.Colors.aurora, "CANLI")
+            return (InstitutionalTheme.Colors.aurora, "Canlı")
         } else if fallbackMacroReady {
-            return (InstitutionalTheme.Colors.holo, "MAKRO")
+            return (InstitutionalTheme.Colors.holo, "Makro")
         } else {
-            return (InstitutionalTheme.Colors.titan, "YÜKLENİYOR")
+            return (InstitutionalTheme.Colors.titan, "Yükleniyor")
         }
     }
 
@@ -81,17 +81,19 @@ struct SirkiyeDashboardView: View {
 
     // MARK: - Header Row
 
+    // 2026-04-30 H-49 — sade. ArgusSectionCaption "SİRKİYE KORTEKS" caps
+    // mono + 16pt .black mode + tinted capsule status pill kalktı.
+    // Yerine sade label + 17pt medium başlık + sade dot+text status.
     private var headerRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    MotorLogo(.aether, size: 12)
-                    ArgusSectionCaption("SİRKİYE KORTEKS")
-                }
-                .accessibilityAddTraits(.isHeader)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Sirkiye nabzı")
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .accessibilityAddTraits(.isHeader)
 
                 Text(modeDisplayText)
-                    .font(.system(size: 16, weight: .black))
+                    .font(.system(size: 17, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
@@ -103,20 +105,13 @@ struct SirkiyeDashboardView: View {
 
     private var statusPill: some View {
         HStack(spacing: 6) {
-            ArgusDot(color: statusIndicator.color, size: 5)
+            Circle()
+                .fill(statusIndicator.color)
+                .frame(width: 6, height: 6)
             Text(statusIndicator.text)
-                .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .tracking(1.2)
-                .foregroundColor(statusIndicator.color)
+                .font(.system(size: 12))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            Capsule().fill(statusIndicator.color.opacity(0.14))
-        )
-        .overlay(
-            Capsule().stroke(statusIndicator.color.opacity(0.35), lineWidth: 0.5)
-        )
     }
 
     // MARK: - Main Row
@@ -154,34 +149,29 @@ struct SirkiyeDashboardView: View {
         .frame(width: 56, height: 56)
     }
 
+    // 2026-04-30 H-49 sade — caps mono micro etiketler ve heavy mono
+    // değerler sentence case + medium fontlara çekildi.
     private var stanceBlock: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text("DURUŞ")
-                .font(.system(.caption2, design: .monospaced))
-                .fontWeight(.bold)
-                .tracking(1.1)
-                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Duruş")
+                .font(.system(size: 11))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
 
             Text(stanceText)
-                .font(.system(.callout, design: .monospaced))
-                .fontWeight(.bold)
-                .tracking(0.8)
+                .font(.system(size: 14, weight: .medium))
                 .foregroundColor(stanceColor)
                 .lineLimit(1)
         }
     }
 
     private var xu100Block: some View {
-        VStack(alignment: .trailing, spacing: 3) {
+        VStack(alignment: .trailing, spacing: 2) {
             Text("BIST 100")
-                .font(.system(.caption2, design: .monospaced))
-                .fontWeight(.bold)
-                .tracking(1.1)
-                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                .font(.system(size: 11))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
 
             Text(xu100DisplayValue)
-                .font(.system(.title3, design: .monospaced))
-                .fontWeight(.heavy)
+                .font(.system(size: 17, weight: .medium))
                 .monospacedDigit()
                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                 .lineLimit(1)
@@ -235,15 +225,17 @@ struct SirkiyeDashboardView: View {
         else { return InstitutionalTheme.Colors.crimson }
     }
 
+    /// 2026-04-30 H-49 — sade. Caps "PANİK MOD / AŞIRI KORKU" → sentence
+    /// case ifadeler.
     private var modeDisplayText: String {
         switch atmosphere.mode {
-        case .panic:        return "PANİK MOD"
-        case .extremeFear:  return "AŞIRI KORKU"
-        case .fear:         return "KORKU MOD"
-        case .neutral:      return "NÖTR ATMOSFER"
-        case .greed:        return "AÇGÖZLÜ MOD"
-        case .extremeGreed: return "AŞIRI AÇGÖZLÜLÜK"
-        case .complacency:  return "REHAVET"
+        case .panic:        return "Panik"
+        case .extremeFear:  return "Aşırı korku"
+        case .fear:         return "Korku"
+        case .neutral:      return "Nötr"
+        case .greed:        return "Açgözlü"
+        case .extremeGreed: return "Aşırı açgözlü"
+        case .complacency:  return "Rehavet"
         }
     }
 
@@ -260,12 +252,12 @@ struct SirkiyeDashboardView: View {
     }
 
     private var stanceText: String {
-        guard let decision = viewModel.bistAtmosphere else { return "BEKLENİYOR" }
+        guard let decision = viewModel.bistAtmosphere else { return "Bekleniyor" }
         switch decision.stance {
-        case .riskOff:   return "RİSK KAPALI"
-        case .defensive: return "DEFANSİF"
-        case .cautious:  return "TEDBİRLİ"
-        case .riskOn:    return "RİSK AÇIK"
+        case .riskOff:   return "Risk kapalı"
+        case .defensive: return "Defansif"
+        case .cautious:  return "Tedbirli"
+        case .riskOn:    return "Risk açık"
         }
     }
 

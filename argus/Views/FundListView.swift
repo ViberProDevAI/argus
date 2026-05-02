@@ -11,19 +11,17 @@ struct FundListView: View {
     @State private var searchText = ""
     @State private var selectedFund: FundListItem? = nil
     
+    // 2026-04-30 H-52 — sade. Cockpit/Sirkiye TerminalStockRow ile aynı
+    // dil: kompakt control satırı + sade kategori scroll + grouped row
+    // listesi (per-row hairline). Tinted holo pill ve daire ikon kalktı.
     var body: some View {
-        // NavigationView removed for embedding in ArgusCockpitView
         ZStack {
             InstitutionalTheme.Colors.background.ignoresSafeArea()
-            
+
             VStack(spacing: 0) {
-                // MARK: - Sort Picker
-                sortPickerSection
-                
-                // MARK: - Category Filter
+                controlSection
                 categoryFilterSection
-                
-                // MARK: - Fund List
+
                 if dataManager.isLoading && dataManager.fundPrices.isEmpty {
                     loadingView
                 } else {
@@ -31,20 +29,12 @@ struct FundListView: View {
                 }
             }
         }
-        // .navigationTitle("Fonlar") // Managed by parent
-        // .navigationBarTitleDisplayMode(.large)
-         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button(action: {
-                    Task { await dataManager.refresh() }
-                }) {
-                    Image(systemName: "arrow.clockwise")
-                        .foregroundColor(InstitutionalTheme.Colors.holo)
-                }
-                .disabled(dataManager.isLoading)
-            }
-        }
-        .searchable(text: $searchText, prompt: "Fon ara...")
+        // 2026-04-30 H-53 — kendi toolbar refresh'i kaldırıldı. ArgusCockpitView'in
+        // toolbar'ında zaten refresh button var, duplicate görünüyordu.
+        // Search bar da kaldırıldı — Cockpit'te diğer tab'lerde de yok.
+        // Aşağıdaki controlSection için filtreleme şimdilik kategori chip'i
+        // ile yeterli; arama ihtiyacı belirirse Cockpit ortak top bar'ına
+        // eklenecek.
         .task {
             if dataManager.fundPrices.isEmpty {
                 await dataManager.loadAllFunds()
@@ -62,37 +52,54 @@ struct FundListView: View {
         }
     }
     
-    // MARK: - Sort Picker Section
-    private var sortPickerSection: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(FundDataManager.SortOption.allCases, id: \.self) { option in
-                    Button(action: { sortOption = option }) {
-                        Text(option.rawValue)
-                            .font(.caption)
-                            .fontWeight(sortOption == option ? .bold : .regular)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                sortOption == option ?
-                                InstitutionalTheme.Colors.holo.opacity(0.2) :
-                                InstitutionalTheme.Colors.surface1
-                            )
-                            .foregroundColor(sortOption == option ? InstitutionalTheme.Colors.holo : .white)
-                            .cornerRadius(8)
+    // MARK: - Control section (2026-04-30 H-52)
+    //
+    // Eski: yatay scroll'da 5+ tinted holo pill (selected) — Cockpit'le
+    // tutarsız. Yeni: TerminalControlBar dili — sol "X fon" muted +
+    // sağda "Sırala · 1 hafta ▾" sade Menu.
+    private var controlSection: some View {
+        HStack(spacing: 10) {
+            Text("\(filteredFunds.count) fon")
+                .font(.system(size: 12))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .monospacedDigit()
+
+            Spacer(minLength: 6)
+
+            Menu {
+                Picker("Sıralama", selection: $sortOption) {
+                    ForEach(FundDataManager.SortOption.allCases, id: \.self) { option in
+                        Text(option.rawValue).tag(option)
                     }
                 }
+            } label: {
+                HStack(spacing: 4) {
+                    Text(sortOption.rawValue)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 9))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                }
+                .padding(.horizontal, 4)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            .accessibilityLabel("Sıralama menüsü")
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(InstitutionalTheme.Colors.background)
     }
     
-    // MARK: - Category Filter Section
+    // MARK: - Category Filter Section (2026-04-30 H-52)
+    //
+    // Tinted holo pill (opacity 0.2 selected) → sade chip; selected =
+    // textPrimary text + 1px borderSubtle stroke; passive = textSecondary
+    // + transparent. İkonlar duruyor — küçük şekilde tanımayı kolaylaştırır.
     private var categoryFilterSection: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                // "All" chip
                 CategoryChip(
                     title: "Tümü",
                     icon: "square.grid.2x2",
@@ -100,8 +107,7 @@ struct FundListView: View {
                 ) {
                     selectedCategory = nil
                 }
-                
-                // Category chips
+
                 ForEach(FundCategory.allCases) { category in
                     CategoryChip(
                         title: category.rawValue,
@@ -112,28 +118,37 @@ struct FundListView: View {
                     }
                 }
             }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
+            .padding(.horizontal, 16)
+            .padding(.bottom, 10)
         }
     }
-    
-    // MARK: - Fund List Section
+
+    // MARK: - Fund List Section (2026-04-30 H-52)
+    //
+    // SwiftUI List + listRowBackground + listRowSeparator → ScrollView +
+    // LazyVStack + manuel hairline. Cockpit/Sirkiye TerminalStockRow ile
+    // aynı dil — grouped tek surface, alt 0.5px hairline.
     private var fundListSection: some View {
-        List {
-            ForEach(filteredFunds) { fund in
-                FundRowView(
-                    fund: fund,
-                    priceData: dataManager.fundPrices[fund.code]
-                )
-                .listRowBackground(InstitutionalTheme.Colors.surface1)
-                .listRowSeparatorTint(Color.gray.opacity(0.2))
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    selectedFund = fund
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(filteredFunds) { fund in
+                    Button(action: { selectedFund = fund }) {
+                        FundRowView(
+                            fund: fund,
+                            priceData: dataManager.fundPrices[fund.code]
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                if filteredFunds.isEmpty {
+                    Text("Kriterlere uygun fon bulunamadı")
+                        .font(.system(size: 13))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .padding(.top, 32)
                 }
             }
+            .padding(.bottom, 100)
         }
-        .listStyle(.plain)
         .refreshable {
             await dataManager.refresh()
         }
@@ -176,26 +191,36 @@ struct CategoryChip: View {
     let icon: String
     let isSelected: Bool
     let action: () -> Void
-    
+
+    // 2026-04-30 H-52 — sade. Tinted holo background + holo border
+    // (selected) → outline border tek dilde: textPrimary + borderSubtle
+    // stroke. Passive: textSecondary + transparent.
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.caption2)
+                    .font(.system(size: 11))
                 Text(title)
-                    .font(.caption)
+                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
                     .lineLimit(1)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(isSelected ? InstitutionalTheme.Colors.holo.opacity(0.2) : InstitutionalTheme.Colors.surface1)
-            .foregroundColor(isSelected ? InstitutionalTheme.Colors.holo : .white)
-            .cornerRadius(16)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .foregroundColor(isSelected
+                             ? InstitutionalTheme.Colors.textPrimary
+                             : InstitutionalTheme.Colors.textSecondary)
+            .background(InstitutionalTheme.Colors.surface1)
+            .clipShape(Capsule())
             .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(isSelected ? InstitutionalTheme.Colors.holo : Color.clear, lineWidth: 1)
+                Capsule().stroke(
+                    isSelected
+                        ? InstitutionalTheme.Colors.borderSubtle
+                        : Color.clear,
+                    lineWidth: 0.5
+                )
             )
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -204,73 +229,66 @@ struct CategoryChip: View {
 struct FundRowView: View {
     let fund: FundListItem
     let priceData: FundPriceData?
-    
+
+    // 2026-04-30 H-53 — A versiyonu (iki satır kart):
+    // Üst satır: kod + kategori muted + getiri renkli (sağ)
+    // Alt satır: tam ad + kuruluş muted + NAV ₺X.XX (sağ)
+    // Bilgi yoğun, hızlı tarama mantığı; per-row grouped + alt hairline.
     var body: some View {
-        HStack(spacing: 12) {
-            // Category Icon
-            ZStack {
-                Circle()
-                    .fill(categoryColor.opacity(0.2))
-                    .frame(width: 40, height: 40)
-                
-                Image(systemName: fund.category.icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(categoryColor)
-            }
-            
-            // Fund Info
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(fund.code)
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text(fund.shortName)
-                        .font(.subheadline)
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                        .lineLimit(1)
-                }
-                
-                Text(fund.founder.rawValue)
-                    .font(.caption)
+        VStack(alignment: .leading, spacing: 4) {
+            // Üst satır
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(fund.code)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Text(fund.category.rawValue)
+                    .font(.system(size: 11))
                     .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-            }
-            
-            Spacer()
-            
-            // Returns
-            VStack(alignment: .trailing, spacing: 4) {
-                if let priceData = priceData, let return1W = priceData.return1Week {
+                Spacer(minLength: 6)
+                if let priceData, let return1W = priceData.return1Week {
                     Text(String(format: "%+.1f%%", return1W))
-                        .font(.headline)
-                        .fontWeight(.bold)
-                        .foregroundColor(return1W >= 0 ? InstitutionalTheme.Colors.aurora : InstitutionalTheme.Colors.crimson)
-                    
-                    Text("1 Hafta")
-                        .font(.caption2)
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .font(.system(size: 14, weight: .medium, design: .monospaced))
+                        .foregroundColor(return1W >= 0
+                                         ? InstitutionalTheme.Colors.aurora
+                                         : InstitutionalTheme.Colors.crimson)
+                        .monospacedDigit()
                 } else {
-                    ProgressView()
-                        .scaleEffect(0.7)
+                    ProgressView().scaleEffect(0.55)
+                }
+            }
+
+            // Alt satır
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(fund.shortName)
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .lineLimit(1)
+                Text("·")
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                Text(fund.founder.rawValue)
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    .lineLimit(1)
+                Spacer(minLength: 6)
+                if let priceData {
+                    Text(String(format: "₺%.2f", priceData.currentPrice))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .monospacedDigit()
                 }
             }
         }
-        .padding(.vertical, 8)
-    }
-    
-    private var categoryColor: Color {
-        switch fund.category {
-        case .hisse: return .blue
-        case .paraPiyasasi: return .green
-        case .kiymetliMaden: return .yellow
-        case .borclanma: return .purple
-        case .degisken: return .orange
-        case .serbest: return .red
-        case .fonSepeti: return .teal
-        case .katilim: return .indigo
-        case .karma: return .gray
-        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(
+            Rectangle()
+                .fill(InstitutionalTheme.Colors.borderSubtle)
+                .frame(height: 0.5),
+            alignment: .bottom
+        )
+        .contentShape(Rectangle())
     }
 }
 

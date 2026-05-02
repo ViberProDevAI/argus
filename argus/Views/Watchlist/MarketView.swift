@@ -127,83 +127,60 @@ struct MarketView: View {
 
     // MARK: - Top Bar (Tab row + command header)
 
+    // 2026-04-30 H-49 — sade. İki ayrı surface1 katmanı (tab row ayrı,
+    // command header ayrı) tek panele birleşti. Header ikon renkleri:
+    // primary (mavi) keşfet/+ → tüm ikonlar textSecondary nötr.
     private var topBar: some View {
-        VStack(spacing: 0) {
-            // Tab Row: Global / Sirkiye (sentence case — H-26)
+        VStack(spacing: 10) {
+            HStack(alignment: .center) {
+                Text("Piyasa")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Spacer()
+                HStack(spacing: 0) {
+                    headerIconButton(icon: "line.3.horizontal", label: "Menü") { showDrawer = true }
+                    headerIconButton(icon: "globe", label: "Keşfet") { showDiscover = true }
+                    headerIconButton(icon: "plus", label: "Hisse ekle") { showSearch = true }
+                    headerIconButton(icon: "bell", label: "Bildirimler") { showNotifications = true }
+                }
+            }
+
             HStack(spacing: 0) {
                 marketTabButton(title: "Global", mode: .global)
                 marketTabButton(title: "Sirkiye", mode: .bist)
+                Spacer()
+                Circle()
+                    .fill(InstitutionalTheme.Colors.aurora)
+                    .frame(width: 6, height: 6)
+                Text("Açık")
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .padding(.leading, 6)
+                    .padding(.trailing, 8)
+                Text(Date().formatted(.dateTime.hour().minute()))
+                    .font(.system(size: 12))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
-            .background(InstitutionalTheme.Colors.surface1)
-
-            // Command Header — sentence-case, mono caption stack çıkartıldı.
-            VStack(spacing: 6) {
-                HStack(alignment: .center) {
-                    Text("Piyasa")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    Spacer()
-                    HStack(spacing: 4) {
-                        headerIconButton(
-                            icon: "line.3.horizontal",
-                            tint: InstitutionalTheme.Colors.textSecondary,
-                            label: "Menü"
-                        ) { showDrawer = true }
-
-                        headerIconButton(
-                            icon: "globe",
-                            tint: InstitutionalTheme.Colors.primary,
-                            label: "Keşfet"
-                        ) { showDiscover = true }
-
-                        headerIconButton(
-                            icon: "plus.circle.fill",
-                            tint: InstitutionalTheme.Colors.primary,
-                            label: "Hisse ekle"
-                        ) { showSearch = true }
-
-                        headerIconButton(
-                            icon: "bell.fill",
-                            tint: InstitutionalTheme.Colors.textSecondary,
-                            label: "Bildirimler"
-                        ) { showNotifications = true }
-                    }
-                }
-
-                // Status satırı — yalın dot + "Açık" + saat. Mono caps caption yok.
-                HStack(spacing: 6) {
-                    ArgusDot(color: InstitutionalTheme.Colors.aurora, size: 6)
-                    Text("Açık")
-                        .font(.system(size: 12))
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                    Spacer()
-                    Text(Date().formatted(.dateTime.hour().minute()))
-                        .font(.system(size: 12))
-                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                        .lineLimit(1)
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(InstitutionalTheme.Colors.surface1)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(InstitutionalTheme.Colors.borderSubtle)
-                    .frame(height: 0.5)
-            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .background(InstitutionalTheme.Colors.surface1)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(InstitutionalTheme.Colors.borderSubtle)
+                .frame(height: 0.5)
         }
     }
 
     @ViewBuilder
-    private func headerIconButton(icon: String, tint: Color, label: String, action: @escaping () -> Void) -> some View {
+    private func headerIconButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(.title3, design: .default))
-                .foregroundColor(tint)
-                .frame(width: 44, height: 44)
+                .font(.system(size: 17, weight: .regular))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .frame(width: 36, height: 36)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -212,33 +189,27 @@ struct MarketView: View {
 
     // MARK: - Tab Button
 
+    // 2026-04-30 H-49: Eski tam-genişlik 50/50 split (marketTabButton
+    // her biri maxWidth:.infinity) yerine drawer/portfolio ile aynı sade
+    // underline tab. Solda yan yana sıkışıyor, sağda status satırı var.
     @ViewBuilder
     private func marketTabButton(title: String, mode: MarketMode) -> some View {
         let isSelected = selectedMarket == mode
-        let indicatorTint: Color = (mode == .global)
-            ? InstitutionalTheme.Colors.primary
-            : InstitutionalTheme.Colors.negative
-
         Button(action: { withAnimation(.easeInOut(duration: 0.18)) { selectedMarket = mode } }) {
-            VStack(spacing: 6) {
+            VStack(spacing: 4) {
                 Text(title)
-                    .font(.system(size: 15, weight: isSelected ? .semibold : .medium))
-                    .foregroundColor(
-                        isSelected
-                            ? InstitutionalTheme.Colors.textPrimary
-                            : InstitutionalTheme.Colors.textSecondary
-                    )
-
-                if isSelected {
-                    Rectangle()
-                        .fill(indicatorTint)
-                        .frame(height: 2)
-                        .matchedGeometryEffect(id: "TabUnderline", in: animation)
-                } else {
-                    Rectangle().fill(Color.clear).frame(height: 2)
-                }
+                    .font(.system(size: 13, weight: isSelected ? .medium : .regular))
+                    .foregroundColor(isSelected
+                                     ? InstitutionalTheme.Colors.textPrimary
+                                     : InstitutionalTheme.Colors.textSecondary)
+                Rectangle()
+                    .fill(isSelected
+                          ? InstitutionalTheme.Colors.textPrimary
+                          : Color.clear)
+                    .frame(height: 1.5)
+                    .matchedGeometryEffect(id: isSelected ? "TabUnderline" : "TabUnderlineHidden_\(mode.rawValue)", in: animation)
             }
-            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.horizontal, 8)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -765,6 +736,9 @@ struct BistCrystalRow: View {
         return names[cleanSymbol] ?? cleanSymbol
     }
 
+    // 2026-04-30 H-49 — sade. CrystalWatchlistRow ile tutarlı dile geçti:
+    // şirket adı 14pt semibold üstte, sembol 11pt mono caption alt;
+    // fiyat 14pt semibold (mono yerine standart), yüzde sade renkli text.
     var body: some View {
         HStack(spacing: 12) {
             // Kimlik
@@ -773,13 +747,13 @@ struct BistCrystalRow: View {
                     .overlay(Circle().stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 1))
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(cleanSymbol)
-                        .font(.system(.callout, design: .default))
-                        .fontWeight(.bold)
-                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
                     Text(companyName)
-                        .font(.caption2)
-                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        .lineLimit(1)
+                    Text(cleanSymbol)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                         .lineLimit(1)
                 }
             }
@@ -788,25 +762,26 @@ struct BistCrystalRow: View {
             // Orion Sinyal
             if let result = orionResult {
                 OrionSignalBadge(result: result)
-                    .frame(width: 84, alignment: .center)
             } else {
                 Text("—")
-                    .font(.system(.caption, design: .monospaced))
+                    .font(.system(size: 11))
                     .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-                    .frame(width: 84, alignment: .center)
             }
 
             // Fiyat + % Değişim
             if let q = quote {
-                VStack(alignment: .trailing, spacing: 4) {
+                VStack(alignment: .trailing, spacing: 2) {
                     Text(String(format: "₺%.2f", q.currentPrice))
-                        .font(.system(.callout, design: .monospaced))
-                        .fontWeight(.bold)
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
                         .monospacedDigit()
                         .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-                    ArgusDeltaPill(delta: q.percentChange, isPercent: true, compact: true)
+                    Text(String(format: "%+.2f%%", q.percentChange))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(q.percentChange >= 0
+                                         ? InstitutionalTheme.Colors.aurora
+                                         : InstitutionalTheme.Colors.crimson)
                 }
-                .frame(minWidth: 84, alignment: .trailing)
+                .frame(minWidth: 82, alignment: .trailing)
             } else {
                 VStack(alignment: .trailing, spacing: 4) {
                     RoundedRectangle(cornerRadius: 4)
@@ -816,11 +791,11 @@ struct BistCrystalRow: View {
                         .fill(InstitutionalTheme.Colors.surface2)
                         .frame(width: 44, height: 12)
                 }
-                .frame(minWidth: 84, alignment: .trailing)
+                .frame(minWidth: 82, alignment: .trailing)
             }
         }
-        .padding(.vertical, 8)
-        .frame(minHeight: 52)
+        .padding(.vertical, 10)
+        .overlay(ArgusHair(), alignment: .bottom)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
@@ -845,38 +820,29 @@ struct OrionSignalBadge: View {
         return "equal.circle.fill"
     }
 
+    /// 2026-04-30 H-49 — sade. "AL/SAT/TUT" caps mono tracking → sentence
+    /// case "Al/Sat/Tut" (CrystalWatchlistRow actionPill ile aynı dil).
     private var shortVerdict: String {
         let v = result.verdict.lowercased()
-        if v.contains("al") || v.contains("buy")   { return "AL" }
-        if v.contains("sat") || v.contains("sell") { return "SAT" }
-        return "TUT"
+        if v.contains("al") || v.contains("buy")   { return "Al" }
+        if v.contains("sat") || v.contains("sell") { return "Sat" }
+        return "Tut"
     }
 
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(.caption, design: .default))
-                .foregroundColor(tint)
-
+        HStack(spacing: 5) {
             Text(shortVerdict)
-                .font(.system(.caption2, design: .monospaced))
-                .fontWeight(.bold)
-                .tracking(0.8)
+                .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(tint)
-
             Text("\(Int(result.score))")
-                .font(.system(.caption2, design: .monospaced))
-                .fontWeight(.semibold)
+                .font(.system(size: 11))
+                .foregroundColor(tint.opacity(0.75))
                 .monospacedDigit()
-                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
         }
         .padding(.horizontal, 8)
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
         .background(
             Capsule().fill(tint.opacity(0.14))
-        )
-        .overlay(
-            Capsule().stroke(tint.opacity(0.35), lineWidth: 0.5)
         )
         .accessibilityLabel(Text("Orion sinyali \(shortVerdict), skor \(Int(result.score))"))
     }

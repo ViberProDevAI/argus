@@ -54,7 +54,7 @@ struct PortfolioView: View {
 
                 VStack(spacing: 0) {
                     ScrollView {
-                        VStack(spacing: 20) {
+                        VStack(spacing: 16) {
                             LiquidDashboardHeader(
                                 viewModel: viewModel,
                                 selectedMarket: $selectedMarket,
@@ -65,22 +65,13 @@ struct PortfolioView: View {
                             .padding(.horizontal)
                             .padding(.top, 8)
 
-                            TradeBrainStatusBand(
-                                viewModel: viewModel,
-                                market: selectedMarket,
-                                openTradeBrain: { showTradeBrain = true }
-                            )
-                            .padding(.horizontal)
-
-                            DailyAgendaView(viewModel: viewModel, market: selectedMarket)
+                            // 2026-04-30 H-46 — sade Trade Brain band.
+                            // Eski TradeBrainStatusBand + DailyAgendaView +
+                            // PortfolioPlanBoard kombinasyonu (devasa) →
+                            // tek satır kompakt özet, ayrıntılar Trade Brain
+                            // ekranında.
+                            tradeBrainBand
                                 .padding(.horizontal)
-
-                            PortfolioPlanBoard(
-                                viewModel: viewModel,
-                                market: selectedMarket,
-                                openTradeBrain: { showTradeBrain = true }
-                            )
-                            .padding(.horizontal)
 
                             PortfolioReportsView(viewModel: viewModel, mode: selectedMarket)
 
@@ -122,23 +113,11 @@ struct PortfolioView: View {
                         .zIndex(100)
                 }
 
-                // Trade Brain Alert Banner (ilk uyarı)
-                if let latestAlert = viewModel.planAlerts.first {
-                    VStack {
-                        TradeBrainAlertBanner(
-                            alert: latestAlert,
-                            onDismiss: {
-                                ExecutionStateViewModel.shared.planAlerts.removeFirst()
-                            }
-                        )
-                        .padding(.horizontal)
-                        .padding(.top, 60)
-                        Spacer()
-                    }
-                    .zIndex(99)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .animation(.spring(response: 0.3), value: viewModel.planAlerts.count)
-                }
+                // 2026-04-30 H-46: Üstten düşen TradeBrainAlertBanner overlay
+                // kaldırıldı. Aynı bilgiler şimdi iki yere yedirilmiş:
+                // (1) ilgili pozisyon kartının altında inline alert satırı
+                //     (UnifiedPositionCard'a alerts parametresi geçer)
+                // (2) Trade Brain status band'inde toplam sayı + özet
             }
             .navigationBarHidden(true)
             .sheet(isPresented: $showNewTradeSheet) {
@@ -267,6 +246,7 @@ struct PortfolioView: View {
 
     @ViewBuilder
     private func positionCard(for trade: Trade, market: TradeMarket) -> some View {
+        let symbolAlerts = viewModel.planAlerts.filter { $0.symbol == trade.symbol }
         UnifiedPositionCard(
             trade: trade,
             currentPrice: viewModel.quotes[trade.symbol]?.currentPrice ?? trade.entryPrice,
@@ -275,9 +255,91 @@ struct PortfolioView: View {
             onSell: {
                 tradeToSell = trade
                 showSellConfirmation = true
+            },
+            alerts: symbolAlerts,
+            onAlertDismiss: { alert in
+                ExecutionStateViewModel.shared.planAlerts.removeAll { $0.id == alert.id }
             }
         )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .onTapGesture { selectedTrade = trade }
+    }
+
+    // MARK: - Trade Brain band (2026-04-30 H-46)
+    //
+    // Eski TradeBrainStatusBand + DailyAgendaView + PortfolioPlanBoard (3
+    // dev component) yerine tek satır kompakt status band. Aktif uyarı
+    // sayısı + ilk 2 özet + tıklayınca Trade Brain ekranı.
+
+    @ViewBuilder
+    private var tradeBrainBand: some View {
+        let alerts = viewModel.planAlerts
+        Button(action: { showTradeBrain = true }) {
+            HStack(spacing: 10) {
+                ZStack(alignment: .topTrailing) {
+                    Image("TradeBrainIcon")
+                        .resizable()
+                        .renderingMode(.template)
+                        .aspectRatio(contentMode: .fit)
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        .frame(width: 22, height: 22)
+                    if hasHighPriorityAlert(alerts) {
+                        Circle()
+                            .fill(InstitutionalTheme.Colors.crimson)
+                            .frame(width: 7, height: 7)
+                            .overlay(
+                                Circle().stroke(InstitutionalTheme.Colors.surface1, lineWidth: 1.5)
+                            )
+                            .offset(x: 1, y: -1)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 1) {
+                    HStack(spacing: 6) {
+                        Text("Trade Brain")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                        if !alerts.isEmpty {
+                            Text("\(alerts.count) bildirim")
+                                .font(.system(size: 11))
+                                .foregroundColor(hasHighPriorityAlert(alerts)
+                                                 ? InstitutionalTheme.Colors.crimson
+                                                 : InstitutionalTheme.Colors.textSecondary)
+                        }
+                    }
+                    Text(tradeBrainSummary(alerts))
+                        .font(.system(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(InstitutionalTheme.Colors.surface1)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func hasHighPriorityAlert(_ alerts: [TradeBrainAlert]) -> Bool {
+        alerts.contains { $0.priority == .high || $0.priority == .critical }
+    }
+
+    private func tradeBrainSummary(_ alerts: [TradeBrainAlert]) -> String {
+        if alerts.isEmpty {
+            return "Aktif uyarı yok · planları gör"
+        }
+        let symbols = Array(Set(alerts.map { $0.symbol })).prefix(2).joined(separator: " · ")
+        let suffix = alerts.count > 2 ? " · …" : ""
+        return "\(symbols)\(suffix)"
     }
 
     // MARK: - Plan Editor
@@ -325,7 +387,7 @@ struct PortfolioView: View {
             ArgusDrawerView.DrawerItem(title: "Islem Gecmisi", subtitle: "Kapanan islemler", icon: "clock.arrow.circlepath") {
                 showHistory = true; showDrawer = false
             },
-            ArgusDrawerView.DrawerItem(title: "Trade Brain", subtitle: "Yonetim paneli", icon: "brain") {
+            ArgusDrawerView.DrawerItem(title: "Trade Brain", subtitle: "Yönetim paneli", icon: "TradeBrainIcon") {
                 showTradeBrain = true; showDrawer = false
             },
             ArgusDrawerView.DrawerItem(title: "Global Portfoy", subtitle: "Pazar degistir", icon: "globe") {
