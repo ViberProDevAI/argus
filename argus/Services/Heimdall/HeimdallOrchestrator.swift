@@ -154,21 +154,20 @@ final class HeimdallOrchestrator {
             ]
         case .crypto:
             return [
-                ChainStep(provider: "yahoo")   { [yahoo]   in try await yahoo.fetchQuote(symbol: resolved) },
                 ChainStep(provider: "finnhub") { [finnhub] in try await finnhub.fetchQuote(symbol: resolved) },
-                ChainStep(provider: "stooq")   { [stooq]   in try await Self.singleFromBatch(stooq: stooq, resolved: resolved, original: original) }
+                ChainStep(provider: "yahoo")   { [yahoo]   in try await yahoo.fetchQuote(symbol: resolved) }
             ]
         case .usEquity:
             return [
-                ChainStep(provider: "yahoo")   { [yahoo]   in try await yahoo.fetchQuote(symbol: resolved) },
                 ChainStep(provider: "stooq")   { [stooq]   in try await Self.singleFromBatch(stooq: stooq, resolved: resolved, original: original) },
+                ChainStep(provider: "yahoo")   { [yahoo]   in try await yahoo.fetchQuote(symbol: resolved) },
                 ChainStep(provider: "finnhub") { [finnhub] in try await finnhub.fetchQuote(symbol: resolved) },
                 ChainStep(provider: "fmp")     { [fmp]     in try await Self.fmpToQuote(fmp: fmp, symbol: resolved) }
             ]
         case .index, .forex, .commodity:
             return [
-                ChainStep(provider: "yahoo")   { [yahoo]   in try await yahoo.fetchQuote(symbol: resolved) },
                 ChainStep(provider: "stooq")   { [stooq]   in try await Self.singleFromBatch(stooq: stooq, resolved: resolved, original: original) },
+                ChainStep(provider: "yahoo")   { [yahoo]   in try await yahoo.fetchQuote(symbol: resolved) },
                 ChainStep(provider: "finnhub") { [finnhub] in try await finnhub.fetchQuote(symbol: resolved) }
             ]
         }
@@ -460,24 +459,27 @@ final class HeimdallOrchestrator {
                 ChainStep(provider: "binance") { [binance] in
                     try await binance.fetchCandles(symbol: resolved, timeframe: timeframe, limit: limit)
                 },
-                ChainStep(provider: "yahoo") { [yahoo] in
-                    try await yahoo.fetchCandles(symbol: resolved, timeframe: timeframe, limit: limit)
-                },
                 ChainStep(provider: "finnhub") { [finnhub] in
                     try await finnhub.fetchCandles(symbol: resolved, timeframe: timeframe, limit: limit)
+                },
+                ChainStep(provider: "yahoo") { [yahoo] in
+                    try await yahoo.fetchCandles(symbol: resolved, timeframe: timeframe, limit: limit)
                 }
             ]
         case .usEquity, .index, .forex, .commodity:
             var steps: [ChainStep<[Candle]>] = []
-            steps.append(ChainStep(provider: "yahoo") { [yahoo] in
-                try await yahoo.fetchCandles(symbol: resolved, timeframe: timeframe, limit: limit)
-            })
+            // Stooq is keyless and returns daily series in one CSV, so
+            // it leads for daily/weekly/monthly. Intraday timeframes
+            // skip Stooq because the free feed is end-of-day only.
             if isDaily {
                 let interval = Self.stooqInterval(for: timeframe)
                 steps.append(ChainStep(provider: "stooq") { [stooq] in
                     try await stooq.fetchDailyCandles(symbol: resolved, limit: limit, interval: interval)
                 })
             }
+            steps.append(ChainStep(provider: "yahoo") { [yahoo] in
+                try await yahoo.fetchCandles(symbol: resolved, timeframe: timeframe, limit: limit)
+            })
             steps.append(ChainStep(provider: "finnhub") { [finnhub] in
                 try await finnhub.fetchCandles(symbol: resolved, timeframe: timeframe, limit: limit)
             })

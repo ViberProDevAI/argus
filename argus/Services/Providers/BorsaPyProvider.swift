@@ -249,21 +249,24 @@ actor BorsaPyProvider {
     private var preferredBackendBaseURL: String?
     private var blockedBackendsUntil: [String: Date] = [:]
     private let backendCooldownSeconds: TimeInterval = 30
-    // 2026-04-22: Timeout 20s → 8s. Render.com free tier cold start
-    // 40-60s yanıt verebiliyordu; scan'i tıkıyordu. 8s'de dönmeyen
-    // isteği bırak, circuit breaker 5dk boyunca backend'i pas geçer.
-    private let requestTimeoutSeconds: TimeInterval = 8
-    private let slowRequestThresholdSeconds: TimeInterval = 4
-    private let maxAttemptsPerBackend = 2  // 3 → 2 (hızlı fail)
+    // Render free tier cold-starts in 30-60s. We refuse to block the
+    // BIST chain for that long; warmUp() runs in parallel at app launch
+    // so the first user-facing request finds the backend warm. If it
+    // still misses, fail fast at 5s and let the chain hand off to the
+    // Yahoo fallback while the circuit cools.
+    private let requestTimeoutSeconds: TimeInterval = 5
+    private let slowRequestThresholdSeconds: TimeInterval = 3
+    private let maxAttemptsPerBackend = 2
     private let initialRetryDelaySeconds: TimeInterval = 0.35
     private let requestGate = BorsaPyRequestGate.shared
 
-    // Global circuit breaker — 3 art arda timeout olduğunda 5dk boyunca
-    // BorsaPy'ye hiç istek gitmez. BIST sembolleri Yahoo fallback'e düşer.
+    // Global circuit breaker. Two consecutive timeouts trip the breaker
+    // for 5 minutes; BIST traffic falls through to the Yahoo fallback
+    // until BorsaPy recovers.
     private var consecutiveTimeouts: Int = 0
     private var circuitOpenUntil: Date?
-    private let circuitFailThreshold = 3
-    private let circuitOpenDuration: TimeInterval = 300 // 5 dakika
+    private let circuitFailThreshold = 2
+    private let circuitOpenDuration: TimeInterval = 300
     private let circuitQueue = DispatchQueue(label: "argus.borsapy.circuit")
 
     func isCircuitOpen() -> Bool {
@@ -302,13 +305,36 @@ actor BorsaPyProvider {
 
     /// Render.com free tier uyku moduna giriyor. Uygulama açılışında bu methodu çağırarak
     /// backend'i önceden ısıtırız. Health endpoint hızlı yanıtlar, asıl veri isteklerini hızlandırır.
+    /// Pings the configured backend so Render's free tier wakes up
+    /// before the first user-facing BIST request. Uses its own long
+    /// timeout (Render cold start can run 30-60s) and bypasses the
+    /// circuit breaker so the wake-up itself does not trip it.
     func warmUp() async {
-        do {
-            let _ = try await fetchJSON(path: "/health")
-            print("✅ BorsaPyProvider: Backend ısındı (Render.com uyanık)")
-        } catch {
-            print("⚠️ BorsaPyProvider: Warm-up başarısız (backend uyuyor olabilir) - \(error.localizedDescription)")
+        guard let baseURL = preferredBackendBaseURL ?? Self.candidateBaseURLs().first else {
+            return
         }
+        guard let url = URL(string: "\(baseURL)/health") else { return }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 90
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        do {
+            _ = try await URLSession.shared.data(for: request)
+            print("BorsaPyProvider: backend warm")
+        } catch {
+            print("BorsaPyProvider: warm-up failed (\(error.localizedDescription))")
+        }
+    }
+
+    private static func candidateBaseURLs() -> [String] {
+        var urls: [String] = []
+        if let configured = Bundle.main.object(forInfoDictionaryKey: infoPlistBackendURLKey) as? String,
+           !configured.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            urls.append(configured)
+        }
+        if canUseLocalNetworkFallbacks {
+            urls.append(contentsOf: simulatorLocalFallbacks)
+        }
+        return urls
     }
 
     // MARK: - Public API: Quote
