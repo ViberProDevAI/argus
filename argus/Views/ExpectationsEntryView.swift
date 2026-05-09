@@ -12,6 +12,14 @@ import SwiftUI
 struct ExpectationsEntryView: View {
     @ObservedObject private var store = ExpectationsStore.shared
     @Environment(\.dismiss) private var dismiss
+    // 2026-05-09: Drawer'dan açılan view nested NavigationLink chain'inde
+    // pop'lanırken `\.dismiss` zaman zaman ölü kalıyor; eski API fallback.
+    @Environment(\.presentationMode) private var presentationMode
+
+    private func popBack() {
+        dismiss()
+        presentationMode.wrappedValue.dismiss()
+    }
 
     var body: some View {
         ZStack {
@@ -39,7 +47,7 @@ struct ExpectationsEntryView: View {
 
     private var topNav: some View {
         HStack(spacing: 8) {
-            Button(action: { dismiss() }) {
+            Button(action: popBack) {
                 Image(systemName: "chevron.left")
                     .font(DesignTokens.Fonts.custom(size: 18, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
@@ -157,9 +165,15 @@ struct IndicatorExpectationFormView: View {
     let indicator: ExpectationsStore.EconomicIndicator
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.presentationMode) private var presentationMode
     @ObservedObject private var store = ExpectationsStore.shared
     @State private var inputText: String = ""
     @FocusState private var inputFocused: Bool
+
+    private func popBack() {
+        dismiss()
+        presentationMode.wrappedValue.dismiss()
+    }
 
     var body: some View {
         ZStack {
@@ -203,7 +217,7 @@ struct IndicatorExpectationFormView: View {
 
     private var topNav: some View {
         HStack(spacing: 8) {
-            Button(action: { dismiss() }) {
+            Button(action: popBack) {
                 Image(systemName: "chevron.left")
                     .font(DesignTokens.Fonts.custom(size: 18, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)

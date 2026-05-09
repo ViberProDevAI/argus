@@ -13,6 +13,12 @@ struct ChironPerformanceView: View {
     @State private var isLoading = true
 
     @Environment(\.dismiss) private var dismiss
+    // 2026-05-09: Settings → Motor kalibrasyonu → Performans gibi nested
+    // NavigationLink push'larında `\.dismiss` her zaman güvenilir pop
+    // tetiklemiyordu (kullanıcı raporu: geri dönüş yaptırmıyor). Eski
+    // `\.presentationMode` API'si UIKit pop'a daha doğrudan bağlandığı
+    // için fallback olarak tutuyoruz.
+    @Environment(\.presentationMode) private var presentationMode
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +35,7 @@ struct ChironPerformanceView: View {
             }
         }
         .background(InstitutionalTheme.Colors.background.ignoresSafeArea())
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .task {
             await loadData()
         }
@@ -39,7 +45,7 @@ struct ChironPerformanceView: View {
 
     private var inlineTopNav: some View {
         HStack(spacing: 8) {
-            Button(action: { dismiss() }) {
+            Button(action: popBack) {
                 Image(systemName: "chevron.left")
                     .font(DesignTokens.Fonts.custom(size: 18, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)
@@ -64,6 +70,16 @@ struct ChironPerformanceView: View {
                 .fill(InstitutionalTheme.Colors.borderSubtle)
                 .frame(height: 0.5)
         }
+    }
+
+    // MARK: - Pop helper
+    //
+    // Önce yeni `\.dismiss` action'ını dener, etkisiz kaldıysa eski
+    // `presentationMode.wrappedValue.dismiss()` ile fallback yapar.
+    // Nested NavigationLink push'larında ikisinden biri mutlaka tetikler.
+    private func popBack() {
+        dismiss()
+        presentationMode.wrappedValue.dismiss()
     }
 
     // MARK: - Öğrenme kartı

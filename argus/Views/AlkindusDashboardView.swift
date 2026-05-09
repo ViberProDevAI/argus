@@ -48,13 +48,16 @@ struct AlkindusDashboardView: View {
     // Eski: sadece `!router.navigationStack.isEmpty` — Settings →
     // NavigationLink ile push'ta router yolunu değiştirmediği için
     // false dönüyor, geri butonu gözükmüyordu.
-    // Yeni: `\.isPresented` push/sheet/cover'da true; router'a paralel
-    // olarak NavigationLink push'unu da yakalıyor.
-    @Environment(\.isPresented) private var isPresented
-
-    private var isPushed: Bool {
-        !router.navigationStack.isEmpty || isPresented
-    }
+    // Ara çözüm: `\.isPresented` ekledik ama nested NavigationLink
+    // (Settings → Motor kalibrasyonu → Gözlem Paneli) zincirinde
+    // güvenilir dönmüyordu — kullanıcı yine geri dönemiyordu.
+    //
+    // 2026-05-09: View tab root değil, her erişim push üzerinden geçiyor
+    // (NavigationRouter case .alkindusDashboard veya Settings'ten
+    // NavigationLink). `isPushed` artık daima true — geri butonu her
+    // zaman görünür. Drawer menüsü de gerekmiyor; navigation hiyerarşisi
+    // pop ile çözülür.
+    private var isPushed: Bool { true }
 
     // MARK: - Body
 

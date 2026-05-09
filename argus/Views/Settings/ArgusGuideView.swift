@@ -1,15 +1,24 @@
 import SwiftUI
 
 struct ArgusGuideView: View {
-    @Environment(\.presentationMode) var presentationMode
-    
+    // 2026-05-09: Settings → Argus rehberi NavigationLink ile push'lanıyor;
+    // ek olarak NavigationRouter case .guide route'u da push üzerinden
+    // çalışıyor. Eski `.bars3` + xmark kombosu push stack'inde geri
+    // dönüş bırakmıyordu — kullanıcı uygulamayı kapatmak zorunda kalıyordu.
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.presentationMode) private var presentationMode
+
+    private func popBack() {
+        dismiss()
+        presentationMode.wrappedValue.dismiss()
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             ArgusNavHeader(
                 title: "ARGUS REHBERİ",
                 subtitle: "KONSEY · MOTOR · GÖREV",
-                leadingDeco: .bars3([.holo, .text, .text]),
-                actions: [.custom(sfSymbol: "xmark", action: { presentationMode.wrappedValue.dismiss() })]
+                leadingDeco: .back(onTap: popBack)
             )
 
             TabView {

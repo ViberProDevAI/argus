@@ -31,6 +31,9 @@ struct ChironInsightsView: View {
     // ile pop et. router.navigationStack boş olsa bile (NavigationLink
     // path'i değiştirmiyor) `\.dismiss` push'u doğru pop'lar.
     @Environment(\.dismiss) private var dismiss
+    // 2026-05-09: ChironPerformanceView'daki gibi nested NavigationLink
+    // push'larında `\.dismiss` bazen ölü kalıyor; eski API fallback.
+    @Environment(\.presentationMode) private var presentationMode
 
     init(symbol: String? = nil) {
         self.symbol = symbol
@@ -65,8 +68,14 @@ struct ChironInsightsView: View {
             }
         }
         .background(InstitutionalTheme.Colors.background.ignoresSafeArea())
-        .navigationBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
         .onAppear { loadData() }
+    }
+
+    // MARK: - Pop helper
+    private func popBack() {
+        dismiss()
+        presentationMode.wrappedValue.dismiss()
     }
 
     // MARK: - Inline top nav (2026-05-04 H-61)
@@ -76,7 +85,7 @@ struct ChironInsightsView: View {
     // bar'ına güvenemiyoruz; her durumda kendi geri butonumuzu çiziyoruz.
     private var inlineTopNav: some View {
         HStack(spacing: 8) {
-            Button(action: { dismiss() }) {
+            Button(action: popBack) {
                 Image(systemName: "chevron.left")
                     .font(DesignTokens.Fonts.custom(size: 18, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textPrimary)

@@ -494,13 +494,24 @@ struct SettingsSubPage<Content: View>: View {
     let title: String
     @ViewBuilder let content: () -> Content
     @Environment(\.dismiss) private var dismiss
+    // 2026-05-09: Settings alt sayfaları kendileri NavigationLink ile
+    // push'lanıyor; ek olarak nested push (ör. Motor kalibrasyonu →
+    // Performans) içeriyorlar. Yeni `\.dismiss` action bazen ölü kaldığı
+    // için eski `presentationMode.wrappedValue.dismiss()` fallback olarak
+    // tutuluyor. İki çağrıdan biri pop'u garanti tetikler.
+    @Environment(\.presentationMode) private var presentationMode
+
+    private func popBack() {
+        dismiss()
+        presentationMode.wrappedValue.dismiss()
+    }
 
     var body: some View {
         ZStack {
             InstitutionalTheme.Colors.background.ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack(spacing: 8) {
-                    Button(action: { dismiss() }) {
+                    Button(action: popBack) {
                         Image(systemName: "chevron.left")
                             .font(DesignTokens.Fonts.custom(size: 18, weight: .medium))
                             .foregroundColor(InstitutionalTheme.Colors.textPrimary)

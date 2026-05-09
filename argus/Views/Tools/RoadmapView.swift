@@ -1,8 +1,11 @@
 import SwiftUI
 
 struct RoadmapView: View {
-    @Environment(\.presentationMode) var presentationMode
-    
+    // 2026-05-09: View NavigationRouter case .roadmap üzerinden push'lanıyor.
+    // Eski xmark + presentationMode kombosu push stack'ini pop'lamıyor;
+    // back chevron + `\.dismiss` ile geri dönüş güvence altına alındı.
+    @Environment(\.dismiss) private var dismiss
+
     // Static Roadmap Data (mirroring task.md future section)
     let milestones: [RoadmapItem] = [
         RoadmapItem(
@@ -36,8 +39,7 @@ struct RoadmapView: View {
             ArgusNavHeader(
                 title: "GELECEK VİZYONU",
                 subtitle: "YOL HARİTASI · KİLOMETRE TAŞLARI",
-                leadingDeco: .bars3([.holo, .text, .text]),
-                actions: [.custom(sfSymbol: "xmark", action: { presentationMode.wrappedValue.dismiss() })]
+                leadingDeco: .back(onTap: { dismiss() })
             )
             ZStack {
                 InstitutionalTheme.Colors.background.ignoresSafeArea()

@@ -72,12 +72,18 @@ struct PriceAlertSettingsView: View {
     @StateObject private var scanner = PriceAlertScanService()
     @State private var infoMessage: String?
 
+    // 2026-05-09: Settings → Fiyat alarmları NavigationLink ile push'lanıyor
+    // ama leadingDeco `.bars3` olduğundan geri butonu yoktu. Kullanıcı geri
+    // dönemiyordu. `\.dismiss` ile push'u doğru pop'layan back chevron'a
+    // geçildi.
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         VStack(spacing: 0) {
             ArgusNavHeader(
                 title: "FİYAT ALARMLARI",
                 subtitle: "WATCHLIST · TARAYICI · SİNYAL",
-                leadingDeco: .bars3([.holo, .text, .text]),
+                leadingDeco: .back(onTap: { dismiss() }),
                 actions: [
                     .custom(sfSymbol: scanner.isScanning ? "stop.circle" : "arrow.clockwise",
                             action: {

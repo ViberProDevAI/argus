@@ -11,6 +11,11 @@ struct SignalsView: View {
     @State private var isScanning = false
     @State private var showJournal = false
 
+    // 2026-05-09: View NavigationRouter case .signals üzerinden push'lanıyor.
+    // Eski leadingDeco `.bars3` geri butonu bırakmıyordu; push'tan kullanıcı
+    // çıkış yapamıyordu.
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         // 2026-05-03 H-59: nested NavigationStack kaldırıldı — ContentView
         // root NavigationStack ile çakışıyordu.
@@ -21,7 +26,7 @@ struct SignalsView: View {
                     ArgusNavHeader(
                         title: "Sinyaller",
                         subtitle: "Al, sat, izle",
-                        leadingDeco: .bars3([.holo, .text, .text]),
+                        leadingDeco: .back(onTap: { dismiss() }),
                         actions: [
                             .custom(sfSymbol: "list.bullet.clipboard",
                                     action: { showJournal = true }),

@@ -6,8 +6,13 @@ import SwiftUI
 /// Main container view for Observatory with tab-based navigation
 struct ObservatoryContainerView: View {
     @State private var selectedTab: ObservatoryTab = .timeline
-    @Environment(\.presentationMode) var presentationMode
-    
+
+    // 2026-05-09: Eski sürümde leadingDeco `.bars3` + sağda xmark vardı.
+    // Bu view NavigationRouter ile push'lanıyor — push'ta xmark dismiss
+    // navigation stack'i pop'lamaz, kullanıcı geri dönemiyordu. Tutarlı
+    // back chevron'a alındı.
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         ZStack {
             // V5: Tek katman surface0 background; NeuralNetworkBackground
@@ -18,8 +23,7 @@ struct ObservatoryContainerView: View {
                 ArgusNavHeader(
                     title: "GÖZLEMEVİ",
                     subtitle: "ZAMAN · ÖĞRENME · TRADE · SAĞLIK",
-                    leadingDeco: .bars3([.holo, .text, .text]),
-                    actions: [.custom(sfSymbol: "xmark", action: { presentationMode.wrappedValue.dismiss() })]
+                    leadingDeco: .back(onTap: { dismiss() })
                 )
 
                 // 3. Custom Tab Bar

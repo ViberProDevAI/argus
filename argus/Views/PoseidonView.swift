@@ -3,12 +3,17 @@ import SwiftUI
 struct PoseidonView: View {
     let score: WhaleScore
 
+    // 2026-05-09: NavigationRouter case .poseidon → PoseidonRouterView →
+    // PoseidonView push'lanıyor. Önceki `.bars3` decoration geri butonu
+    // bırakmıyor, kullanıcı push'tan dönemiyordu.
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         VStack(spacing: 0) {
             ArgusNavHeader(
                 title: "POSEIDON · BALİNA AVI",
                 subtitle: "INSIDER · DARK POOL · KURUMSAL",
-                leadingDeco: .bars3([.holo, .text, .text])
+                leadingDeco: .back(onTap: { dismiss() })
             )
 
             ScrollView {

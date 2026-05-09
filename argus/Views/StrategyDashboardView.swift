@@ -2,17 +2,23 @@ import SwiftUI
 
 struct StrategyDashboardView: View {
     @ObservedObject private var marketVM = MarketViewModel.shared
-    
+
     @State private var selectedBucket: OrionMultiFrameEngine.StrategyBucket = .swing
     @State private var multiFrameReports: [String: OrionMultiFrameEngine.MultiFrameReport] = [:]
     @State private var isLoading = true
-    
+
+    // 2026-05-09: View Sanctum'dan sheet olarak ya da push üzerinden
+    // açılabiliyor; her iki senaryoda da `\.dismiss` doğru kapanış sağlar.
+    // Eski `.bars3` decoration ve `navigationBarItems(trailing: ...)` kombosu
+    // `navigationBarHidden(true)` yüzünden geri butonu bırakmıyordu.
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         VStack(spacing: 0) {
             ArgusNavHeader(
                 title: "STRATEJİ MERKEZİ",
                 subtitle: "TRADE BRAIN · MULTI-TIMEFRAME",
-                leadingDeco: .bars3([.holo, .text, .text]),
+                leadingDeco: .back(onTap: { dismiss() }),
                 actions: [.custom(sfSymbol: "arrow.clockwise", action: { Task { await loadData() } })]
             )
             ZStack {
