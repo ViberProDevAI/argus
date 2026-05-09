@@ -27,12 +27,16 @@ struct AlkindusDashboardView: View {
 
     @State private var stats: AlkindusStats?
     @State private var verdicts: [AlkindusVerdict] = []
+    @State private var pending: [PendingObservation] = []
     @State private var pendingCount: Int = 0
     @State private var symbolInsight: SymbolInsight?
     @State private var isLoading = true
     @State private var isMaturing = false
     @State private var isAnalyzing = false
     @State private var isCleaningUp = false
+    @State private var isResetting = false
+    @State private var showResetConfirmation = false
+    @State private var showAdvanced = false
     @State private var analysisProgress: (done: Int, total: Int)? = nil
     @State private var lastMatureRun: Date?
     @State private var lastProcessingResult: ProcessingResult?
@@ -87,15 +91,24 @@ struct AlkindusDashboardView: View {
                                 symbolInsightCard
                             }
 
-                            summaryCard(stats: stats)
+                            // 2026-05-09 yeniden tasarım:
+                            // 4 KPI grid + sayısal karmaşa kaldırıldı. Yerine
+                            // 3 sade bölüm: 1) "şu an test edilen", 2) "son
+                            // sonuçlar", 3) "öğrenilen örüntüler". En üstte
+                            // tek cümlelik durum banner'ı, en altta katlanır
+                            // "gelişmiş" bölümü. Kullanıcı her açışta net
+                            // görür: ne dönüyor, ne öğrenildi, ne zaman gelecek.
+                            heroStatusCard(stats: stats)
 
-                            modulePerformanceCard(stats: stats)
+                            activeTestsCard
 
                             verdictsCard
 
-                            actionsCard
+                            learnedPatternsCard(stats: stats)
 
-                            howItWorksCard
+                            modulePerformanceCard(stats: stats)
+
+                            advancedCard
 
                             Color.clear.frame(height: 40)
                         }
@@ -187,42 +200,41 @@ struct AlkindusDashboardView: View {
         }
     }
 
-    // MARK: - 1. Özet KPI
+    // MARK: - 1. Hero Status (durum banner'ı)
+    //
+    // 2026-05-09: 4 KPI grid yerine tek cümlelik anlamlı durum.
+    // Eski grid (Olgunlaşan / Doğruluk / Bekleyen / Son güncelleme)
+    // tek başına anlam taşımayan rakamlar gösteriyordu — kullanıcı
+    // "1024 bekleyen" görse bile öğrenme olduğunu sanıyordu.
+    // Yeni banner: aktif test sayısı + en yakın sonuç ETA + öğrenilmiş
+    // doğruluk yüzdesi (varsa).
 
-    private func summaryCard(stats: AlkindusStats) -> some View {
+    private func heroStatusCard(stats: AlkindusStats) -> some View {
+        let activeCount = pending.filter { !$0.isFullyEvaluated }.count
         let totalEvaluated = verdicts.count
         let correctCount = verdicts.filter { $0.wasCorrect }.count
         let accuracy = totalEvaluated > 0 ? Double(correctCount) / Double(totalEvaluated) : 0
+        let etaDays = daysUntilNextVerdict()
 
-        return VStack(alignment: .leading, spacing: 12) {
-            Text("Özet")
-                .font(DesignTokens.Fonts.custom(size: 12, weight: .medium))
-                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 8) {
-                kpiTile(label: "Olgunlaşan karar",
-                        value: "\(totalEvaluated)",
-                        sub: totalEvaluated == 0 ? "henüz yok" : nil,
-                        color: InstitutionalTheme.Colors.textPrimary)
-
-                kpiTile(label: "Doğruluk",
-                        value: totalEvaluated > 0 ? "%\(Int(accuracy * 100))" : "—",
-                        sub: totalEvaluated > 0 ? "\(correctCount) / \(totalEvaluated)" : nil,
-                        color: scoreColor(accuracy))
-
-                kpiTile(label: "Bekleyen",
-                        value: "\(pendingCount)",
-                        sub: pendingCount == 0 ? "kuyruk boş" : "olgunlaşma bekliyor",
-                        color: InstitutionalTheme.Colors.textPrimary)
-
-                kpiTile(label: "Son güncelleme",
-                        value: lastMatureLabel(stats: stats),
-                        sub: nil,
-                        color: InstitutionalTheme.Colors.textSecondary)
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(activeCount > 0 ? InstitutionalTheme.Colors.aurora : InstitutionalTheme.Colors.textTertiary)
+                    .frame(width: 6, height: 6)
+                Text(heroHeadline(activeCount: activeCount, totalEvaluated: totalEvaluated))
+                    .font(DesignTokens.Fonts.custom(size: 14, weight: .medium))
+                    .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                Spacer()
             }
+
+            Text(heroDetail(activeCount: activeCount,
+                            etaDays: etaDays,
+                            totalEvaluated: totalEvaluated,
+                            accuracy: accuracy))
+                .font(DesignTokens.Fonts.custom(size: 12))
+                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .lineSpacing(2)
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -234,36 +246,49 @@ struct AlkindusDashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
-    private func kpiTile(label: String, value: String, sub: String?, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label)
-                .font(DesignTokens.Fonts.custom(size: 11))
-                .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-            Text(value)
-                .font(DesignTokens.Fonts.custom(size: 22, weight: .medium))
-                .foregroundColor(color)
-                .monospacedDigit()
-            if let sub = sub {
-                Text(sub)
-                    .font(DesignTokens.Fonts.custom(size: 11))
-                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-            } else {
-                Color.clear.frame(height: 13)
-            }
+    private func heroHeadline(activeCount: Int, totalEvaluated: Int) -> String {
+        if activeCount == 0 && totalEvaluated == 0 {
+            return "Henüz öğrenme döngüsü başlamadı"
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(InstitutionalTheme.Colors.surface2)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        if activeCount == 0 {
+            return "Aktif test yok — yeni karar bekleniyor"
+        }
+        return "\(activeCount) sembol için 15 günlük test sürüyor"
     }
 
-    private func lastMatureLabel(stats: AlkindusStats) -> String {
-        let date = lastMatureRun ?? stats.lastUpdated
-        let elapsed = Date().timeIntervalSince(date)
-        if elapsed < 60 { return "şimdi" }
-        if elapsed < 3600 { return "\(Int(elapsed / 60)) dk önce" }
-        if elapsed < 86400 { return "\(Int(elapsed / 3600)) sa önce" }
-        return "\(Int(elapsed / 86400)) gün önce"
+    private func heroDetail(activeCount: Int, etaDays: Int?, totalEvaluated: Int, accuracy: Double) -> String {
+        var parts: [String] = []
+        if let days = etaDays, activeCount > 0 {
+            if days == 0 {
+                parts.append("İlk sonuç bugün olgunlaşacak")
+            } else if days == 1 {
+                parts.append("İlk sonuç yarın olgunlaşacak")
+            } else {
+                parts.append("İlk sonuç \(days) gün sonra olgunlaşacak")
+            }
+        } else if activeCount == 0 && totalEvaluated == 0 {
+            parts.append("Otopilot ya da sembol detayı bir karar üretince 7 ve 15 gün sonra otomatik test edilir.")
+        }
+
+        if totalEvaluated > 0 {
+            parts.append("\(totalEvaluated) test tamamlandı, doğruluk %\(Int(accuracy * 100)).")
+        }
+
+        return parts.joined(separator: " · ")
+    }
+
+    private func daysUntilNextVerdict() -> Int? {
+        let now = Date()
+        let upcoming: [Int] = pending.flatMap { obs -> [Int] in
+            obs.horizons
+                .filter { !obs.evaluatedHorizons.contains($0) }
+                .map { horizon in
+                    let target = Calendar.current.date(byAdding: .day, value: horizon, to: obs.decisionDate) ?? obs.decisionDate
+                    let secondsLeft = target.timeIntervalSince(now)
+                    return max(0, Int(ceil(secondsLeft / 86400)))
+                }
+        }
+        return upcoming.min()
     }
 
     // MARK: - 2. Modül Performansı
@@ -428,56 +453,54 @@ struct AlkindusDashboardView: View {
         .padding(.vertical, 8)
     }
 
-    // MARK: - 4. Aksiyonlar
+    // MARK: - 2. Şu an test edilen
     //
-    // 2026-05-04 H-61: 3 aksiyon (önceden sadece "Şimdi olgunlaştır" vardı):
-    //   • Şimdi olgunlaştır — bekleyen gözlemleri 7g/15g pencerelerine göre
-    //     fiyat değişimiyle karşılaştır, modül skor tablolarına yaz.
-    //   • Verileri analiz et — Component performance + symbol learner taze
-    //     hesaplama tetikler. Sonuç KPI'lara yansır.
-    //   • Eski kayıtları temizle — 7+ gün önce senkronlanmış data lake
-    //     kayıtlarını ve işlenmiş ledger eventlerini siler. Disk geri kazanır.
-    private var actionsCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    // 2026-05-09: Pending observations'ı geri sayımla göster. Kullanıcı
+    // hangi semboller için aktif öğrenme döngüsü çalıştığını ve ne zaman
+    // sonuç geleceğini somut görür.
+
+    private var activeTestsCard: some View {
+        let active = pending
+            .filter { !$0.isFullyEvaluated }
+            .sorted { lhs, rhs in nextHorizonDate(for: lhs) < nextHorizonDate(for: rhs) }
+
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Aksiyon")
+                Text("Şu an test edilen")
                     .font(DesignTokens.Fonts.custom(size: 12, weight: .medium))
                     .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 Spacer()
-                if let flash = actionFlash {
-                    Text(flash)
+                if !active.isEmpty {
+                    Text("\(active.count) sembol")
                         .font(DesignTokens.Fonts.custom(size: 11))
-                        .foregroundColor(InstitutionalTheme.Colors.aurora)
-                        .transition(.opacity)
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
                 }
             }
 
-            actionRow(
-                icon: "arrow.triangle.2.circlepath",
-                title: isMaturing ? "Olgunlaştırma çalışıyor" : "Şimdi olgunlaştır",
-                trailing: "\(pendingCount) bekliyor",
-                isRunning: isMaturing,
-                disabled: isMaturing || isAnalyzing || isCleaningUp,
-                action: runMaturation
-            )
-
-            actionRow(
-                icon: "chart.bar.doc.horizontal",
-                title: analysisTitle,
-                trailing: analysisTrailing,
-                isRunning: isAnalyzing,
-                disabled: isMaturing || isAnalyzing || isCleaningUp,
-                action: runAnalysis
-            )
-
-            actionRow(
-                icon: "trash",
-                title: isCleaningUp ? "Veritabanı temizleniyor" : "Eski kayıtları temizle",
-                trailing: dbSizeMB > 0 ? String(format: "%.1f MB", dbSizeMB) : nil,
-                isRunning: isCleaningUp,
-                disabled: isMaturing || isAnalyzing || isCleaningUp,
-                action: runCleanup
-            )
+            if active.isEmpty {
+                Text("Aktif test yok. Otopilot taraması ya da sembol detay açılması yeni test başlatır.")
+                    .font(DesignTokens.Fonts.custom(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .padding(.vertical, 6)
+            } else {
+                VStack(spacing: 0) {
+                    let display = Array(active.prefix(8))
+                    ForEach(Array(display.enumerated()), id: \.element.id) { idx, obs in
+                        activeTestRow(obs)
+                        if idx < display.count - 1 {
+                            Rectangle()
+                                .fill(InstitutionalTheme.Colors.borderSubtle)
+                                .frame(height: 0.5)
+                        }
+                    }
+                    if active.count > 8 {
+                        Text("…ve \(active.count - 8) tane daha")
+                            .font(DesignTokens.Fonts.custom(size: 11))
+                            .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                            .padding(.top, 8)
+                    }
+                }
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -487,6 +510,259 @@ struct AlkindusDashboardView: View {
                 .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
         )
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func activeTestRow(_ obs: PendingObservation) -> some View {
+        let nextHorizon = obs.horizons.first { !obs.evaluatedHorizons.contains($0) } ?? obs.horizons.last ?? 15
+        let target = Calendar.current.date(byAdding: .day, value: nextHorizon, to: obs.decisionDate) ?? obs.decisionDate
+        let now = Date()
+        let daysLeft = max(0, Int(ceil(target.timeIntervalSince(now) / 86400)))
+        let actionLabel: String = {
+            switch obs.action {
+            case "BUY":    return "al"
+            case "SELL":   return "sat"
+            case "HOLD":   return "bekle"
+            case "VETOED": return "veto"
+            default:       return obs.action.lowercased()
+            }
+        }()
+
+        return HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(obs.symbol)
+                        .font(DesignTokens.Fonts.custom(size: 13, weight: .medium))
+                        .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                    Text(actionLabel)
+                        .font(DesignTokens.Fonts.custom(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    Text("· T+\(nextHorizon)g")
+                        .font(DesignTokens.Fonts.custom(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                }
+                Text("Başlangıç \(timeAgo(obs.decisionDate))")
+                    .font(DesignTokens.Fonts.custom(size: 11))
+                    .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+            }
+            Spacer()
+            Text(daysLeft == 0 ? "bugün olgunlaşacak"
+                 : daysLeft == 1 ? "1 gün kaldı"
+                 : "\(daysLeft) gün kaldı")
+                .font(DesignTokens.Fonts.custom(size: 12, weight: .medium))
+                .foregroundColor(daysLeft <= 1 ? InstitutionalTheme.Colors.aurora : InstitutionalTheme.Colors.textPrimary)
+                .monospacedDigit()
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func nextHorizonDate(for obs: PendingObservation) -> Date {
+        let nextHorizon = obs.horizons.first { !obs.evaluatedHorizons.contains($0) } ?? obs.horizons.last ?? 15
+        return Calendar.current.date(byAdding: .day, value: nextHorizon, to: obs.decisionDate) ?? obs.decisionDate
+    }
+
+    // MARK: - 4. Öğrenilen örüntüler
+    //
+    // 2026-05-09: Calibration data'dan düz Türkçe cümleler türet.
+    // Ham bracket istatistiği değil, kullanıcının okuyabileceği tespit:
+    // "Risk-On rejiminde Teknik (%72)" gibi.
+
+    private func learnedPatternsCard(stats: AlkindusStats) -> some View {
+        let patterns = derivedPatterns(stats: stats)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Öğrenilen örüntüler")
+                    .font(DesignTokens.Fonts.custom(size: 12, weight: .medium))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                Spacer()
+                if !patterns.isEmpty {
+                    Text("\(patterns.count) tespit")
+                        .font(DesignTokens.Fonts.custom(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                }
+            }
+
+            if patterns.isEmpty {
+                Text("Henüz örüntü yok. Tamamlanmış testler arttıkça modül × rejim performans tespiti burada cümleyle çıkar.")
+                    .font(DesignTokens.Fonts.custom(size: 13))
+                    .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    .padding(.vertical, 6)
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(patterns.enumerated()), id: \.offset) { _, line in
+                        HStack(alignment: .top, spacing: 8) {
+                            Circle()
+                                .fill(InstitutionalTheme.Colors.aurora)
+                                .frame(width: 4, height: 4)
+                                .padding(.top, 7)
+                            Text(line)
+                                .font(DesignTokens.Fonts.custom(size: 13))
+                                .foregroundColor(InstitutionalTheme.Colors.textPrimary)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .lineSpacing(2)
+                        }
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(InstitutionalTheme.Colors.surface1)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(InstitutionalTheme.Colors.borderSubtle, lineWidth: 0.5)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func derivedPatterns(stats: AlkindusStats) -> [String] {
+        var lines: [String] = []
+
+        // 1. En güçlü modül-rejim eşleşmeleri (en az 5 attempt)
+        var regimeBest: [(regime: String, module: String, rate: Double, attempts: Int)] = []
+        for (regime, insight) in stats.calibration.regimes {
+            for (module, attempts) in insight.moduleAttempts where attempts >= 5 {
+                let correct = insight.moduleCorrect[module] ?? 0
+                let rate = Double(correct) / Double(attempts)
+                regimeBest.append((regime, module, rate, attempts))
+            }
+        }
+        regimeBest.sort { $0.rate > $1.rate }
+
+        for entry in regimeBest.prefix(2) where entry.rate >= 0.6 {
+            let strength = entry.rate >= 0.7 ? "güçlü" : "iyi"
+            lines.append("\(displayRegime(entry.regime)) rejiminde \(displayName(for: entry.module)) \(strength) çalışıyor (%\(Int(entry.rate * 100)) · \(entry.attempts) test).")
+        }
+
+        // 2. En zayıf modül-rejim (alarm değeri)
+        if let worst = regimeBest.last, worst.rate < 0.4, worst.attempts >= 5 {
+            lines.append("\(displayRegime(worst.regime)) rejiminde \(displayName(for: worst.module)) zayıf (%\(Int(worst.rate * 100)) · \(worst.attempts) test).")
+        }
+
+        // 3. Yüksek skor bracket'inde modül performansı
+        for (module, cal) in stats.calibration.modules {
+            if let high = cal.brackets["80-100"], high.attempts >= 5 {
+                let rate = high.hitRate
+                if rate >= 0.7 {
+                    lines.append("\(displayName(for: module)) %80+ skor verdiğinde %\(Int(rate * 100)) doğru — yüksek güven sinyali.")
+                } else if rate < 0.45 {
+                    lines.append("\(displayName(for: module)) %80+ skor verdiğinde sadece %\(Int(rate * 100)) doğru — yüksek güven sinyali güvenilmez.")
+                }
+            }
+        }
+
+        return Array(lines.prefix(5))
+    }
+
+    private func displayRegime(_ regime: String) -> String {
+        switch regime.lowercased() {
+        case "riskon", "risk_on", "risk-on": return "Risk-On"
+        case "riskoff", "risk_off", "risk-off": return "Risk-Off"
+        case "neutral", "nötr": return "Nötr"
+        case "transition", "geçiş": return "Geçiş"
+        default: return regime.capitalized
+        }
+    }
+
+    // MARK: - 5. Gelişmiş (katlanır)
+    //
+    // Eski actionsCard + howItWorksCard tek bir "gelişmiş" başlığı altında
+    // toplandı. Varsayılan kapalı; kullanıcı manuel olgunlaştırma, analiz,
+    // temizlik, sıfırlama isterse açar. Her gün dashboard'u açan kullanıcının
+    // bu butonlara her seferinde maruz kalmaması için.
+
+    private var advancedCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showAdvanced.toggle() }
+            } label: {
+                HStack {
+                    Text("Gelişmiş")
+                        .font(DesignTokens.Fonts.custom(size: 12, weight: .medium))
+                        .foregroundColor(InstitutionalTheme.Colors.textSecondary)
+                    Spacer()
+                    Image(systemName: showAdvanced ? "chevron.up" : "chevron.down")
+                        .font(DesignTokens.Fonts.custom(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if showAdvanced {
+                VStack(spacing: 10) {
+                    Color.clear.frame(height: 4)
+
+                    if let flash = actionFlash {
+                        Text(flash)
+                            .font(DesignTokens.Fonts.custom(size: 11))
+                            .foregroundColor(InstitutionalTheme.Colors.aurora)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .transition(.opacity)
+                    }
+
+                    actionRow(
+                        icon: "arrow.triangle.2.circlepath",
+                        title: isMaturing ? "Olgunlaştırma çalışıyor" : "Şimdi olgunlaştır",
+                        trailing: "\(pendingCount) bekliyor",
+                        isRunning: isMaturing,
+                        disabled: isMaturing || isAnalyzing || isCleaningUp || isResetting,
+                        action: runMaturation
+                    )
+
+                    actionRow(
+                        icon: "chart.bar.doc.horizontal",
+                        title: analysisTitle,
+                        trailing: analysisTrailing,
+                        isRunning: isAnalyzing,
+                        disabled: isMaturing || isAnalyzing || isCleaningUp || isResetting,
+                        action: runAnalysis
+                    )
+
+                    actionRow(
+                        icon: "trash",
+                        title: isCleaningUp ? "Veritabanı temizleniyor" : "Eski kayıtları temizle",
+                        trailing: dbSizeMB > 0 ? String(format: "%.1f MB", dbSizeMB) : nil,
+                        isRunning: isCleaningUp,
+                        disabled: isMaturing || isAnalyzing || isCleaningUp || isResetting,
+                        action: runCleanup
+                    )
+
+                    actionRow(
+                        icon: "exclamationmark.arrow.circlepath",
+                        title: isResetting ? "Sıfırlanıyor" : "Öğrenmeyi sıfırla",
+                        trailing: nil,
+                        isRunning: isResetting,
+                        disabled: isMaturing || isAnalyzing || isCleaningUp || isResetting,
+                        action: { showResetConfirmation = true }
+                    )
+
+                    Text("Şimdi olgunlaştır: bekleyen testleri zamanı gelmişse hemen değerlendirir. Sıfırla: tüm öğrenmeyi siler — bozuk eski veriyi temizlemek için. Sıfırlamadan sonra ilk gerçek sonuç ~7 gün sonra gelir.")
+                        .font(DesignTokens.Fonts.custom(size: 11))
+                        .foregroundColor(InstitutionalTheme.Colors.textTertiary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .lineSpacing(2)
+                        .padding(.top, 4)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(InstitutionalTheme.Colors.surface1.opacity(0.6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(
+                    InstitutionalTheme.Colors.borderSubtle,
+                    style: StrokeStyle(lineWidth: 0.5, dash: [4, 3])
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .alert("Öğrenmeyi sıfırla?", isPresented: $showResetConfirmation) {
+            Button("Vazgeç", role: .cancel) {}
+            Button("Sıfırla", role: .destructive) { runReset() }
+        } message: {
+            Text("Tüm bekleyen testler, sonuçlar ve öğrenilmiş kalibrasyon silinir. İlk gerçek sonuç yeniden ~7 gün sonra olgunlaşır. Geri alınamaz.")
+        }
     }
 
     /// Analiz butonunun başlık metni — çalışırken ilerleme göstergesi.
@@ -548,47 +824,33 @@ struct AlkindusDashboardView: View {
         .disabled(disabled)
     }
 
-    // MARK: - Nasıl çalışıyor (kısa açıklama)
-
-    private var howItWorksCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Nasıl çalışıyor")
-                .font(DesignTokens.Fonts.custom(size: 12, weight: .medium))
-                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-            Text("Her al/sat kararı kuyruğa girer. 7 ve 15 gün sonra fiyat değişimi gerçekle karşılaştırılır. Doğruysa modül +1, yanlışsa -1. Zamanla modüllerin gerçek doğruluk oranı çıkar.")
-                .font(DesignTokens.Fonts.custom(size: 12))
-                .foregroundColor(InstitutionalTheme.Colors.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .lineSpacing(2)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(InstitutionalTheme.Colors.surface1.opacity(0.6))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(
-                    InstitutionalTheme.Colors.borderSubtle,
-                    style: StrokeStyle(lineWidth: 0.5, dash: [4, 3])
-                )
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
+    // 2026-05-09: howItWorksCard kaldırıldı.
+    // Nasıl çalıştığı bilgisi artık heroStatusCard ve advancedCard içindeki
+    // dipnotlardan akıyor; ayrı kart kullanıcıya tekrar dilden gelen bir
+    // ekran daha ekliyordu.
 
     // MARK: - Empty state
 
+    // 2026-05-09: Boş hâl artık dürüst.
+    // Eski metin "istatistikler burada görünecek" diyordu ama uygulama
+    // 6 ay boyunca veri toplamış görünüp hiç olgunlaşmadığında bu mesaj
+    // anlamsızlaşıyordu. Yeni metin somut: ilk sonuç tarihi tahmini +
+    // ne yapılması gerektiği. Otopilot tarama yoksa kullanıcıya neden
+    // veri gelmediğini söylüyor.
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "brain.head.profile")
                 .font(DesignTokens.Fonts.custom(size: 28))
                 .foregroundColor(InstitutionalTheme.Colors.textTertiary)
-            Text("Henüz veri yok")
+            Text("Henüz öğrenme döngüsü başlamadı")
                 .font(DesignTokens.Fonts.custom(size: 14, weight: .medium))
                 .foregroundColor(InstitutionalTheme.Colors.textPrimary)
-            Text("Kararlar verildikçe ve olgunlaştıkça istatistikler burada görünecek.")
+            Text("Otopilot tarama yapınca ya da bir sembol detayı açınca Argus karar üretir; o karar 7 ve 15 gün sonra otomatik test edilir. İlk sonuç en erken bir hafta sonra olgunlaşır.")
                 .font(DesignTokens.Fonts.custom(size: 12))
                 .foregroundColor(InstitutionalTheme.Colors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
+                .lineSpacing(2)
         }
     }
 
@@ -658,6 +920,7 @@ struct AlkindusDashboardView: View {
         await MainActor.run {
             self.stats = stats
             self.verdicts = verdicts
+            self.pending = pending
             self.pendingCount = pending.count
             self.symbolInsight = freshInsight
             self.dbSizeMB = size
@@ -774,6 +1037,27 @@ struct AlkindusDashboardView: View {
                 }
                 withAnimation { self.actionFlash = msg }
             }
+            await clearFlashAfterDelay()
+        }
+    }
+
+    /// 2026-05-09: Tüm öğrenme verisini sıfırla.
+    /// pending_observations.json + alkindus_verdicts.json + calibration.json
+    /// silinir. Eski FIFO cap'i tarafından buduulmuş bozuk veri için temiz
+    /// başlangıç sağlar. Ardından KPI'lar boşalır, ilk gerçek verdict ~7 gün
+    /// sonra olgunlaşır.
+    private func runReset() {
+        isResetting = true
+        actionFlash = nil
+        Task {
+            await AlkindusMemoryStore.shared.resetLearning()
+            ComponentPerformanceService.shared.clearCache()
+
+            await MainActor.run {
+                self.isResetting = false
+                withAnimation { self.actionFlash = "Öğrenme sıfırlandı" }
+            }
+            await loadAll()
             await clearFlashAfterDelay()
         }
     }

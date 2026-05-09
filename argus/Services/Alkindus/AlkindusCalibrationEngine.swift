@@ -41,10 +41,20 @@ actor AlkindusCalibrationEngine {
             reasoning: reasoning
         )
 
-        // Use atomic append to prevent race conditions between observe() calls
-        await memoryStore.appendPendingObservation(observation)
-
-        print("Alkindus: Yeni gozlem kaydedildi - \(symbol) \(action)")
+        // 2026-05-09: Sembol-başı-tek-slot.
+        // Aynı sembol için zaten aktif test (henüz T+15'i tamamlamamış
+        // pending observation) varsa yenisini açmıyoruz. Bu kuralla:
+        //   - Pending kuyruğu watchlist boyutuyla doğal sınırlanır
+        //     (eski 500 hard cap pratikte gereksizleşir)
+        //   - Her sembolün 15 günlük öğrenme döngüsü kesintisiz tamamlanır
+        //   - Verdict üretildiği an pending'den temizlenir → bir sonraki
+        //     `observe()` çağrısı otomatik olarak yeni testi başlatır
+        let added = await memoryStore.appendPendingObservationIfAbsent(observation)
+        if added {
+            print("Alkindus: Yeni test başlatıldı — \(symbol) \(action)")
+        } else {
+            print("Alkindus: \(symbol) zaten test ediliyor, atlandı")
+        }
     }
 
     // MARK: - Periodic Maturation Check
@@ -279,13 +289,11 @@ actor AlkindusCalibrationEngine {
             print("🧹 Alkindus: \(cleaned) eski (30+ gün) gözlem temizlendi, kalan \(pending.count)")
         }
 
-        // HARD CAP: 500'den fazla pending olmasın. Eskilerden başlayarak budar.
-        if pending.count > 500 {
-            pending.sort { $0.decisionDate > $1.decisionDate } // en yeni önde
-            let trimmed = pending.count - 500
-            pending = Array(pending.prefix(500))
-            print("✂️ Alkindus: hard cap (500) aşıldı, \(trimmed) eski gözlem budandı")
-        }
+        // 2026-05-09: 500 hard cap kaldırıldı.
+        // Sembol-başı-tek-slot kuralı (`appendPendingObservationIfAbsent`)
+        // pending kuyruğunu watchlist boyutuyla doğal sınırlıyor. 30 günlük
+        // yaş filtresi güvenlik ağı olarak yeterli. Eski cap T+15 dolmadan
+        // gözlemleri buduyordu — öğrenme döngüsü hiç kapanmıyordu.
 
         await memoryStore.savePendingObservations(pending)
 

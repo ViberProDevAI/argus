@@ -100,9 +100,12 @@ actor AlkindusMemoryStore {
     func saveVerdict(_ verdict: AlkindusVerdict) async {
         var verdicts = await loadVerdicts()
         verdicts.append(verdict)
-        // Keep latest 200 verdicts
-        if verdicts.count > 200 {
-            verdicts = Array(verdicts.suffix(200))
+        // 2026-05-09: 200 → 2000.
+        // 200 cap ~8 günlük history idi (ortalama 25 sembol × 2 horizon).
+        // UI'da "neden öğrenmiyor?" izlenimini güçlendiriyordu.
+        // 2000 verdict ≈ birkaç MB JSON, 80+ gün history.
+        if verdicts.count > 2000 {
+            verdicts = Array(verdicts.suffix(2000))
         }
         do {
             let encoded = try JSONEncoder().encode(verdicts)
@@ -124,6 +127,42 @@ actor AlkindusMemoryStore {
         var pending = await loadPendingObservations()
         pending.append(observation)
         await savePendingObservations(pending)
+    }
+
+    /// 2026-05-09: Sembol-başı-tek-slot modeli.
+    /// Aynı sembol için zaten olgunlaşmamış (henüz T+15'i tamamlamamış)
+    /// pending observation varsa yeni kayıt eklemez.
+    /// Eski sürümde her `observe()` çağrısı yeni kayıt açıyordu; otopilot
+    /// saatlik tarama ile aynı sembol için günde 24 paralel observation
+    /// üretip 500'lük FIFO cap'i tetikliyor, T+15 dolmadan eskiler atılıyordu.
+    /// Yeni davranış: aktif test bitene kadar (verdict üretip silinene kadar)
+    /// aynı sembol için yeni test açılmaz. Test bitince bir sonraki observe()
+    /// otomatik olarak yeni testi başlatır → kesintisiz öğrenme döngüsü.
+    /// Returns true if observation was added, false if symbol already tracked.
+    @discardableResult
+    func appendPendingObservationIfAbsent(_ observation: PendingObservation) async -> Bool {
+        var pending = await loadPendingObservations()
+        let alreadyTracked = pending.contains { $0.symbol == observation.symbol && !$0.isFullyEvaluated }
+        if alreadyTracked {
+            return false
+        }
+        pending.append(observation)
+        await savePendingObservations(pending)
+        return true
+    }
+
+    // MARK: - Reset Learning
+    //
+    // 2026-05-09: Eski FIFO cap'i pending observation'ları olgunlaşmadan
+    // budadığı için aylardır bozuk veri birikmişti. "Öğrenmeyi sıfırla"
+    // butonu bu bozuk veriyi temizleyip Alkindus'a temiz başlangıç verir.
+    // Calibration brackets ve regime insights da silinir — yeni 15-günlük
+    // döngüden öğrenmeye baştan başlar.
+    func resetLearning() async {
+        try? FileManager.default.removeItem(at: pendingPath)
+        try? FileManager.default.removeItem(at: verdictsPath)
+        try? FileManager.default.removeItem(at: calibrationPath)
+        // Klasör hâlâ var; bir sonraki save'de dosyalar yeniden oluşur.
     }
     
     // MARK: - Update Module Calibration
