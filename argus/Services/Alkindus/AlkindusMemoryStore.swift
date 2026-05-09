@@ -363,10 +363,48 @@ struct BracketStats: Codable {
         self.correct = correct
     }
 
+    /// Ham (smoothed olmayan) hit rate — UI'da gerçek sayıyı göstermek için.
+    /// Örnek boyutu küçükse uçuk yüzdeler verebilir (3/3 = %100).
     var hitRate: Double {
         guard attempts > 0 else { return 0 }
         return correct / attempts
     }
+
+    /// 2026-05-09 Faz D — Laplace smoothing.
+    /// Bayesian prior: her bracket başlangıçta 5 deneme/2.5 doğru varsayılır
+    /// (yani %50, n=5 prior). Bu, az örnekli durumlarda uçuk yüzdeleri önler:
+    ///   • 3/3 = %100 yerine (3+2.5)/(3+5) = %68.75
+    ///   • 0/3 = %0 yerine (0+2.5)/(3+5) = %31.25
+    /// Çok örnekle (n>>5) gerçek hit rate'e yaklaşır. Karar mekanizması bu
+    /// "smooth" değeri kullanarak istatistiksel olarak savunulabilir kararlar
+    /// verir; UI ham `hitRate` ve `attempts` ile şeffaflığı korur.
+    var smoothedHitRate: Double {
+        let priorAttempts: Double = 5
+        let priorCorrect: Double = 2.5
+        return (correct + priorCorrect) / (attempts + priorAttempts)
+    }
+
+    /// 2026-05-09 Faz D — Wilson skor güven aralığı (%95).
+    /// Düşük örnek boyutunda ham orana göre çok daha sağlam alt/üst sınır.
+    /// Returns (lower, upper). Karar verirken alt sınırı kullanmak (kötümser
+    /// tahmin) güvenli — "en kötü ihtimalle %X doğru" garantisi.
+    var wilsonInterval95: (lower: Double, upper: Double) {
+        guard attempts > 0 else { return (0, 1) }
+        let z: Double = 1.96  // %95 güven
+        let n = attempts
+        let p = correct / attempts
+        let denominator = 1 + (z * z) / n
+        let center = p + (z * z) / (2 * n)
+        let spread = z * sqrt((p * (1 - p) / n) + (z * z) / (4 * n * n))
+        let lower = max(0, (center - spread) / denominator)
+        let upper = min(1, (center + spread) / denominator)
+        return (lower, upper)
+    }
+
+    /// Örnek boyutu yeterli mi? Karar mekanizması az örnekte nötr (0.5)
+    /// ağırlık katsayısı kullanmalı, çok örnekte gerçek smoothedHitRate'e
+    /// güvenmeli.
+    var sampleSizeReliable: Bool { attempts >= 10 }
 
     mutating func updateWeighted(correct isCorrect: Bool, weight: Double) {
         attempts += weight

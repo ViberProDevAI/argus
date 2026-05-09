@@ -145,16 +145,34 @@ actor AlkindusCalibrationEngine {
                 if outcome.grade == .excellent || outcome.grade == .stopped {
                     print("📊 Alkindus: \(observation.symbol) \(observation.action) horizon=\(horizon)d → \(outcome.grade.rawValue.uppercased()) (entry=\(String(format: "%.2f", observation.priceAtDecision)), now=\(String(format: "%.2f", currentPrice)))")
                 }
-                
+
+                // 2026-05-09 Faz A — Modül-spesifik atıf.
+                // Eski sürüm her modüle konseyin TOPLAM doğruluğunu (`wasCorrect`)
+                // yazıyordu. Aether=45 (AL'ye karşı oy verdi) konsey AL kararı
+                // doğru çıkınca yine "doğru" sayılıyordu — Aether'in kendi tezi
+                // yanlıştı ama brackets'a +1 correct işleniyordu. Sonuç: kalibrasyon
+                // verisi yanıltıcı, "Aether yüksek skor verdi mi düşük mü" ayrımı
+                // anlamsızlaştı.
+                //
+                // Yeni sürüm: her modül kendi tezi (skor ≥ 50 ise bullish, < 50
+                // bearish) ile fiyat hareketinin yönünü karşılaştırır. Bu zaten
+                // moduleVerdicts üretmek için altta yapılıyordu (UI verdict
+                // listesi); artık recordOutcomeWeighted çağrısında da kullanılıyor.
+                let priceChangeForAttribution = ((currentPrice - observation.priceAtDecision) / max(observation.priceAtDecision, 0.0001))
+
                 // Update calibration for each module that voted (with weighted brackets)
                 for (module, score) in observation.moduleScores {
+                    let moduleBullish = score >= 50
+                    let moduleCorrect = (moduleBullish && priceChangeForAttribution > 0)
+                                     || (!moduleBullish && priceChangeForAttribution < 0)
+
                     // Use weighted brackets to reduce edge effects at boundaries
                     let weightedBrackets = scoreToBracketsWeighted(score)
                     for (bracket, weight) in weightedBrackets {
                         await memoryStore.recordOutcomeWeighted(
                             module: module,
                             scoreBracket: bracket,
-                            wasCorrect: wasCorrect,
+                            wasCorrect: moduleCorrect,
                             weight: weight,
                             regime: observation.regime
                         )
@@ -164,30 +182,34 @@ actor AlkindusCalibrationEngine {
                     await AlkindusAnomalyDetector.shared.recordModulePerformance(
                         module: module,
                         score: score,
-                        wasCorrect: wasCorrect
+                        wasCorrect: moduleCorrect
                     )
                 }
-                
-                // Phase 2: Track correlation data
+
+                // Phase 2: Track correlation data — konseyin toplam doğruluğu
+                // (modül korelasyonu zaten konsey kararı ekseninde mantıklı)
                 await AlkindusCorrelationTracker.shared.recordCorrelation(
                     modules: observation.moduleScores,
                     wasCorrect: wasCorrect
                 )
-                
-                // Phase 3: Track symbol-specific performance
+
+                // Phase 3: Track symbol-specific performance — modül-spesifik atıf
                 let isBist = observation.symbol.uppercased().hasSuffix(".IS")
-                for (module, _) in observation.moduleScores {
+                for (module, score) in observation.moduleScores {
+                    let moduleBullish = score >= 50
+                    let moduleCorrect = (moduleBullish && priceChangeForAttribution > 0)
+                                     || (!moduleBullish && priceChangeForAttribution < 0)
                     await AlkindusSymbolLearner.shared.recordOutcome(
                         symbol: observation.symbol,
                         module: module,
-                        wasCorrect: wasCorrect,
+                        wasCorrect: moduleCorrect,
                         isBist: isBist
                     )
                     
-                    // Phase 3: Track temporal patterns
+                    // Phase 3: Track temporal patterns — modül-spesifik atıf
                     await AlkindusTemporalAnalyzer.shared.recordOutcome(
                         module: module,
-                        wasCorrect: wasCorrect,
+                        wasCorrect: moduleCorrect,
                         timestamp: observation.decisionDate,
                         symbol: observation.symbol
                     )

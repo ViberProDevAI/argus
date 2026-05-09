@@ -31,12 +31,20 @@ struct AgoraDebateSheet: View {
                         
                         // 4. CLAIM vs OBJECTION SUMMARY
                         claimObjectionSection
-                        
+
+                        // 4.5. ALKINDUS WEIGHT ADJUSTMENTS
+                        // 2026-05-09 Faz C — Konsey kararı verirken Alkindus
+                        // geçmiş güveniyle hangi modülün ağırlığını nasıl
+                        // ayarladı? Şeffaflık için ham gerekçe satırları.
+                        if !decision.alkindusWeightAdvice.isEmpty {
+                            alkindusInsightSection
+                        }
+
                         // 5. VETOES (if any)
                         if !decision.vetoes.isEmpty {
                             vetoesSection
                         }
-                        
+
                         // 6. TERMINOLOGY GLOSSARY
                         terminologySection
                         
@@ -605,6 +613,81 @@ struct AgoraDebateSheet: View {
         .cornerRadius(12)
     }
     
+    // MARK: - Alkindus Insight Section
+    //
+    // 2026-05-09 Faz C — "Öğrendiğini kullandı mı?" şeffaflığı.
+    // Eski sürümde Alkindus aylardır kalibrasyon verisi biriktiriyordu ama
+    // konsey hiç okumuyordu, kullanıcı da göremiyordu. Şimdi her kararın
+    // arkasında: hangi modülün geçmiş güveni nasıldı, ağırlığı bu yüzden
+    // nasıl ayarlandı, açıkça gösteriliyor.
+    private var alkindusInsightSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "brain.head.profile")
+                    .foregroundColor(.purple)
+                Text("Alkindus Geçmiş Güveni")
+                    .font(.headline)
+                    .foregroundColor(DesignTokens.Colors.textPrimary)
+            }
+
+            Text("Bu karar verilirken her modülün geçmiş başarısı sorgulandı. Çarpan ×1.0 = nötr (yeterli veri yok), >1.0 = ağırlık güçlendirildi, <1.0 = ağırlık zayıflatıldı.")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.7))
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.bottom, 4)
+
+            VStack(alignment: .leading, spacing: 6) {
+                let sortedKeys = decision.alkindusWeightAdvice.keys.sorted()
+                ForEach(sortedKeys, id: \.self) { key in
+                    if let advice = decision.alkindusWeightAdvice[key] {
+                        alkindusAdviceRow(advice: advice)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color.purple.opacity(0.05))
+        .cornerRadius(12)
+    }
+
+    private func alkindusAdviceRow(advice: WeightAdvice) -> some View {
+        let multColor: Color = {
+            if advice.multiplier > 1.05 { return .green }
+            if advice.multiplier < 0.95 { return .red }
+            return .gray
+        }()
+        let multIcon: String = {
+            if advice.multiplier > 1.05 { return "arrow.up.right" }
+            if advice.multiplier < 0.95 { return "arrow.down.right" }
+            return "equal"
+        }()
+
+        return HStack(alignment: .top, spacing: 8) {
+            Image(systemName: multIcon)
+                .font(.caption)
+                .foregroundColor(multColor)
+                .frame(width: 16, alignment: .center)
+                .padding(.top, 2)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(advice.evidence)
+                    .font(.caption)
+                    .foregroundColor(DesignTokens.Colors.textPrimary.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if advice.isReliable {
+                    Text("güven aralığı: %\(Int(advice.confidenceLower * 100))–%\(Int(advice.confidenceUpper * 100))")
+                        .font(.caption2)
+                        .foregroundColor(DesignTokens.Colors.textSecondary)
+                        .monospacedDigit()
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 2)
+    }
+
     // MARK: - Learning Section
     private var learningSection: some View {
         VStack(alignment: .leading, spacing: 8) {

@@ -75,6 +75,14 @@ struct ArgusGrandDecision: Sendable, Equatable, Codable {
     // Kelly Criterion pozisyon çarpanı (0.3x – 2.0x)
     let kellyMultiplier: Double
 
+    // 2026-05-09 Faz C — Alkindus geçmiş güveni şeffaflığı.
+    // Bu kararda her modülün geçmiş güveninin ağırlığı nasıl etkilediği.
+    // AgoraDebateSheet ve diğer şeffaflık ekranları kullanıcıya
+    // "neden bu modülün oyu güçlendirildi/zayıflatıldı" gerekçesini
+    // gösterebilir. Boş gelirse (yeterli veri yok) sadece skor bracket
+    // ve örnek boyutu hakkında nötr bilgi var.
+    var alkindusWeightAdvice: [String: WeightAdvice] = [:]
+
     let timestamp: Date
     
     var shouldTrade: Bool {
@@ -434,6 +442,31 @@ actor ArgusGrandCouncil {
             historicalPrices: candles.map { $0.close }
         )
 
+        // 2026-05-09 Faz B — Alkindus geri bildirim hattı.
+        // Karar oluşturulmadan önce Alkindus'un her modül için "geçmişte bu
+        // skor bracket'inde bu rejimde nasıldı?" sorusu sorulur. Dönen
+        // çarpanlar `calculateGrandDecision` içinde modül ağırlıklarına
+        // uygulanır. Eski sürümde Alkindus aylardır veri biriktiriyordu ama
+        // hiçbir karar bu veriyi okumuyordu — tam bir black-box. Şimdi:
+        //   • Orion=75 + Risk-On rejimi → "geçmişte %72 doğru" → ×1.22
+        //   • Aether=45 + Risk-On → "geçmişte %38 doğru" → ×0.88
+        // Bu çarpanlar GrandDecision'a `weightAdvice` olarak da yazılır,
+        // AgoraDebateSheet kullanıcıya "neden bu modülün oyu zayıflatıldı"
+        // gerekçesini gösterebilir.
+        let alkindusModuleScores: [String: Double] = [
+            "orion":   orionDecision.netSupport * 100.0,
+            "atlas":   (atlasDecision?.netSupport ?? 0.0) * 100.0,
+            "aether":  aetherDecision.netSupport * 100.0,
+            "hermes":  (hermesDecision?.netSupport ?? 0.0) * 100.0,
+            "phoenix": phoenixResult?.confidence ?? 0.0,
+            "athena":  athena?.factorScore ?? 0.0,
+            "demeter": demeter?.totalScore ?? 0.0
+        ]
+        let alkindusAdvice = await AlkindusWeightAdvisor.shared.getAdvice(
+            moduleScores: alkindusModuleScores,
+            regime: aetherDecision.stance.rawValue
+        )
+
         // 3. Calculate grand decision (GLOBAL LEGACY)
         let grandDecision = calculateGrandDecision(
             symbol: symbol,
@@ -457,7 +490,8 @@ actor ArgusGrandCouncil {
             poseidon: whaleScore,
             dailyMF: dailyMF,
             weeklyMF: weeklyMF,
-            kellyMultiplier: kellyMult
+            kellyMultiplier: kellyMult,
+            alkindusAdvice: alkindusAdvice
         )
 
         // ARGUS 3.0: THE HOOK (GLOBAL)
@@ -572,7 +606,11 @@ actor ArgusGrandCouncil {
         poseidon: WhaleScore? = nil,
         dailyMF: OrionMultiFrameEngine.TimeframeAnalysis? = nil,
         weeklyMF: OrionMultiFrameEngine.TimeframeAnalysis? = nil,
-        kellyMultiplier: Double = 1.0
+        kellyMultiplier: Double = 1.0,
+        // 2026-05-09 Faz B — Alkindus geçmiş güvenine göre ağırlık çarpanları.
+        // Modül adı (lowercased: "orion", "atlas", ...) → WeightAdvice.
+        // Boş gelirse (henüz veri yok) modül ağırlıkları aynen kullanılır.
+        alkindusAdvice: [String: WeightAdvice] = [:]
     ) -> ArgusGrandDecision {
         
         var contributors: [ModuleContribution] = []
@@ -937,7 +975,9 @@ actor ArgusGrandCouncil {
 
             // Modül ağırlıkları — Chiron 5-rejim sistemi
             let chironRegime = ChironRegimeEngine.shared.globalResult.regime
-            let moduleWeights: [String: Double]
+            // 2026-05-09 Faz B: `let` → `var`. Alkindus çarpanları aşağıda
+            // moduleWeights'i yeniden ayarlıyor (re-normalize sonrası).
+            var moduleWeights: [String: Double]
             switch chironRegime {
             case .trend:
                 // Trend: teknik dominant, mean-reversion ve tahmin güçlü
@@ -980,6 +1020,23 @@ actor ArgusGrandCouncil {
                     "Prometheus": 0.05
                 ]
             }
+
+            // 2026-05-09 Faz B — Alkindus geçmiş güveni uygulanır.
+            // Yukarıdaki sabit ağırlıklar "rejim için ideal" varsayılan dağılım.
+            // Alkindus aylardır gerçek sonuçları izledi: hangi modül hangi
+            // skor bracket'inde gerçekten doğru çıktı? Bu bilgi şimdi her
+            // modülün ağırlığını (1.0 = nötr) çarpanla ayarlar.
+            //
+            // Yaklaşım:
+            //   1) Her modülün base weight'i × Alkindus çarpanı (0.5..1.5) hesaplanır
+            //   2) "Orion Patterns" gibi advice'ı olmayan modüllere 1.0 (nötr) uygulanır
+            //   3) Tüm ağırlıklar yeniden normalize edilir (toplam = 1.0)
+            //   4) Az veriyle karar mekanizması rahatsız edilmez: çarpan 1.0 dönerse
+            //      eski davranış aynen korunur
+            moduleWeights = applyAlkindusMultipliers(
+                baseWeights: moduleWeights,
+                advice: alkindusAdvice
+            )
 
             // 2026-05-05 (Round 6 A.1) Zayıf sinyal penalty: Eski sürüm her council'ın
             // confidence'ını olduğu gibi alıp ağırlıkla çarpıyordu. Sonuç: Aether %38
@@ -1248,8 +1305,8 @@ actor ArgusGrandCouncil {
         }
         // Floor: sıfır göstermesin (paper trading UX, gerçek paraya geçilirse 0.0'a çek)
         let finalConfidence = max(min(avgConfidence * hermesMultiplier, 1.0), 0.20)
-        
-        return ArgusGrandDecision(
+
+        var decision = ArgusGrandDecision(
             id: UUID(),
             symbol: symbol,
             action: finalAction,
@@ -1271,6 +1328,8 @@ actor ArgusGrandCouncil {
             kellyMultiplier: kellyMultiplier,
             timestamp: Date()
         )
+        decision.alkindusWeightAdvice = alkindusAdvice
+        return decision
     }
 
     // MARK: - Weekly Candle Aggregation
@@ -1296,6 +1355,46 @@ actor ArgusGrandCouncil {
                 volume: sorted.map(\.volume).reduce(0, +)
             )
         }
+    }
+
+    // MARK: - Alkindus Multiplier Application
+    //
+    // 2026-05-09 Faz B — Modül ağırlıklarını Alkindus geçmiş güveni ile
+    // ölçekler, sonra toplam = 1.0 olacak şekilde yeniden normalize eder.
+    //
+    // Önemli detaylar:
+    //   • Modül adı eşleştirme: moduleWeights "Orion", "Atlas" gibi (TitleCase)
+    //     anahtarlar kullanır; advice "orion", "atlas" lowercase. Aşağıda
+    //     lowercased() ile eşleşme yapılır.
+    //   • "Orion Patterns" gibi advice'ı olmayan modüller için 1.0x (nötr).
+    //   • Re-normalization: çarpanlar uygulandıktan sonra toplam ağırlık
+    //     1.0 olmazsa eşit oran çarpılır. Bu, konseyin toplam güven seviyesini
+    //     korur — sadece modüller arasındaki "kim ne kadar söz sahibi" oranı
+    //     değişir.
+    private func applyAlkindusMultipliers(
+        baseWeights: [String: Double],
+        advice: [String: WeightAdvice]
+    ) -> [String: Double] {
+        guard !advice.isEmpty else { return baseWeights }
+
+        var adjusted: [String: Double] = [:]
+        for (module, baseWeight) in baseWeights {
+            let key = module.lowercased()
+            // Orion Patterns için Orion'un advice'ını kullan (alt motor)
+            let lookupKey = key == "orion patterns" ? "orion" : key
+            let multiplier = advice[lookupKey]?.multiplier ?? 1.0
+            adjusted[module] = baseWeight * multiplier
+        }
+
+        // Re-normalize: toplam = 1.0 (orijinal toplam ile aynı)
+        let originalSum = baseWeights.values.reduce(0, +)
+        let adjustedSum = adjusted.values.reduce(0, +)
+        guard adjustedSum > 0 else { return baseWeights }
+        let scale = originalSum / adjustedSum
+        for key in adjusted.keys {
+            adjusted[key] = (adjusted[key] ?? 0) * scale
+        }
+        return adjusted
     }
 
     // MARK: - Sector-Based News Multiplier
